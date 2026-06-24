@@ -27,6 +27,7 @@ PAPER_TRADES_FILE = Path(
 DASHBOARD_FILE = Path(
     os.getenv("STOCK_DASHBOARD_FILE", WATCHLIST_EXPORT_DIR / "dashboard.html")
 ).expanduser().resolve()
+PIPELINE_STATE_FILE = WATCHLIST_EXPORT_DIR / "pipeline_state.json"
 
 MIN_SCORE_FOR_MONITOR = 26
 MIN_SCORE_FOR_CANDIDATE = 35
@@ -53,6 +54,9 @@ STOP_LOSS_PCT = float(STRATEGY["risk"]["stop_loss_pct"])
 MAX_HOLDING_DAYS = int(STRATEGY["risk"]["max_holding_days"])
 SLIPPAGE_BPS = float(STRATEGY["execution"]["slippage_bps"])
 MAX_SECTOR_EXPOSURE_PCT = float(STRATEGY["risk"]["max_sector_exposure_pct"])
+MAX_PORTFOLIO_HEAT_PCT = float(STRATEGY["risk"]["max_portfolio_heat_pct"])
+EARNINGS_BLACKOUT_SESSIONS = int(STRATEGY["risk"]["earnings_blackout_sessions"])
+MAX_BID_ASK_SPREAD_PCT = float(STRATEGY["risk"]["max_bid_ask_spread_pct"])
 SCALE_OUT_10_PCT = float(STRATEGY["risk"]["scale_out"]["target_10_initial_shares_pct"])
 SCALE_OUT_20_PCT = float(STRATEGY["risk"]["scale_out"]["target_20_initial_shares_pct"])
 FINAL_LOT_FALLBACK_PCT = float(STRATEGY["risk"]["scale_out"]["final_lot_fallback_pct"])

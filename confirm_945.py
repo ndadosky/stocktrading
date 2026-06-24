@@ -12,6 +12,7 @@ import yfinance as yf
 from scanner_config import (
     CANDIDATES_FILE, CONFIRMATION_WEIGHTS, WATCHLIST_EXPORT_DIR, ensure_directories,
 )
+from pipeline_health import market_gate, record_stage, require_today_csv
 
 
 def flatten_columns(frame: pd.DataFrame) -> pd.DataFrame:
@@ -103,6 +104,19 @@ def market_regime() -> dict:
         return {"market_regime": "UNKNOWN", "spy_5d_%": pd.NA}
 
 
+def live_quote(ticker: str) -> dict:
+    """Best-effort actual quote; keep the bar-range proxy when unavailable."""
+    try:
+        info = yf.Ticker(ticker).get_info()
+        bid, ask = float(info.get("bid") or 0), float(info.get("ask") or 0)
+        if bid > 0 and ask >= bid:
+            midpoint = (bid + ask) / 2
+            return {"bid": bid, "ask": ask, "bid_ask_spread_pct": round((ask - bid) / midpoint * 100, 3), "quote_source": "LIVE BID/ASK"}
+    except Exception as exc:
+        print(f"Quote unavailable for {ticker}: {exc}")
+    return {"bid": pd.NA, "ask": pd.NA, "bid_ask_spread_pct": pd.NA, "quote_source": "5M RANGE PROXY"}
+
+
 def write_html(frame: pd.DataFrame, path, title: str) -> None:
     table = frame.to_html(index=False, escape=True, border=0)
     path.write_text(f"""<!doctype html><html><head><meta charset=\"utf-8\"><title>{escape(title)}</title>
@@ -113,10 +127,14 @@ th,td{{padding:8px;border-bottom:1px solid #ddd;text-align:left}}tr:hover{{backg
 
 def main() -> int:
     ensure_directories()
-    if not CANDIDATES_FILE.exists():
-        print(f"Missing candidates file: {CANDIDATES_FILE}. Run morning_candidates.py first.")
+    if not market_gate("confirmation"):
+        return 0
+    today = datetime.now().astimezone().strftime("%Y-%m-%d")
+    today_candidates = WATCHLIST_EXPORT_DIR / f"morning_candidates_{today}.csv"
+    candidates = require_today_csv(today_candidates, "confirmation")
+    if candidates is None:
+        print(f"Missing or stale candidates: {today_candidates}. Run morning_candidates.py first.")
         return 1
-    candidates = pd.read_csv(CANDIDATES_FILE)
     ticker_col = "Ticker" if "Ticker" in candidates.columns else "ticker"
     if ticker_col not in candidates.columns:
         print("Candidates file has no Ticker column."); return 1
@@ -129,6 +147,9 @@ def main() -> int:
         try:
             result = confirm_ticker(ticker)
             if result:
+                if result["session_date"] != today:
+                    print(f"Skipped {ticker}: latest intraday session is {result['session_date']}, expected {today}")
+                    continue
                 source = metadata.loc[ticker] if ticker in metadata.index else pd.Series(dtype=object)
                 result.update({
                     "sector": source.get("Sector", "Unknown"),
@@ -136,8 +157,15 @@ def main() -> int:
                     "morning_score": source.get("strategy_score", pd.NA),
                     "morning_signal": source.get("strategy_signal", ""),
                     "morning_components": source.get("strategy_notes", ""),
+                    "earnings_date": source.get("earnings_date", pd.NA),
+                    "sessions_to_earnings": source.get("sessions_to_earnings", pd.NA),
+                    "earnings_blocked": source.get("earnings_blocked", False),
+                    "earnings_status": source.get("earnings_status", "UNKNOWN"),
                     "confirmation_band": "A" if result["score"] >= 50 else "B" if result["score"] >= 40 else "C" if result["score"] >= 25 else "D",
                     **regime,
+                })
+                result.update(live_quote(ticker) if result["score"] >= 40 else {
+                    "bid": pd.NA, "ask": pd.NA, "bid_ask_spread_pct": pd.NA, "quote_source": "NOT REQUESTED"
                 })
                 results.append(result)
             else: print(f"Skipped {ticker}: missing intraday data")
@@ -145,16 +173,19 @@ def main() -> int:
             print(f"Skipped {ticker}: {exc}")
     columns = ["ticker", "session_date", "confirmed_at", "sector", "market_regime", "spy_5d_%",
                "rsi_14", "morning_score", "morning_signal", "morning_components",
+               "earnings_date", "sessions_to_earnings", "earnings_blocked", "earnings_status",
                "open", "current", "prior_close", "vwap", "first_15m_high",
                "current_vs_open_%", "current_vs_prior_%", "score", "signal", "notes",
-               "confirmation_band", "confirmation_volume", "spread_proxy_pct",
+               "confirmation_band", "confirmation_volume", "bid", "ask", "bid_ask_spread_pct", "quote_source", "spread_proxy_pct",
                "target_10", "target_20", "target_30", "stop_8"]
     output = pd.DataFrame(results, columns=columns).sort_values("score", ascending=False)
-    today = datetime.now().astimezone().strftime("%Y-%m-%d")
     csv_path = WATCHLIST_EXPORT_DIR / f"confirm_945_{today}.csv"
     output.to_csv(csv_path, index=False)
     write_html(output, csv_path.with_suffix(".html"), f"9:45 confirmation — {today}")
     print(f"Saved {len(output)} confirmations to {csv_path}")
+    coverage = len(output) / len(candidates) if len(candidates) else 0
+    status = "SUCCESS" if coverage >= 0.70 else "DEGRADED" if results else "FAILED"
+    record_stage("confirmation", status, len(output), f"{coverage:.0%} intraday coverage; live quotes requested for buys")
     return 0 if results else 1
 
 

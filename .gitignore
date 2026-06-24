@@ -7,3 +7,8 @@ venv/
 .env.*
 logs/
 .DS_Store
+exports/*
+!exports/.gitkeep
+paper_trades.csv
+paper_trades.html
+archive/

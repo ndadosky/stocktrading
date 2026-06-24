@@ -16,7 +16,12 @@ from typing import Dict, List, Optional
 import pandas as pd
 import yfinance as yf
 
-from scanner_config import MAX_DAILY_PAPER_TRADES, WATCHLIST_EXPORT_DIR, ensure_directories
+from scanner_config import (
+    CONFIRMATION_WEIGHTS, MAX_DAILY_PAPER_TRADES, MAX_HOLDING_DAYS, MAX_PORTFOLIO_HEAT_PCT,
+    MAX_SECTOR_EXPOSURE_PCT, SCALE_OUT_10_PCT, SCALE_OUT_20_PCT, SHARES_PER_TRADE,
+    SLIPPAGE_BPS, STARTING_CAPITAL, STOP_LOSS_PCT, TAKE_PROFIT_PCT,
+    WATCHLIST_EXPORT_DIR, ensure_directories,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -57,7 +62,7 @@ def fetch_intraday(tickers: List[str], target: date) -> Dict[str, pd.DataFrame]:
     """Download in chunks so one bad symbol does not discard the whole universe."""
     output: Dict[str, pd.DataFrame] = {}
     start = target - timedelta(days=7)
-    end = target + timedelta(days=1)
+    end = min(target + timedelta(days=22), datetime.now().date() + timedelta(days=1))
     for offset in range(0, len(tickers), 40):
         chunk = tickers[offset:offset + 40]
         try:
@@ -83,6 +88,66 @@ def fetch_intraday(tickers: List[str], target: date) -> Dict[str, pd.DataFrame]:
     return output
 
 
+def simulate_scaled_exit(entry_quote: float, bars: pd.DataFrame) -> dict:
+    """Mirror production slippage, 50/25/25 scale-outs, gap stops, and time exit."""
+    entry = entry_quote * (1 + SLIPPAGE_BPS / 10_000)
+    target10, target20, target30 = entry * 1.10, entry * 1.20, entry * 1.30
+    stop = entry * (1 - STOP_LOSS_PCT / 100)
+    remaining = float(SHARES_PER_TRADE)
+    proceeds = 0.0
+    sold10 = sold20 = sold30 = sold_protect = sold_stop = sold_time = 0.0
+    exit_reason = "OPEN"
+    session_dates = []
+    for value in bars.index.date:
+        if value not in session_dates:
+            session_dates.append(value)
+    allowed_dates = set(session_dates[:MAX_HOLDING_DAYS])
+    test_bars = bars[[value in allowed_dates for value in bars.index.date]]
+
+    def sell(quantity: float, reference: float, reason: str) -> float:
+        nonlocal remaining, proceeds, exit_reason
+        quantity = min(remaining, quantity)
+        fill = reference * (1 - SLIPPAGE_BPS / 10_000)
+        proceeds += quantity * fill
+        remaining -= quantity
+        exit_reason = reason
+        return quantity
+
+    for timestamp, bar in test_bars.iterrows():
+        if remaining <= 0:
+            break
+        low, high, opening = float(bar["Low"]), float(bar["High"]), float(bar["Open"])
+        if low <= stop:
+            sold_stop += sell(remaining, min(stop, opening), "STOP -8%")
+            break
+        if sold20 > 0 and low <= target10:
+            sold_protect += sell(remaining, min(target10, opening), "PROTECT +10%")
+            break
+        if sold10 <= 0 and high >= target10:
+            sold10 += sell(round(SHARES_PER_TRADE * SCALE_OUT_10_PCT / 100), target10, "SCALE +10%")
+        if remaining > 0 and sold20 <= 0 and high >= target20:
+            sold20 += sell(round(SHARES_PER_TRADE * SCALE_OUT_20_PCT / 100), target20, "SCALE +20%")
+        if remaining > 0 and sold20 > 0 and high >= target30:
+            sold30 += sell(remaining, target30, "FINAL +30%")
+            break
+    complete_window = len(session_dates) >= MAX_HOLDING_DAYS
+    mark = float(test_bars["Close"].iloc[-1]) if not test_bars.empty else entry
+    if remaining > 0 and complete_window:
+        sold_time += sell(remaining, mark, f"TIME EXIT {MAX_HOLDING_DAYS}D")
+    realized = proceeds - (SHARES_PER_TRADE - remaining) * entry
+    unrealized = remaining * (mark - entry)
+    pnl = realized + unrealized
+    return {
+        "entry_price": round(entry, 4), "mark_price": round(mark, 4),
+        "remaining_shares": remaining, "shares_sold_10": sold10, "shares_sold_20": sold20,
+        "shares_sold_30": sold30, "shares_sold_protect": sold_protect,
+        "shares_sold_stop": sold_stop, "shares_sold_time": sold_time,
+        "exit_reason": exit_reason, "resolved": remaining <= 0,
+        "success": sold10 > 0, "p_l_100_shares": round(pnl, 2),
+        "strategy_return_%": round(pnl / (entry * SHARES_PER_TRADE) * 100, 2),
+    }
+
+
 def replay_confirmation(ticker: str, data: pd.DataFrame, target: date) -> Optional[dict]:
     session = data[data.index.date == target]
     prior = data[data.index.date < target]
@@ -105,37 +170,35 @@ def replay_confirmation(ticker: str, data: pd.DataFrame, target: date) -> Option
     vs_open = (current / open_price - 1) * 100
 
     score, notes = 0, []
-    for condition, note in (
-        (current > open_price, "above open"), (current > prior_close, "above prior close"),
-        (current > vwap, "above VWAP"), (current > first_15m_high, "broke first 15m high"),
-        (vs_open <= 5, "not overextended"),
+    for condition, note, weight in (
+        (current > open_price, "above open", CONFIRMATION_WEIGHTS["above_open"]),
+        (current > prior_close, "above prior close", CONFIRMATION_WEIGHTS["above_prior_close"]),
+        (current > vwap, "above VWAP", CONFIRMATION_WEIGHTS["above_vwap"]),
+        (current > first_15m_high, "broke first 15m high", CONFIRMATION_WEIGHTS["first_15m_breakout"]),
+        (vs_open <= 5, "not overextended", CONFIRMATION_WEIGHTS["not_overextended"]),
     ):
         if condition:
-            score += 10
+            score += weight
             notes.append(note)
     if vs_open > 8:
-        score -= 15
+        score += CONFIRMATION_WEIGHTS["too_extended_penalty"]
         notes.append("too extended")
 
-    entry = float(later["Open"].iloc[0])
-    after_entry = session[session.index >= later.index[0]]
+    entry_quote = float(later["Open"].iloc[0])
+    after_entry = data[data.index >= later.index[0]]
     close_price = float(session["Close"].iloc[-1])
     high_after_entry = float(after_entry["High"].max())
     low_after_entry = float(after_entry["Low"].min())
+    simulated = simulate_scaled_exit(entry_quote, after_entry)
     return {
         "ticker": ticker, "confirmation_score": score,
         "signal": "🔥 BUY TODAY" if score >= 40 else "👀 WAIT" if score >= 25 else "🔴 PASS",
         "confirmation_price": round(current, 4), "entry_time": str(later.index[0].time()),
-        "entry_price": round(entry, 4), "close_price": round(close_price, 4),
-        "close_return_%": round((close_price / entry - 1) * 100, 2),
-        "max_gain_%": round((high_after_entry / entry - 1) * 100, 2),
-        "max_drawdown_%": round((low_after_entry / entry - 1) * 100, 2),
-        "hit_10": high_after_entry >= entry * 1.10,
-        "hit_20": high_after_entry >= entry * 1.20,
-        "hit_30": high_after_entry >= entry * 1.30,
-        "stop_8_hit": low_after_entry <= entry * 0.92,
-        "p_l_100_shares": round((close_price - entry) * 100, 2),
+        "close_price": round(close_price, 4),
+        "max_gain_%": round((high_after_entry / simulated["entry_price"] - 1) * 100, 2),
+        "max_drawdown_%": round((low_after_entry / simulated["entry_price"] - 1) * 100, 2),
         "notes": ", ".join(notes),
+        **simulated,
     }
 
 
@@ -146,20 +209,21 @@ def report_html(results: pd.DataFrame, target: date, source: Path, biased: bool)
     summary = {
         "Trades": len(trades), "Capital deployed": f"${total_cost:,.2f}",
         "Close P/L": f"${total_pnl:,.2f}",
-        "Close return": f"{total_pnl / total_cost * 100:.2f}%" if total_cost else "0.00%",
-        "Winners / losers": f"{(trades['close_return_%'] > 0).sum()} / {(trades['close_return_%'] < 0).sum()}" if not trades.empty else "0 / 0",
-        "Touched 10/20/30%": f"{trades.hit_10.sum()} / {trades.hit_20.sum()} / {trades.hit_30.sum()}" if not trades.empty else "0 / 0 / 0",
-        "Touched -8% stop": int(trades.stop_8_hit.sum()) if not trades.empty else 0,
+        "Strategy return": f"{total_pnl / total_cost * 100:.2f}%" if total_cost else "0.00%",
+        "Winners / losers": f"{(trades['p_l_100_shares'] > 0).sum()} / {(trades['p_l_100_shares'] < 0).sum()}" if not trades.empty else "0 / 0",
+        "Scaled 10/20/30": f"{(trades.shares_sold_10 > 0).sum()} / {(trades.shares_sold_20 > 0).sum()} / {(trades.shares_sold_30 > 0).sum()}" if not trades.empty else "0 / 0 / 0",
+        "Stopped / time exit": f"{(trades.shares_sold_stop > 0).sum()} / {(trades.shares_sold_time > 0).sum()}" if not trades.empty else "0 / 0",
     }
     cards = "".join(f"<div><b>{escape(str(k))}</b><span>{escape(str(v))}</span></div>" for k, v in summary.items())
     shown = results.copy()
     if not shown.empty:
-        shown["close_return_%"] = shown["close_return_%"].map(
+        shown["strategy_return_%"] = shown["strategy_return_%"].map(
             lambda x: f"<span class='{'pos' if x >= 0 else 'neg'}'>{x:.2f}%</span>"
         )
     table = shown.to_html(index=False, escape=False, border=0)
     warning = ("LOOK-AHEAD-BIASED APPROXIMATION: the candidate snapshot is from a later date. "
                "Confirmation and price outcomes use only the requested date, but candidate selection does not.") if biased else "Candidate snapshot matches the backtest date."
+    warning += " Historical bid/ask is unavailable; 10-bps slippage is used. Earnings are enforced only when present in the saved snapshot."
     return f"""<!doctype html><html><head><meta charset=\"utf-8\"><title>Backtest — {target}</title>
 <style>body{{font:14px Arial;margin:24px;background:#f6f8fa;color:#17202a}}.warning{{padding:12px;background:#fff3cd;border-left:5px solid #e0a800}}
 .cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}}.cards div{{background:white;padding:12px}}.cards span{{display:block;font-size:19px;margin-top:5px}}
@@ -193,14 +257,40 @@ def main() -> int:
         return 1
     candidate_rank = {ticker: rank + 1 for rank, ticker in enumerate(tickers)}
     results["candidate_rank"] = results["ticker"].map(candidate_rank)
+    metadata = candidates.copy()
+    metadata["_ticker"] = metadata[ticker_column].astype(str).str.upper()
+    metadata = metadata.drop_duplicates("_ticker").set_index("_ticker")
+    results["sector"] = results["ticker"].map(lambda ticker: metadata.loc[ticker].get("Sector", "Unknown") if ticker in metadata.index else "Unknown")
+    results["earnings_blocked"] = results["ticker"].map(lambda ticker: metadata.loc[ticker].get("earnings_blocked", False) if ticker in metadata.index else False)
     # Stable, pre-entry tie-breaking: never use future return to choose among
     # names with the same confirmation score.
     results = results.sort_values(
         ["confirmation_score", "candidate_rank"], ascending=[False, True], kind="mergesort"
     )
     results["selected"] = False
-    qualifying = results.index[results["confirmation_score"] >= 40][:max(args.limit, 0)]
-    results.loc[qualifying, "selected"] = True
+    results["selection_note"] = "score below 40"
+    cash, heat = STARTING_CAPITAL, 0.0
+    sector_used: Dict[str, float] = {}
+    selected_count = 0
+    for index, row in results[results["confirmation_score"] >= 40].iterrows():
+        if selected_count >= max(args.limit, 0):
+            results.at[index, "selection_note"] = "daily limit"
+            continue
+        cost = float(row["entry_price"]) * SHARES_PER_TRADE
+        risk = float(row["entry_price"]) * STOP_LOSS_PCT / 100 * SHARES_PER_TRADE
+        sector = str(row["sector"])
+        if str(row["earnings_blocked"]).strip().lower() in {"true", "1", "yes"}:
+            results.at[index, "selection_note"] = "earnings blackout"; continue
+        if cost > cash:
+            results.at[index, "selection_note"] = "cash limit"; continue
+        if sector_used.get(sector, 0) + cost > STARTING_CAPITAL * MAX_SECTOR_EXPOSURE_PCT / 100:
+            results.at[index, "selection_note"] = "sector limit"; continue
+        if heat + risk > STARTING_CAPITAL * MAX_PORTFOLIO_HEAT_PCT / 100:
+            results.at[index, "selection_note"] = "portfolio heat"; continue
+        results.at[index, "selected"] = True
+        results.at[index, "selection_note"] = "selected"
+        cash -= cost; heat += risk; sector_used[sector] = sector_used.get(sector, 0) + cost
+        selected_count += 1
     csv_path = WATCHLIST_EXPORT_DIR / f"backtest_{target}.csv"
     html_path = csv_path.with_suffix(".html")
     results.to_csv(csv_path, index=False)
@@ -209,7 +299,7 @@ def main() -> int:
     selected = results[results["selected"]]
     print(f"Saved {len(results)} confirmations and {len(selected)} selected trades to {csv_path}")
     if not selected.empty:
-        print(selected[["ticker", "confirmation_score", "entry_price", "close_price", "close_return_%", "p_l_100_shares"]].to_string(index=False))
+        print(selected[["ticker", "confirmation_score", "entry_price", "exit_reason", "strategy_return_%", "p_l_100_shares"]].to_string(index=False))
         print(f"Total close P/L: ${selected['p_l_100_shares'].sum():,.2f}")
     if biased:
         print("WARNING: candidate universe comes from a different date; results have look-ahead bias.")

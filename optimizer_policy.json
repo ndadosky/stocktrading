@@ -1,0 +1,11 @@
+{
+  "minimum_resolved_trades": 60,
+  "chronological_holdout_pct": 20,
+  "minimum_holdout_trades": 12,
+  "maximum_adopted_changes_per_day": 1,
+  "target_success_rate_pct": 80,
+  "target_window_resolved_trades": 50,
+  "weekly_human_review_required": true,
+  "baseline_file": "strategy_baseline.json",
+  "active_settings_file": "strategy_settings.json"
+}

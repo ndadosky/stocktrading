@@ -10,22 +10,27 @@ import pandas as pd
 import yfinance as yf
 
 from scanner_config import (
-    MAX_DAILY_PAPER_TRADES, MAX_HOLDING_DAYS, MAX_SECTOR_EXPOSURE_PCT,
+    EARNINGS_BLACKOUT_SESSIONS, MAX_BID_ASK_SPREAD_PCT, MAX_DAILY_PAPER_TRADES,
+    MAX_HOLDING_DAYS, MAX_PORTFOLIO_HEAT_PCT, MAX_SECTOR_EXPOSURE_PCT,
     MIN_CONFIRMATION_SCORE_TO_BUY, PAPER_TRADES_FILE, SHARES_PER_TRADE,
     FINAL_LOT_FALLBACK_PCT, SCALE_OUT_10_PCT, SCALE_OUT_20_PCT, SLIPPAGE_BPS,
     STARTING_CAPITAL, STOP_LOSS_PCT, TAKE_PROFIT_PCT,
     WATCHLIST_EXPORT_DIR, ensure_directories,
 )
+from market_calendar import sessions_until
+from pipeline_health import market_gate, record_stage, require_today_csv
 
 TRADE_COLUMNS = [
     "trade_id", "trade_date", "entry_datetime", "ticker", "sector", "market_regime",
-    "rsi_14", "morning_score", "confirmation_score", "confirmation_band",
-    "confirmation_components", "entry_volume", "spread_proxy_pct", "quoted_entry_price",
-    "entry_price", "shares", "remaining_shares", "status", "current_price", "target_10", "target_20",
+    "rsi_14", "morning_score", "confirmation_score", "confirmation_band", "earnings_date",
+    "sessions_to_earnings", "earnings_status", "confirmation_components", "entry_volume", "bid", "ask",
+    "bid_ask_spread_pct", "quote_source", "spread_proxy_pct", "quoted_entry_price",
+    "entry_price", "initial_cost", "initial_risk", "shares", "remaining_shares", "status", "current_price", "target_10", "target_20",
     "target_30", "stop_8", "exit_datetime", "exit_price", "exit_reason",
     "realized_proceeds", "realized_p_l", "shares_sold_10", "shares_sold_20",
     "shares_sold_30", "shares_sold_protect", "shares_sold_stop", "shares_sold_time",
     "target_10_hit_at", "target_20_hit_at", "target_30_hit_at", "last_evaluated_at",
+    "corporate_action_factor", "last_corporate_action_at", "data_failure_count", "review_flag",
     "holding_days", "last_updated",
 ]
 OPEN_STATUS = "OPEN"
@@ -73,6 +78,7 @@ def account_summary(trades: pd.DataFrame) -> dict:
         return {
             "cash": STARTING_CAPITAL, "open_value": 0.0, "equity": STARTING_CAPITAL,
             "realized_p_l": 0.0, "unrealized_p_l": 0.0, "deployed": 0.0,
+            "portfolio_heat": 0.0, "portfolio_heat_pct": 0.0,
             "open_positions": 0, "closed_trades": 0,
         }
     entry = pd.to_numeric(trades["entry_price"], errors="coerce").fillna(0)
@@ -82,15 +88,20 @@ def account_summary(trades: pd.DataFrame) -> dict:
     proceeds = pd.to_numeric(trades["realized_proceeds"], errors="coerce").fillna(0)
     realized_by_row = pd.to_numeric(trades["realized_p_l"], errors="coerce").fillna(0)
     is_open = remaining > 0
-    total_entry_cost = float((entry * shares).sum())
+    initial_cost = pd.to_numeric(trades.get("initial_cost"), errors="coerce").fillna(entry * shares)
+    total_entry_cost = float(initial_cost.sum())
     cash = STARTING_CAPITAL - total_entry_cost + float(proceeds.sum())
     open_value = float((current[is_open] * remaining[is_open]).sum())
     realized = float(realized_by_row.sum())
     unrealized = float(((current[is_open] - entry[is_open]) * remaining[is_open]).sum())
+    stops = pd.to_numeric(trades["stop_8"], errors="coerce").fillna(entry)
+    portfolio_heat = float(((entry[is_open] - stops[is_open]).clip(lower=0) * remaining[is_open]).sum())
     return {
         "cash": cash, "open_value": open_value, "equity": cash + open_value,
         "realized_p_l": realized, "unrealized_p_l": unrealized,
         "deployed": float((entry[is_open] * remaining[is_open]).sum()),
+        "portfolio_heat": portfolio_heat,
+        "portfolio_heat_pct": portfolio_heat / STARTING_CAPITAL * 100 if STARTING_CAPITAL else 0.0,
         "open_positions": int(is_open.sum()), "closed_trades": int((~is_open).sum()),
     }
 
@@ -114,18 +125,34 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
     open_mask = pd.to_numeric(trades["remaining_shares"], errors="coerce").fillna(0).gt(0) if not trades.empty else pd.Series(dtype=bool)
     active_cost = (
         pd.to_numeric(trades.loc[open_mask, "entry_price"], errors="coerce").fillna(0)
-        * pd.to_numeric(trades.loc[open_mask, "shares"], errors="coerce").fillna(0)
+        * pd.to_numeric(trades.loc[open_mask, "remaining_shares"], errors="coerce").fillna(0)
     ) if not trades.empty else pd.Series(dtype=float)
     sector_cost = active_cost.groupby(trades.loc[open_mask, "sector"].fillna("Unknown")).sum().to_dict() if not trades.empty else {}
     sector_limit = STARTING_CAPITAL * MAX_SECTOR_EXPOSURE_PCT / 100
+    current_heat = float(((
+        pd.to_numeric(trades.loc[open_mask, "entry_price"], errors="coerce").fillna(0)
+        - pd.to_numeric(trades.loc[open_mask, "stop_8"], errors="coerce").fillna(0)
+    ) * pd.to_numeric(trades.loc[open_mask, "remaining_shares"], errors="coerce").fillna(0)).sum()) if not trades.empty else 0.0
+    heat_limit = STARTING_CAPITAL * MAX_PORTFOLIO_HEAT_PCT / 100
     additions = []
     for row in eligible.itertuples(index=False):
         ticker = str(row.ticker).upper()
         if (today, ticker) in existing:
             continue
+        earnings_blocked = getattr(row, "earnings_blocked", False)
+        if str(earnings_blocked).strip().lower() in {"true", "1", "yes"}:
+            print(f"Skipped {ticker}: earnings within {EARNINGS_BLACKOUT_SESSIONS} sessions")
+            continue
+        live_spread = pd.to_numeric(getattr(row, "bid_ask_spread_pct", pd.NA), errors="coerce")
+        if pd.notna(live_spread) and float(live_spread) > MAX_BID_ASK_SPREAD_PCT:
+            print(f"Skipped {ticker}: {float(live_spread):.2f}% spread exceeds {MAX_BID_ASK_SPREAD_PCT:.2f}%")
+            continue
         quoted = float(row.current)
-        execution = quoted * (1 + SLIPPAGE_BPS / 10_000)
+        ask = pd.to_numeric(getattr(row, "ask", pd.NA), errors="coerce")
+        execution_reference = float(ask) if pd.notna(ask) and float(ask) > 0 else quoted
+        execution = execution_reference * (1 + SLIPPAGE_BPS / 10_000)
         trade_cost = execution * SHARES_PER_TRADE
+        initial_risk = execution * STOP_LOSS_PCT / 100 * SHARES_PER_TRADE
         sector_value = getattr(row, "sector", "Unknown")
         sector = "Unknown" if pd.isna(sector_value) or not str(sector_value).strip() else str(sector_value)
         if trade_cost > available_cash + 0.005:
@@ -133,6 +160,9 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
             continue
         if float(sector_cost.get(sector, 0)) + trade_cost > sector_limit + 0.005:
             print(f"Skipped {ticker}: {sector} exposure would exceed {MAX_SECTOR_EXPOSURE_PCT:.0f}%")
+            continue
+        if current_heat + initial_risk > heat_limit + 0.005:
+            print(f"Skipped {ticker}: portfolio heat would exceed {MAX_PORTFOLIO_HEAT_PCT:.1f}%")
             continue
         raw_components = [getattr(row, "morning_components", ""), getattr(row, "notes", "")]
         components = " | ".join(str(value) for value in raw_components if not pd.isna(value) and str(value).strip())
@@ -143,10 +173,17 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
             "rsi_14": getattr(row, "rsi_14", pd.NA), "morning_score": getattr(row, "morning_score", pd.NA),
             "confirmation_score": int(row.score),
             "confirmation_band": getattr(row, "confirmation_band", "B"),
+            "earnings_date": getattr(row, "earnings_date", pd.NA),
+            "sessions_to_earnings": getattr(row, "sessions_to_earnings", pd.NA),
+            "earnings_status": getattr(row, "earnings_status", "UNKNOWN"),
             "confirmation_components": components,
             "entry_volume": getattr(row, "confirmation_volume", pd.NA),
+            "bid": getattr(row, "bid", pd.NA), "ask": getattr(row, "ask", pd.NA),
+            "bid_ask_spread_pct": getattr(row, "bid_ask_spread_pct", pd.NA),
+            "quote_source": getattr(row, "quote_source", "5M RANGE PROXY"),
             "spread_proxy_pct": getattr(row, "spread_proxy_pct", pd.NA),
             "quoted_entry_price": quoted, "entry_price": execution,
+            "initial_cost": trade_cost, "initial_risk": initial_risk,
             "shares": SHARES_PER_TRADE, "remaining_shares": SHARES_PER_TRADE,
             "status": OPEN_STATUS, "current_price": execution,
             "target_10": execution * (1 + TAKE_PROFIT_PCT / 100),
@@ -158,10 +195,13 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
             "shares_sold_protect": 0, "shares_sold_stop": 0, "shares_sold_time": 0,
             "target_10_hit_at": pd.NA, "target_20_hit_at": pd.NA, "target_30_hit_at": pd.NA,
             "last_evaluated_at": _entry_datetime(row, today), "holding_days": 1,
+            "corporate_action_factor": 1.0, "last_corporate_action_at": pd.NA,
+            "data_failure_count": 0, "review_flag": "",
             "last_updated": datetime.now().astimezone().isoformat(timespec="seconds"),
         })
         available_cash -= trade_cost
         sector_cost[sector] = float(sector_cost.get(sector, 0)) + trade_cost
+        current_heat += initial_risk
     if additions:
         new_rows = pd.DataFrame(additions, columns=TRADE_COLUMNS)
         trades = new_rows if trades.empty else pd.concat([trades, new_rows], ignore_index=True)
@@ -169,7 +209,49 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
 
 
 def _holding_days(entry: pd.Timestamp, current: pd.Timestamp) -> int:
-    return max(1, len(pd.bdate_range(entry.date(), current.date())))
+    return max(1, sessions_until(entry.date(), current.date()) + 1)
+
+
+def apply_corporate_actions(trades: pd.DataFrame) -> pd.DataFrame:
+    """Adjust active share/price fields for splits; flag unavailable symbols."""
+    if trades.empty:
+        return trades
+    result = trades.copy()
+    active = pd.to_numeric(result["remaining_shares"], errors="coerce").fillna(0).gt(0)
+    share_fields = ["shares", "remaining_shares", "shares_sold_10", "shares_sold_20", "shares_sold_30",
+                    "shares_sold_protect", "shares_sold_stop", "shares_sold_time"]
+    price_fields = ["entry_price", "current_price", "target_10", "target_20", "target_30", "stop_8"]
+    for idx, row in result[active].iterrows():
+        ticker = str(row["ticker"])
+        try:
+            actions = yf.Ticker(ticker).actions
+            if actions.empty or "Stock Splits" not in actions:
+                continue
+            actions = actions.copy()
+            if actions.index.tz is None:
+                actions.index = actions.index.tz_localize("America/New_York")
+            else:
+                actions.index = actions.index.tz_convert("America/New_York")
+            last_action = pd.Timestamp(row["last_corporate_action_at"]) if pd.notna(row["last_corporate_action_at"]) else pd.Timestamp(row["entry_datetime"])
+            if last_action.tzinfo is None:
+                last_action = last_action.tz_localize("America/New_York")
+            splits = actions[actions.index > last_action]
+            splits = splits[pd.to_numeric(splits["Stock Splits"], errors="coerce").fillna(0) > 0]
+            for timestamp, action in splits.iterrows():
+                ratio = float(action["Stock Splits"])
+                for field in share_fields:
+                    value = pd.to_numeric(result.at[idx, field], errors="coerce")
+                    if pd.notna(value): result.at[idx, field] = float(value) * ratio
+                for field in price_fields:
+                    value = pd.to_numeric(result.at[idx, field], errors="coerce")
+                    if pd.notna(value): result.at[idx, field] = float(value) / ratio
+                factor = pd.to_numeric(result.at[idx, "corporate_action_factor"], errors="coerce")
+                result.at[idx, "corporate_action_factor"] = (float(factor) if pd.notna(factor) else 1.0) * ratio
+                result.at[idx, "last_corporate_action_at"] = timestamp.isoformat()
+                result.at[idx, "review_flag"] = f"SPLIT {ratio:g}:1 APPLIED"
+        except Exception as exc:
+            print(f"Corporate actions unavailable for {ticker}: {exc}")
+    return result
 
 
 def _sell_lot(
@@ -212,8 +294,14 @@ def update_trade_lifecycle(trades: pd.DataFrame) -> pd.DataFrame:
         try:
             bars = intraday_history(ticker)
             if bars.empty:
+                prior_failures = pd.to_numeric(result.at[idx, "data_failure_count"], errors="coerce")
+                failures = (int(prior_failures) if pd.notna(prior_failures) else 0) + 1
+                result.at[idx, "data_failure_count"] = failures
+                if failures >= 3:
+                    result.at[idx, "review_flag"] = "REVIEW: 3 DATA FAILURES / SYMBOL ACTION"
                 print(f"Kept {ticker} open: no intraday data")
                 continue
+            result.at[idx, "data_failure_count"] = 0
             entry_time = pd.Timestamp(row["entry_datetime"])
             if entry_time.tzinfo is None:
                 entry_time = entry_time.tz_localize("America/New_York")
@@ -244,12 +332,14 @@ def update_trade_lifecycle(trades: pd.DataFrame) -> pd.DataFrame:
                 result.at[idx, "last_evaluated_at"] = timestamp.isoformat()
                 # Conservative rule: an ambiguous same-bar stop wins over upside targets.
                 if float(bar["Low"]) <= stop:
-                    _sell_lot(result, idx, remaining, stop, "STOP -8%", timestamp, "shares_sold_stop")
+                    gap_aware_stop = min(stop, float(bar["Open"]))
+                    _sell_lot(result, idx, remaining, gap_aware_stop, "STOP -8%", timestamp, "shares_sold_stop")
                     break
                 # After +20%, the last 25 shares may not round-trip below +10%.
                 target20_already_active = float(result.at[idx, "shares_sold_20"]) > 0
                 if target20_already_active and low <= protect_floor:
-                    _sell_lot(result, idx, remaining, protect_floor, "PROTECT +10%", timestamp, "shares_sold_protect")
+                    gap_aware_floor = min(protect_floor, float(bar["Open"]))
+                    _sell_lot(result, idx, remaining, gap_aware_floor, "PROTECT +10%", timestamp, "shares_sold_protect")
                     break
                 initial = float(result.at[idx, "shares"])
                 if float(result.at[idx, "shares_sold_10"]) <= 0 and high >= target:
@@ -340,6 +430,7 @@ def render_report(frame: pd.DataFrame, today: str, band: pd.DataFrame, component
         "Open positions": summary["open_positions"], "Resolved trades": summary["closed_trades"],
         "Realized P/L": f"${summary['realized_p_l']:,.2f}", "Unrealized P/L": f"${summary['unrealized_p_l']:,.2f}",
         "Resolved success": f"{hit_rate:.1f}%",
+        "Portfolio heat": f"{summary['portfolio_heat_pct']:.2f}%",
     }
     cards = "".join(f"<div class='card'><small>{escape(str(k))}</small><strong>{escape(str(v))}</strong></div>" for k, v in stats.items())
     table = frame.to_html(index=False, escape=True, border=0)
@@ -352,17 +443,25 @@ body{{font:14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;
 
 def main() -> int:
     ensure_directories()
+    if not market_gate("report"):
+        return 0
     today = datetime.now().astimezone().strftime("%Y-%m-%d")
     confirmation_file = WATCHLIST_EXPORT_DIR / f"confirm_945_{today}.csv"
-    if not confirmation_file.exists():
-        print(f"Missing confirmation file: {confirmation_file}. Run confirm_945.py first.")
+    confirmations = require_today_csv(confirmation_file, "report")
+    if confirmations is None:
+        print(f"Missing or stale confirmation file: {confirmation_file}. Run confirm_945.py first.")
         return 1
-    confirmations = pd.read_csv(confirmation_file)
     required = {"ticker", "current", "score"}
     if not required.issubset(confirmations.columns):
         print(f"Confirmation file is missing columns: {sorted(required - set(confirmations.columns))}")
         return 1
-    trades = update_trade_lifecycle(load_trades())
+    if "session_date" in confirmations.columns:
+        confirmations = confirmations[confirmations["session_date"].astype(str).eq(today)].copy()
+    if confirmations.empty:
+        record_stage("report", "BLOCKED", 0, "No confirmations from today's market session")
+        print("Confirmation file contains no rows from today's market session.")
+        return 1
+    trades = update_trade_lifecycle(apply_corporate_actions(load_trades()))
     trades = add_new_trades(trades, confirmations, today)
     trades.to_csv(PAPER_TRADES_FILE, index=False)
     performance = calculate_performance(trades)
@@ -380,6 +479,7 @@ def main() -> int:
     from dashboard import build_dashboard
     build_dashboard(performance, today)
     print(f"Saved {len(performance)} trades to {csv_path} and {html_path}")
+    record_stage("report", "SUCCESS", len(performance), f"Equity ${account_summary(performance)['equity']:,.2f}")
     return 0
 
 

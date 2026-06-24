@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from html import escape
 from pathlib import Path
 from typing import Optional
@@ -13,6 +13,7 @@ from finvizfinance.screener.overview import Overview
 
 from scanner_config import (
     CANDIDATES_FILE,
+    EARNINGS_BLACKOUT_SESSIONS,
     MIN_SCORE_FOR_BUY_NEXT_SESSION,
     MIN_SCORE_FOR_CANDIDATE,
     MIN_SCORE_FOR_MONITOR,
@@ -20,6 +21,8 @@ from scanner_config import (
     WATCHLIST_EXPORT_DIR,
     ensure_directories,
 )
+from market_calendar import sessions_until
+from pipeline_health import market_gate, record_stage
 
 FINVIZ_FILTERS = {
     "Price": "Under $20",
@@ -154,11 +157,35 @@ def get_finviz_candidates() -> pd.DataFrame:
     return screener.screener_view()
 
 
+def earnings_context(ticker: str, as_of: date) -> dict:
+    """Best-effort earnings date; unknown data never masquerades as a safe date."""
+    try:
+        calendar = yf.Ticker(ticker).get_calendar()
+        value = calendar.get("Earnings Date") if isinstance(calendar, dict) else None
+        if isinstance(value, (list, tuple)):
+            value = value[0] if value else None
+        if value is None or pd.isna(value):
+            return {"earnings_date": pd.NA, "sessions_to_earnings": pd.NA, "earnings_blocked": False, "earnings_status": "UNKNOWN"}
+        earnings_date = pd.Timestamp(value).date()
+        sessions = sessions_until(as_of, earnings_date)
+        return {
+            "earnings_date": earnings_date.isoformat(), "sessions_to_earnings": sessions,
+            "earnings_blocked": 0 <= sessions <= EARNINGS_BLACKOUT_SESSIONS,
+            "earnings_status": "BLOCKED" if 0 <= sessions <= EARNINGS_BLACKOUT_SESSIONS else "CLEAR",
+        }
+    except Exception as exc:
+        print(f"Earnings date unavailable for {ticker}: {exc}")
+        return {"earnings_date": pd.NA, "sessions_to_earnings": pd.NA, "earnings_blocked": False, "earnings_status": "UNKNOWN"}
+
+
 def main() -> int:
     ensure_directories()
+    if not market_gate("morning"):
+        return 0
     today = datetime.now().astimezone().strftime("%Y-%m-%d")
     raw = exclude_etfs(get_finviz_candidates())
     if raw.empty or "Ticker" not in raw.columns:
+        record_stage("morning", "FAILED", 0, "Finviz returned no usable candidates")
         print("Finviz returned no usable candidates; no files were overwritten.")
         return 1
 
@@ -182,9 +209,17 @@ def main() -> int:
 
     candidates = pd.DataFrame(rows)
     if candidates.empty:
+        record_stage("morning", "FAILED", 0, "No candidates had sufficient daily history")
         print("No candidates had enough market data; latest candidates were not overwritten.")
         return 1
-    candidates = candidates.sort_values("strategy_score", ascending=False)
+    candidates = candidates.sort_values("strategy_score", ascending=False, kind="mergesort")
+    for column, default in (("earnings_date", pd.NA), ("sessions_to_earnings", pd.NA), ("earnings_blocked", False), ("earnings_status", "NOT CHECKED")):
+        candidates[column] = default
+    review_mask = candidates["strategy_score"] >= MIN_SCORE_FOR_CANDIDATE
+    for index, row in candidates[review_mask].iterrows():
+        context = earnings_context(str(row["Ticker"]), datetime.now().astimezone().date())
+        for key, value in context.items():
+            candidates.at[index, key] = value
     candidates.to_csv(CANDIDATES_FILE, index=False)
     CANDIDATES_FILE.with_suffix(".html").write_text(
         html_document(candidates, f"Latest scored candidates — {today}"), encoding="utf-8"
@@ -195,6 +230,10 @@ def main() -> int:
         html_document(candidates, f"Scored morning candidates — {today}"), encoding="utf-8"
     )
     print(f"Saved {len(candidates)} candidates to {CANDIDATES_FILE}")
+    blocked = int(candidates["earnings_blocked"].fillna(False).astype(bool).sum())
+    coverage = len(candidates) / len(raw) if len(raw) else 0
+    status = "SUCCESS" if coverage >= 0.80 else "DEGRADED"
+    record_stage("morning", status, len(candidates), f"{coverage:.0%} history coverage; {blocked} earnings blocks")
     return 0
 
 
