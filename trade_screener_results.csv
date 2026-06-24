@@ -1,0 +1,19 @@
+ticker,price,day_%,week_%,rvol,rsi,compression_%,risk_to_5d_low_%,dist_20d_high_%,target_10%,target_20%,target_30%,score,signal,why
+UBER,74.43,6.84,1.62,0.85,56.7,6.84,6.4,0.0,81.88,89.32,96.77,46,🚀 PRIME 10–30% SETUP,"early weekly momentum, healthy RSI, above 20SMA, above 50SMA, tight 5-day range, near 20-day breakout, risk under ~8%, near breakout trigger"
+RKT,15.24,13.14,9.48,1.0,62.0,15.28,13.25,0.0,16.76,18.29,19.81,36,👀 WATCH FOR ENTRY,"price $1–20, early weekly momentum, healthy RSI, above 20SMA, above 50SMA, near 20-day breakout, near breakout trigger"
+RZLV,2.61,0.97,-0.57,0.31,51.7,5.43,0.96,12.58,2.87,3.13,3.39,33,👀 WATCH FOR ENTRY,"price $1–20, controlled daily move, healthy RSI, above 50SMA, tight 5-day range, risk under ~8%"
+FWRD,13.38,2.29,-2.83,0.12,84.4,4.82,2.24,2.83,14.72,16.06,17.39,33,👀 WATCH FOR ENTRY,"price $1–20, controlled daily move, above 20SMA, tight 5-day range, near 20-day breakout, risk under ~8%, near breakout trigger, penalty: RSI overheated"
+PFE,24.15,-2.32,-7.27,0.84,35.3,7.35,0.0,7.87,26.56,28.98,31.39,32,👀 WATCH FOR ENTRY,"controlled daily move, tight 5-day range, near 20-day breakout, risk under ~8%, near breakout trigger"
+MU,1039.58,-1.16,1.84,0.49,48.0,16.53,0.0,14.18,1143.54,1247.5,1351.46,32,👀 WATCH FOR ENTRY,"controlled daily move, early weekly momentum, healthy RSI, above 20SMA, above 50SMA, risk under ~8%"
+ONEG,1.63,4.49,7.95,0.06,74.2,25.0,4.29,16.41,1.79,1.96,2.12,27,🟡 EARLY / NEEDS CONFIRMATION,"price $1–20, controlled daily move, early weekly momentum, above 20SMA, risk under ~8%"
+RUN,15.81,23.38,25.04,3.57,54.8,27.05,21.29,5.47,17.39,18.97,20.55,26,🟡 EARLY / NEEDS CONFIRMATION,"price $1–20, healthy RSI, above 20SMA, above 50SMA, near 20-day breakout, buying volume present, near breakout trigger, penalty: too hot today"
+WEN,8.03,28.35,18.68,9.57,66.8,30.23,23.21,0.0,8.84,9.64,10.45,26,🟡 EARLY / NEEDS CONFIRMATION,"price $1–20, early weekly momentum, healthy RSI, above 20SMA, above 50SMA, near 20-day breakout, near breakout trigger, penalty: too hot today"
+TENX,13.68,0.29,20.74,0.3,80.2,15.25,13.23,0.0,15.05,16.42,17.78,22,🟡 EARLY / NEEDS CONFIRMATION,"price $1–20, controlled daily move, above 20SMA, above 50SMA, near 20-day breakout, near breakout trigger, penalty: RSI overheated"
+URG,1.38,-2.33,-16.03,0.27,23.2,12.56,0.0,34.42,1.51,1.65,1.79,16,🔴 PASS,"price $1–20, controlled daily move, risk under ~8%"
+DGXX,6.01,-10.49,-10.62,0.39,34.9,12.22,0.0,25.83,6.62,7.22,7.82,13,🔴 PASS,"price $1–20, above 50SMA, risk under ~8%"
+GPRO,0.71,-1.29,-10.15,0.39,11.7,12.71,0.0,43.6,0.78,0.85,0.92,12,🔴 PASS,"controlled daily move, risk under ~8%"
+HOVR,1.95,-4.19,-10.78,0.49,31.6,14.14,0.0,33.5,2.14,2.33,2.53,10,🔴 PASS,"price $1–20, risk under ~8%"
+ABSI,9.87,33.2,41.0,3.79,71.3,37.47,27.25,0.0,10.86,11.84,12.83,10,🔴 PASS,"price $1–20, above 20SMA, above 50SMA, near 20-day breakout, buying volume present, near breakout trigger, penalty: too hot today, penalty: too extended weekly"
+RDW,11.73,-3.97,-13.07,0.2,31.8,22.37,0.0,54.69,12.91,14.08,15.26,10,🔴 PASS,"price $1–20, risk under ~8%"
+ORCL,157.32,-4.75,-16.47,0.55,14.8,17.14,0.0,36.6,173.05,188.78,204.52,6,🔴 PASS,risk under ~8%
+MSTR,94.86,-8.65,-22.76,0.82,30.8,22.87,0.0,40.37,104.35,113.83,123.32,6,🔴 PASS,risk under ~8%

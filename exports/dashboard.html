@@ -1,0 +1,526 @@
+<!doctype html>
+<html>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<meta http-equiv='refresh' content='300'>
+<title>$25K Paper Portfolio</title>
+<style>
+:root {
+  --canvas: #f5f6f8;
+  --surface: #ffffff;
+  --surface-muted: #f0f1f4;
+  --ink: #111827;
+  --muted: #6b7280;
+  --line: rgba(17,24,39,.1);
+  --line-mid: rgba(17,24,39,.18);
+  --blue: #1d4ed8;
+  --blue-mid: #3b82f6;
+  --green: #15803d;
+  --green-bg: #f0fdf4;
+  --red: #b91c1c;
+  --red-bg: #fef2f2;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+main {
+  max-width: 1280px;
+  margin: auto;
+  padding: 36px 28px 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Topbar ── */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.topbar-left { display: flex; align-items: center; gap: 12px; }
+.logo {
+  width: 36px; height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--blue);
+  display: grid; place-items: center;
+  color: #fff; font-size: 17px;
+  flex-shrink: 0;
+}
+.eyebrow {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.topbar-title { font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+.status-badge {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 0.5px solid var(--line-mid);
+  border-radius: 999px;
+  padding: 7px 13px;
+}
+.dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34,197,94,.2);
+  flex-shrink: 0;
+}
+
+/* ── Hero ── */
+.hero {
+  background: var(--surface);
+  border: 0.5px solid var(--line-mid);
+  border-radius: var(--radius-xl);
+  padding: 28px 32px 24px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem;
+}
+.hero-left { flex: 1; min-width: 0; }
+.hero-label { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+.equity { font-size: 46px; font-weight: 600; letter-spacing: -.055em; line-height: 1; }
+.sparkline { display: block; width: 100%; height: 36px; margin-top: 18px; }
+.hero-right { text-align: right; flex-shrink: 0; }
+.return-pct { font-size: 24px; font-weight: 600; letter-spacing: -.03em; color: var(--green); }
+.return-pct.negative { color: var(--red); }
+.return-sub { font-size: 12px; color: var(--muted); margin-top: 5px; }
+
+/* ── KPI cards ── */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.kpi {
+  background: var(--surface-muted);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+.kpi-label {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.kpi-val { font-size: 20px; font-weight: 600; letter-spacing: -.025em; }
+.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+/* ── Panels ── */
+.grid2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, .7fr);
+  gap: 14px;
+  align-items: start;
+}
+.panel {
+  background: var(--surface);
+  border: 0.5px solid var(--line-mid);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  overflow: hidden;
+}
+.panel.full { grid-column: 1 / -1; }
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.panel-title { font-size: 14px; font-weight: 600; }
+.panel-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  gap: 3px;
+  background: var(--surface-muted);
+  border-radius: var(--radius-md);
+  padding: 3px;
+}
+.tab {
+  font-size: 12px;
+  padding: 4px 11px;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.tab.active {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  border: 0.5px solid var(--line-mid);
+}
+
+/* ── Strategy panel ── */
+.strategy-panel {
+  background: var(--surface-muted);
+  border: 0.5px solid var(--line-mid);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+}
+.rule-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 0.5px solid var(--line);
+}
+.rule-row:last-child { border-bottom: none; }
+.rule-label { font-size: 12px; color: var(--muted); }
+.rule-val { font-size: 13px; font-weight: 600; }
+
+/* ── Empty states ── */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--muted);
+}
+.empty-icon {
+  font-size: 26px;
+  color: #c7cad1;
+  margin-bottom: 4px;
+}
+.empty strong { font-size: 13px; color: #374151; font-weight: 600; }
+.empty span { font-size: 12px; }
+.empty.compact { padding: 1.5rem 1rem; }
+
+/* ── Position table ── */
+table { border-collapse: collapse; width: 100%; white-space: nowrap; }
+th {
+  font-size: 10px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: left;
+  padding: 0 10px 10px 0;
+  border-bottom: 0.5px solid var(--line-mid);
+}
+td {
+  padding: 11px 10px 11px 0;
+  border-bottom: 0.5px solid var(--line);
+  font-size: 13px;
+}
+tbody tr:last-child td { border-bottom: none; }
+.positive { color: var(--green); font-weight: 600; }
+.negative { color: var(--red); font-weight: 600; }
+.pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.pill.up { background: var(--green-bg); color: var(--green); }
+.pill.dn { background: var(--red-bg); color: var(--red); }
+
+/* ── Signal bars ── */
+.sig-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 0.5px solid var(--line);
+}
+.sig-row:last-child { border-bottom: none; }
+.sig-label { font-size: 12px; color: var(--muted); min-width: 88px; }
+.sig-bar-wrap {
+  flex: 1;
+  height: 5px;
+  background: var(--surface-muted);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.sig-bar { height: 100%; border-radius: 999px; background: var(--blue); }
+.sig-pct { font-size: 12px; font-weight: 600; min-width: 34px; text-align: right; }
+
+/* ── Score band ── */
+.band-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 0.5px solid var(--line);
+}
+.band-row:last-child { border-bottom: none; }
+.band-label { font-size: 12px; color: var(--muted); min-width: 60px; }
+.band-bar-wrap {
+  flex: 1;
+  height: 5px;
+  background: var(--surface-muted);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.band-bar { height: 100%; border-radius: 999px; }
+.band-val { font-size: 12px; font-weight: 600; min-width: 36px; text-align: right; }
+
+/* ── History table ── */
+.hist-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 0.5px solid var(--line);
+  font-size: 13px;
+}
+.hist-row:last-child { border-bottom: none; }
+.hist-date { color: var(--muted); }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid2 { grid-template-columns: minmax(0, 1fr); }
+  .panel.full { grid-column: auto; }
+}
+@media (max-width: 560px) {
+  main { padding: 20px 16px 48px; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .status-badge { display: none; }
+  .hero { flex-direction: column; align-items: flex-start; }
+  .hero-right { text-align: left; }
+  .equity { font-size: 38px; }
+}
+</style>
+</head>
+<body>
+<main>
+
+  <!-- Topbar -->
+  <div class='topbar'>
+    <div class='topbar-left'>
+      <div class='logo'>P</div>
+      <div>
+        <p class='eyebrow'>Paper trading</p>
+        <p class='topbar-title'>Pre-Breakout Portfolio</p>
+      </div>
+    </div>
+    <div class='status-badge'>
+      <span class='dot'></span>
+      System ready · updated 2026-06-24 17:14 EDT
+    </div>
+  </div>
+
+  <!-- Hero -->
+  <section class='hero'>
+    <div class='hero-left'>
+      <p class='hero-label'>Total account equity</p>
+      <strong class='equity'>$25,000.00</strong>
+      <svg class='sparkline' viewBox='0 0 600 36' preserveAspectRatio='none' fill='none' xmlns='http://www.w3.org/2000/svg'>
+        <polyline points='0,28 100,26 200,24 300,22 400,20 500,18 600,18'
+          stroke='#3b82f6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' opacity='.5'/>
+        <polyline points='0,28 100,26 200,24 300,22 400,20 500,18 600,18 600,36 0,36'
+          fill='#3b82f6' opacity='.06'/>
+      </svg>
+    </div>
+    <div class='hero-right'>
+      <strong class='return-pct'>+0.00%</strong>
+      <p class='return-sub'>All-time return on $25,000</p>
+    </div>
+  </section>
+
+  <!-- KPIs -->
+  <div class='kpis'>
+    <div class='kpi'>
+      <p class='kpi-label'>Cash</p>
+      <p class='kpi-val'>$25,000.00</p>
+      <p class='kpi-sub'>Available</p>
+    </div>
+    <div class='kpi'>
+      <p class='kpi-label'>Deployed</p>
+      <p class='kpi-val'>$0.00</p>
+      <p class='kpi-sub'>Capital at work</p>
+    </div>
+    <div class='kpi'>
+      <p class='kpi-label'>P/L</p>
+      <p class='kpi-val'>$0.00</p>
+      <p class='kpi-sub'>Cumulative</p>
+    </div>
+    <div class='kpi'>
+      <p class='kpi-label'>Positions</p>
+      <p class='kpi-val'>0</p>
+      <p class='kpi-sub'>Open</p>
+    </div>
+    <div class='kpi'>
+      <p class='kpi-label'>Win rate</p>
+      <p class='kpi-val'>—</p>
+      <p class='kpi-sub'>Resolved</p>
+    </div>
+  </div>
+
+  <!-- Equity chart + Automated controls -->
+  <div class='grid2'>
+    <div class='panel'>
+      <div class='panel-head'>
+        <div>
+          <p class='panel-title'>Equity curve</p>
+          <p class='panel-sub'>Portfolio performance over time</p>
+        </div>
+        <div class='tabs'>
+          <div class='tab active'>1W</div>
+          <div class='tab'>1M</div>
+          <div class='tab'>All</div>
+        </div>
+      </div>
+      <div class='empty'>
+        <div class='empty-icon'>↗</div>
+        <strong>Your equity curve starts tomorrow</strong>
+        <span>Performance will appear after the first confirmed trades.</span>
+      </div>
+    </div>
+
+    <div class='strategy-panel'>
+      <div class='panel-head'>
+        <p class='panel-title'>Automated controls</p>
+      </div>
+      <p style='font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:14px'>
+        Scale out 50 shares at +10%, 25 at +20%, then take the final 25 at +30% or protect them at +10%.
+      </p>
+      <div class='rule-row'><span class='rule-label'>Exit ladder</span><span class='rule-val'>50 / 25 / 25</span></div>
+      <div class='rule-row'><span class='rule-label'>Protective stop</span><span class='rule-val'>−8%</span></div>
+      <div class='rule-row'><span class='rule-label'>Time stop</span><span class='rule-val'>10 sessions</span></div>
+      <div class='rule-row'><span class='rule-label'>Fill slippage</span><span class='rule-val'>10 bps</span></div>
+      <div class='rule-row'><span class='rule-label'>Sector ceiling</span><span class='rule-val'>25%</span></div>
+    </div>
+  </div>
+
+  <!-- Open positions -->
+  <div class='panel full'>
+    <div class='panel-head'>
+      <div>
+        <p class='panel-title'>Open positions</p>
+        <p class='panel-sub'>0 active</p>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Ticker</th>
+          <th>Entry</th>
+          <th>Shares</th>
+          <th>Market value</th>
+          <th>P/L $</th>
+          <th>P/L %</th>
+          <th>Stop</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td colspan='8'>
+            <div class='empty compact'>
+              <div class='empty-icon'>◎</div>
+              <strong>No open positions</strong>
+              <span>Tomorrow's confirmed setups will land here automatically.</span>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Resolved trades -->
+  <div class='panel full'>
+    <div class='panel-head'>
+      <div>
+        <p class='panel-title'>Resolved trades</p>
+        <p class='panel-sub'>0 completed</p>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Ticker</th>
+          <th>Entry date</th>
+          <th>Exit date</th>
+          <th>Shares</th>
+          <th>Entry $</th>
+          <th>Exit $</th>
+          <th>P/L $</th>
+          <th>P/L %</th>
+          <th>Exit reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td colspan='9'>
+            <div class='empty compact'>
+              <div class='empty-icon'>◎</div>
+              <strong>No resolved trades</strong>
+              <span>Completed trades will appear here after exits.</span>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Score-band + Signal contribution -->
+  <div class='grid2'>
+    <div class='panel'>
+      <div class='panel-head'>
+        <div>
+          <p class='panel-title'>Score-band performance</p>
+          <p class='panel-sub'>Resolved outcomes</p>
+        </div>
+      </div>
+      <div class='empty compact'>
+        <strong>Awaiting resolved trades</strong>
+        <span>Score-band results need completed outcomes.</span>
+      </div>
+    </div>
+
+    <div class='panel'>
+      <div class='panel-head'>
+        <div>
+          <p class='panel-title'>Signal contribution</p>
+          <p class='panel-sub'>Top components</p>
+        </div>
+      </div>
+      <div class='empty compact'>
+        <strong>Awaiting resolved trades</strong>
+        <span>Signal contribution appears after exits.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account history -->
+  <div class='panel full'>
+    <div class='panel-head'>
+      <div>
+        <p class='panel-title'>Account history</p>
+        <p class='panel-sub'>Daily snapshots</p>
+      </div>
+    </div>
+    <div class='empty compact'>
+      <div class='empty-icon'>▦</div>
+      <strong>No history yet</strong>
+      <span>Your first daily snapshot will appear tomorrow.</span>
+    </div>
+  </div>
+
+</main>
+</body>
+</html>

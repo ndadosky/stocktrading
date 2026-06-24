@@ -1,0 +1,168 @@
+ticker,confirmation_score,signal,confirmation_price,entry_time,entry_price,close_price,close_return_%,max_gain_%,max_drawdown_%,hit_10,hit_20,hit_30,stop_8_hit,p_l_100_shares,notes,candidate_rank,selected
+APLE,50,🔥 BUY TODAY,16.67,09:50:00,16.68,16.615,-0.39,1.02,-0.48,False,False,False,False,-6.5,"above open, above prior close, above VWAP, broke first 15m high, not overextended",17,True
+BGC,50,🔥 BUY TODAY,12.195,09:50:00,12.195,12.575,3.12,3.32,-0.04,False,False,False,False,38.0,"above open, above prior close, above VWAP, broke first 15m high, not overextended",33,True
+BRBR,50,🔥 BUY TODAY,10.585,09:50:00,10.585,11.27,6.47,8.12,-0.8,False,False,False,False,68.5,"above open, above prior close, above VWAP, broke first 15m high, not overextended",37,True
+CAG,50,🔥 BUY TODAY,13.21,09:50:00,13.2,13.435,1.78,3.03,-1.06,False,False,False,False,23.5,"above open, above prior close, above VWAP, broke first 15m high, not overextended",39,True
+DHC,50,🔥 BUY TODAY,8.975,09:50:00,8.975,9.135,1.78,3.18,-0.17,False,False,False,False,16.0,"above open, above prior close, above VWAP, broke first 15m high, not overextended",52,True
+DRH,50,🔥 BUY TODAY,12.315,09:50:00,12.33,12.285,-0.36,0.81,-0.49,False,False,False,False,-4.5,"above open, above prior close, above VWAP, broke first 15m high, not overextended",54,True
+FLG,50,🔥 BUY TODAY,15.055,09:50:00,15.055,15.045,-0.07,0.17,-1.2,False,False,False,False,-1.0,"above open, above prior close, above VWAP, broke first 15m high, not overextended",60,True
+FNB,50,🔥 BUY TODAY,18.465,09:50:00,18.47,18.76,1.57,1.92,-0.05,False,False,False,False,29.0,"above open, above prior close, above VWAP, broke first 15m high, not overextended",63,True
+GAB,50,🔥 BUY TODAY,5.5635,09:50:00,5.56,5.53,-0.54,0.9,-0.54,False,False,False,False,-3.0,"above open, above prior close, above VWAP, broke first 15m high, not overextended",66,True
+GNW,50,🔥 BUY TODAY,9.06,09:50:00,9.06,9.17,1.21,1.32,-0.17,False,False,False,False,11.0,"above open, above prior close, above VWAP, broke first 15m high, not overextended",71,True
+HBAN,50,🔥 BUY TODAY,17.145,09:50:00,17.145,17.415,1.57,1.78,-0.35,False,False,False,False,27.0,"above open, above prior close, above VWAP, broke first 15m high, not overextended",76,True
+JUNS,50,🔥 BUY TODAY,0.2293,09:50:00,0.2277,0.24,5.4,12.87,0.0,True,False,False,False,1.23,"above open, above prior close, above VWAP, broke first 15m high, not overextended",87,True
+MIR,50,🔥 BUY TODAY,18.73,09:50:00,18.73,18.78,0.27,4.38,-1.23,False,False,False,False,5.0,"above open, above prior close, above VWAP, broke first 15m high, not overextended",100,True
+PCG,50,🔥 BUY TODAY,16.705,09:50:00,16.705,16.78,0.45,1.29,-0.66,False,False,False,False,7.5,"above open, above prior close, above VWAP, broke first 15m high, not overextended",121,True
+RC,50,🔥 BUY TODAY,1.665,09:50:00,1.665,1.685,1.2,2.1,-0.9,False,False,False,False,2.0,"above open, above prior close, above VWAP, broke first 15m high, not overextended",133,True
+SBRA,50,🔥 BUY TODAY,18.455,09:50:00,18.455,18.625,0.92,1.16,-0.57,False,False,False,False,17.0,"above open, above prior close, above VWAP, broke first 15m high, not overextended",143,True
+XERS,50,🔥 BUY TODAY,7.04,09:50:00,7.05,7.21,2.27,3.55,0.0,False,False,False,False,16.0,"above open, above prior close, above VWAP, broke first 15m high, not overextended",166,True
+AAL,40,🔥 BUY TODAY,16.155,09:50:00,16.155,16.135,-0.12,1.24,-0.84,False,False,False,False,-2.0,"above open, above prior close, above VWAP, not overextended",1,True
+ADPT,40,🔥 BUY TODAY,17.58,09:50:00,17.57,17.225,-1.96,1.82,-1.99,False,False,False,False,-34.5,"above open, above prior close, above VWAP, not overextended",5,True
+AGNT,40,🔥 BUY TODAY,4.705,09:50:00,4.705,4.77,1.38,1.59,-1.34,False,False,False,False,6.5,"above open, above prior close, above VWAP, not overextended",7,True
+ALDX,40,🔥 BUY TODAY,2.085,09:50:00,2.085,2.025,-2.88,6.0,-3.6,False,False,False,False,-6.0,"above open, above prior close, above VWAP, not overextended",9,False
+ALKT,40,🔥 BUY TODAY,14.93,09:50:00,14.9059,15.06,1.03,1.24,-2.39,False,False,False,False,15.41,"above open, above prior close, above VWAP, not overextended",10,False
+AMLX,40,🔥 BUY TODAY,16.4,09:50:00,16.4,16.35,-0.3,4.66,-0.3,False,False,False,False,-5.0,"above open, above prior close, above VWAP, not overextended",13,False
+AMRX,40,🔥 BUY TODAY,16.325,09:50:00,16.325,16.645,1.96,2.48,-0.21,False,False,False,False,32.0,"above open, above prior close, above VWAP, not overextended",14,False
+ANNX,40,🔥 BUY TODAY,5.11,09:50:00,5.105,5.27,3.23,5.58,0.0,False,False,False,False,16.5,"above open, above prior close, above VWAP, not overextended",16,False
+APPS,40,🔥 BUY TODAY,9.5,09:50:00,9.5,9.255,-2.58,2.0,-3.58,False,False,False,False,-24.5,"above open, above prior close, above VWAP, not overextended",18,False
+ARHS,40,🔥 BUY TODAY,7.04,09:50:00,7.04,7.07,0.43,1.49,-0.99,False,False,False,False,3.0,"above open, above prior close, above VWAP, not overextended",20,False
+ATYR,40,🔥 BUY TODAY,0.4803,09:50:00,0.4803,0.5382,12.05,16.57,-0.67,True,False,False,False,5.79,"above open, above prior close, above VWAP, not overextended",24,False
+AVAH,40,🔥 BUY TODAY,8.1,09:50:00,8.095,8.21,1.42,1.48,-0.93,False,False,False,False,11.5,"above open, above prior close, above VWAP, not overextended",26,False
+BCRX,40,🔥 BUY TODAY,9.27,09:50:00,9.28,9.31,0.32,2.37,-0.97,False,False,False,False,3.0,"above open, above prior close, above VWAP, not overextended",30,False
+BDTX,40,🔥 BUY TODAY,1.65,09:50:00,1.65,1.605,-2.73,2.42,-3.03,False,False,False,False,-4.5,"above open, above prior close, above VWAP, not overextended",31,False
+BLZE,40,🔥 BUY TODAY,10.575,09:50:00,10.58,11.675,10.35,11.96,-8.22,True,False,False,True,109.5,"above open, above prior close, above VWAP, not overextended",35,False
+CATX,40,🔥 BUY TODAY,3.1,09:50:00,3.1,2.99,-3.55,1.61,-3.71,False,False,False,False,-11.0,"above open, above prior close, above VWAP, not overextended",40,False
+CERS,40,🔥 BUY TODAY,2.615,09:50:00,2.615,2.57,-1.72,1.72,-1.91,False,False,False,False,-4.5,"above open, above prior close, above VWAP, not overextended",41,False
+CHWY,40,🔥 BUY TODAY,18.035,09:50:00,18.022,17.85,-0.95,1.71,-1.9,False,False,False,False,-17.2,"above open, above prior close, above VWAP, not overextended",43,False
+CHYM,40,🔥 BUY TODAY,17.11,09:50:00,17.08,16.645,-2.55,0.47,-3.63,False,False,False,False,-43.5,"above open, above prior close, above VWAP, not overextended",44,False
+CLOV,40,🔥 BUY TODAY,5.2102,09:50:00,5.21,5.05,-3.07,2.69,-4.61,False,False,False,False,-16.0,"above open, above prior close, above VWAP, not overextended",45,False
+COMP,40,🔥 BUY TODAY,9.78,09:50:00,9.78,9.885,1.07,2.56,-0.1,False,False,False,False,10.5,"above open, above prior close, above VWAP, not overextended",46,False
+CTKB,40,🔥 BUY TODAY,3.965,09:50:00,3.97,4.075,2.64,3.65,-0.13,False,False,False,False,10.5,"above open, above prior close, above VWAP, not overextended",49,False
+ELDN,40,🔥 BUY TODAY,4.0399,09:50:00,4.04,3.94,-2.48,4.21,-5.32,False,False,False,False,-10.0,"above open, above prior close, above VWAP, broke first 15m high",57,False
+FLO,40,🔥 BUY TODAY,7.515,09:50:00,7.51,7.555,0.6,1.33,-0.73,False,False,False,False,4.5,"above open, above prior close, above VWAP, not overextended",61,False
+FTRE,40,🔥 BUY TODAY,15.605,09:50:00,15.605,16.45,5.41,5.86,0.0,False,False,False,False,84.5,"above open, above prior close, above VWAP, not overextended",64,False
+HAPN,40,🔥 BUY TODAY,18.88,09:50:00,18.93,18.95,0.11,0.82,-1.48,False,False,False,False,2.0,"above open, above prior close, above VWAP, not overextended",74,False
+IMMX,40,🔥 BUY TODAY,9.65,09:50:00,9.65,9.895,2.54,5.8,-0.41,False,False,False,False,24.5,"above open, above prior close, above VWAP, not overextended",79,False
+IMNM,40,🔥 BUY TODAY,19.36,09:50:00,19.45,19.345,-0.54,0.57,-2.21,False,False,False,False,-10.5,"above open, above prior close, above VWAP, not overextended",80,False
+JBLU,40,🔥 BUY TODAY,5.5336,09:50:00,5.535,5.525,-0.18,2.8,-0.99,False,False,False,False,-1.0,"above open, above prior close, above VWAP, not overextended",86,False
+KSS,40,🔥 BUY TODAY,17.575,09:50:00,17.61,17.515,-0.54,0.88,-1.08,False,False,False,False,-9.5,"above open, above VWAP, broke first 15m high, not overextended",89,False
+KVYO,40,🔥 BUY TODAY,13.205,09:50:00,13.21,13.49,2.12,3.26,-0.34,False,False,False,False,28.0,"above open, above prior close, above VWAP, not overextended",91,False
+LEG,40,🔥 BUY TODAY,10.68,09:50:00,10.6837,10.91,2.12,3.6,0.0,False,False,False,False,22.63,"above open, above prior close, above VWAP, not overextended",92,False
+LPRO,40,🔥 BUY TODAY,3.13,09:50:00,3.1201,3.12,-0.0,0.32,-0.32,False,False,False,False,-0.01,"above open, above prior close, above VWAP, not overextended",94,False
+LXRX,40,🔥 BUY TODAY,2.155,09:50:00,2.155,2.155,0.0,3.71,-0.7,False,False,False,False,0.0,"above open, above prior close, above VWAP, not overextended",95,False
+MFA,40,🔥 BUY TODAY,9.419,09:50:00,9.41,9.415,0.05,0.32,-0.32,False,False,False,False,0.5,"above open, above prior close, above VWAP, not overextended",98,False
+MITK,40,🔥 BUY TODAY,17.33,09:50:00,17.415,17.315,-0.57,2.33,-1.0,False,False,False,False,-10.0,"above open, above prior close, above VWAP, not overextended",101,False
+MRVI,40,🔥 BUY TODAY,5.35,09:50:00,5.358,5.365,0.13,1.16,-1.36,False,False,False,False,0.7,"above open, above prior close, above VWAP, not overextended",103,False
+MYGN,40,🔥 BUY TODAY,4.53,09:50:00,4.54,4.635,2.09,3.72,-0.99,False,False,False,False,9.5,"above open, above prior close, above VWAP, not overextended",105,False
+NEO,40,🔥 BUY TODAY,11.24,09:50:00,11.235,11.47,2.09,3.87,0.0,False,False,False,False,23.5,"above open, above prior close, above VWAP, not overextended",108,False
+NTSK,40,🔥 BUY TODAY,9.19,09:50:00,9.18,9.525,3.76,5.34,-0.27,False,False,False,False,34.5,"above open, above prior close, above VWAP, not overextended",110,False
+NUVB,40,🔥 BUY TODAY,5.8672,09:50:00,5.8641,6.02,2.66,3.85,-0.06,False,False,False,False,15.59,"above open, above prior close, above VWAP, not overextended",112,False
+NWBI,40,🔥 BUY TODAY,14.705,09:50:00,14.705,14.87,1.12,1.33,-0.07,False,False,False,False,16.5,"above open, above prior close, above VWAP, not overextended",114,False
+NWL,40,🔥 BUY TODAY,5.045,09:50:00,5.045,5.125,1.59,3.27,-1.68,False,False,False,False,8.0,"above open, above prior close, above VWAP, not overextended",115,False
+OPTU,40,🔥 BUY TODAY,1.285,09:50:00,1.29,1.375,6.59,6.98,-0.39,False,False,False,False,8.5,"above open, above prior close, above VWAP, broke first 15m high",118,False
+OVID,40,🔥 BUY TODAY,2.296,09:50:00,2.296,2.32,1.05,1.26,-2.0,False,False,False,False,2.4,"above open, above prior close, above VWAP, not overextended",119,False
+PACB,40,🔥 BUY TODAY,1.335,09:50:00,1.335,1.31,-1.87,2.62,-3.0,False,False,False,False,-2.5,"above open, above prior close, above VWAP, not overextended",120,False
+PDYN,40,🔥 BUY TODAY,6.88,09:50:00,6.88,6.47,-5.96,2.43,-7.41,False,False,False,False,-41.0,"above open, above prior close, above VWAP, broke first 15m high",122,False
+PGEN,40,🔥 BUY TODAY,5.4,09:50:00,5.4,5.35,-0.93,3.52,-2.5,False,False,False,False,-5.0,"above open, above prior close, above VWAP, not overextended",123,False
+PMT,40,🔥 BUY TODAY,10.035,09:50:00,10.035,10.06,0.25,0.75,-0.35,False,False,False,False,2.5,"above open, above prior close, above VWAP, not overextended",125,False
+PRCH,40,🔥 BUY TODAY,12.405,09:50:00,12.405,12.91,4.07,4.39,-1.05,False,False,False,False,50.5,"above open, above prior close, above VWAP, not overextended",126,False
+REAL,40,🔥 BUY TODAY,12.465,09:50:00,12.47,12.21,-2.09,0.72,-3.65,False,False,False,False,-26.0,"above open, above prior close, above VWAP, not overextended",134,False
+RGNX,40,🔥 BUY TODAY,9.5,09:50:00,9.5207,9.95,4.51,8.61,-0.59,False,False,False,False,42.93,"above open, above prior close, above VWAP, not overextended",136,False
+RKT,40,🔥 BUY TODAY,13.38,09:50:00,13.3851,13.48,0.71,2.54,-0.26,False,False,False,False,9.49,"above open, above prior close, above VWAP, not overextended",138,False
+SBH,40,🔥 BUY TODAY,13.35,09:50:00,13.33,13.32,-0.08,1.31,-0.38,False,False,False,False,-1.0,"above open, above prior close, above VWAP, not overextended",142,False
+SHC,40,🔥 BUY TODAY,15.83,09:50:00,15.855,15.83,-0.16,0.38,-1.1,False,False,False,False,-2.5,"above open, above prior close, above VWAP, not overextended",145,False
+SHLS,40,🔥 BUY TODAY,10.71,09:50:00,10.71,10.295,-3.87,1.4,-5.21,False,False,False,False,-41.5,"above open, above VWAP, broke first 15m high, not overextended",146,False
+SLDB,40,🔥 BUY TODAY,8.615,09:50:00,8.615,8.78,1.92,6.67,-0.17,False,False,False,False,16.5,"above open, above prior close, above VWAP, not overextended",148,False
+SMMT,40,🔥 BUY TODAY,14.36,09:50:00,14.365,14.26,-0.73,3.1,-1.29,False,False,False,False,-10.5,"above open, above prior close, above VWAP, not overextended",151,False
+SNDX,40,🔥 BUY TODAY,19.42,09:50:00,19.44,19.61,0.87,2.88,0.0,False,False,False,False,17.0,"above open, above prior close, above VWAP, not overextended",152,False
+SPRY,40,🔥 BUY TODAY,10.22,09:50:00,10.22,10.25,0.29,2.25,-3.03,False,False,False,False,3.0,"above open, above prior close, above VWAP, not overextended",153,False
+SVRA,40,🔥 BUY TODAY,5.75,09:50:00,5.745,5.77,0.44,2.61,-0.52,False,False,False,False,2.5,"above open, above prior close, above VWAP, not overextended",154,False
+TRVI,40,🔥 BUY TODAY,17.8,09:50:00,17.87,17.35,-2.91,1.62,-2.91,False,False,False,False,-52.0,"above open, above prior close, above VWAP, not overextended",156,False
+UTZ,40,🔥 BUY TODAY,7.06,09:50:00,7.045,7.06,0.21,1.28,-1.14,False,False,False,False,1.5,"above open, above prior close, above VWAP, not overextended",159,False
+VIR,40,🔥 BUY TODAY,9.73,09:50:00,9.72,10.145,4.37,4.73,0.0,False,False,False,False,42.5,"above open, above prior close, above VWAP, not overextended",160,False
+ABSI,30,👀 WAIT,8.07,09:50:00,8.07,7.375,-8.61,2.17,-8.67,False,False,False,True,-69.5,"above open, above VWAP, not overextended",2,False
+ACRS,30,👀 WAIT,4.83,09:50:00,4.851,4.905,1.11,5.44,-0.54,False,False,False,False,5.4,"above open, above VWAP, not overextended",4,False
+AEO,30,👀 WAIT,17.67,09:50:00,17.68,17.72,0.23,1.47,-0.34,False,False,False,False,4.0,"above open, above VWAP, not overextended",6,False
+AIRJ,30,👀 WAIT,4.81,09:50:00,4.81,5.035,4.68,10.81,0.0,True,False,False,False,22.5,"above open, above VWAP, not overextended",8,False
+ALOY,30,👀 WAIT,19.355,09:50:00,19.42,19.175,-1.26,6.02,-5.41,False,False,False,False,-24.5,"above open, above VWAP, broke first 15m high",11,False
+ALTO,30,👀 WAIT,5.145,09:50:00,5.145,5.11,-0.68,2.82,-1.36,False,False,False,False,-3.5,"above open, above VWAP, not overextended",12,False
+AQST,30,👀 WAIT,4.985,09:50:00,4.99,5.025,0.7,2.3,-0.9,False,False,False,False,3.5,"above open, above prior close, above VWAP",19,False
+ASPI,30,👀 WAIT,7.41,09:50:00,7.425,7.07,-4.78,1.41,-5.39,False,False,False,False,-35.5,"above open, above prior close, above VWAP",21,False
+BFLY,30,👀 WAIT,7.29,09:50:00,7.28,7.665,5.29,8.86,0.0,False,False,False,False,38.5,"above open, above prior close, above VWAP",32,False
+COUR,30,👀 WAIT,5.23,09:50:00,5.23,5.41,3.44,4.4,-0.57,False,False,False,False,18.0,"above open, above VWAP, not overextended",47,False
+CTM,30,👀 WAIT,0.7538,09:50:00,0.755,0.7317,-3.09,1.8,-3.97,False,False,False,False,-2.33,"above open, above VWAP, not overextended",50,False
+CTMX,30,👀 WAIT,3.045,09:50:00,3.05,3.17,3.93,5.57,0.0,False,False,False,False,12.0,"above open, above prior close, not overextended",51,False
+EDIT,30,👀 WAIT,2.82,09:50:00,2.815,2.755,-2.13,2.18,-3.37,False,False,False,False,-6.0,"above open, above prior close, not overextended",56,False
+EXFY,30,👀 WAIT,1.635,09:50:00,1.63,1.55,-4.91,0.0,-9.82,False,False,False,True,-8.0,"above open, above VWAP, not overextended",58,False
+FATE,30,👀 WAIT,2.23,09:50:00,2.23,2.165,-2.91,3.81,-7.17,False,False,False,False,-6.5,"above open, above prior close, above VWAP",59,False
+FLYW,30,👀 WAIT,15.43,09:50:00,15.41,15.62,1.36,1.75,-1.23,False,False,False,False,21.0,"above open, above prior close, not overextended",62,False
+FULC,30,👀 WAIT,3.8,09:50:00,3.8,3.83,0.79,1.58,-2.11,False,False,False,False,3.0,"above open, above prior close, not overextended",65,False
+HAYW,30,👀 WAIT,14.69,09:50:00,14.695,14.79,0.65,1.6,-0.27,False,False,False,False,9.5,"above open, above VWAP, not overextended",75,False
+HIVE,30,👀 WAIT,4.745,09:50:00,4.745,4.625,-2.53,2.63,-4.32,False,False,False,False,-12.0,"above open, above VWAP, not overextended",77,False
+HRTX,30,👀 WAIT,0.426,09:50:00,0.4235,0.4189,-1.09,2.55,-2.41,False,False,False,False,-0.46,"above open, above VWAP, not overextended",78,False
+INFQ,30,👀 WAIT,15.52,09:50:00,15.5271,15.96,2.79,6.82,-2.43,False,False,False,False,43.29,"above open, above prior close, above VWAP",81,False
+KEEL,30,👀 WAIT,6.485,09:50:00,6.485,6.59,1.62,6.01,-1.03,False,False,False,False,10.5,"above open, above VWAP, broke first 15m high",88,False
+LILAK,30,👀 WAIT,5.58,09:50:00,5.58,5.89,5.56,7.08,-1.88,False,False,False,False,31.0,"above open, above prior close, above VWAP",93,False
+MGNX,30,👀 WAIT,4.83,09:50:00,4.83,4.695,-2.8,2.28,-5.69,False,False,False,False,-13.5,"above open, above prior close, above VWAP",99,False
+MQ,30,👀 WAIT,3.816,09:50:00,3.815,3.82,0.13,0.66,-1.44,False,False,False,False,0.5,"above open, above prior close, not overextended",102,False
+NAVI,30,👀 WAIT,7.98,09:50:00,8.0,7.99,-0.13,0.81,-1.25,False,False,False,False,-1.0,"above prior close, above VWAP, not overextended",106,False
+NUAI,30,👀 WAIT,6.455,09:50:00,6.47,6.16,-4.79,2.78,-4.95,False,False,False,False,-31.0,"above open, above VWAP, not overextended",111,False
+OI,30,👀 WAIT,9.07,09:50:00,9.1,9.1,0.0,2.64,-0.6,False,False,False,False,0.0,"above open, above VWAP, not overextended",116,False
+PLTD,30,👀 WAIT,8.68,09:50:00,8.6899,8.9,2.42,2.94,-0.92,False,False,False,False,21.01,"above open, above VWAP, not overextended",124,False
+PSNL,30,👀 WAIT,10.18,09:50:00,10.18,10.06,-1.18,3.73,-1.82,False,False,False,False,-12.0,"above open, above VWAP, not overextended",128,False
+QS,30,👀 WAIT,7.405,09:50:00,7.4,7.42,0.27,4.32,-0.81,False,False,False,False,2.0,"above open, above VWAP, not overextended",131,False
+QTRX,30,👀 WAIT,3.5096,09:50:00,3.51,3.22,-8.26,1.99,-9.12,False,False,False,True,-29.0,"above open, above prior close, not overextended",132,False
+REAX,30,👀 WAIT,1.735,09:50:00,1.735,1.755,1.15,2.59,-1.31,False,False,False,False,2.0,"above open, above prior close, not overextended",135,False
+RLAY,30,👀 WAIT,17.16,09:50:00,17.149,17.43,1.64,3.21,-0.17,False,False,False,False,28.1,"above open, above VWAP, not overextended",139,False
+RZLT,30,👀 WAIT,5.125,09:50:00,5.12,4.885,-4.59,2.73,-4.69,False,False,False,False,-23.5,"above open, above VWAP, not overextended",141,False
+SFIX,30,👀 WAIT,4.245,09:50:00,4.24,4.335,2.24,2.36,-2.83,False,False,False,False,9.5,"above open, above prior close, above VWAP",144,False
+UAA,30,👀 WAIT,5.815,09:50:00,5.815,5.785,-0.52,1.63,-1.38,False,False,False,False,-3.0,"above open, above VWAP, not overextended",158,False
+VLY,30,👀 WAIT,14.245,09:50:00,14.25,14.385,0.95,1.09,-0.21,False,False,False,False,13.5,"above open, above VWAP, not overextended",161,False
+VTAK,30,👀 WAIT,1.0978,09:50:00,1.0999,0.942,-14.36,2.74,-14.54,False,False,False,True,-15.79,"above prior close, above VWAP, not overextended",162,False
+WAY,30,👀 WAIT,17.84,09:50:00,17.765,18.42,3.69,5.04,0.0,False,False,False,False,65.5,"above open, above prior close, not overextended",163,False
+WKSP,30,👀 WAIT,0.8604,09:50:00,0.8627,0.8785,1.83,6.64,-5.8,False,False,False,False,1.58,"above open, above prior close, above VWAP",165,False
+IOVA,25,👀 WAIT,4.32,09:50:00,4.3201,4.4377,2.72,4.63,-1.39,False,False,False,False,11.76,"above open, above prior close, above VWAP, broke first 15m high, too extended",83,False
+ABUS,20,🔴 PASS,4.48,09:50:00,4.485,4.445,-0.89,2.01,-2.01,False,False,False,False,-4.0,"above VWAP, not overextended",3,False
+ATLN,20,🔴 PASS,1.0102,09:50:00,1.0199,1.32,29.42,78.45,-2.83,True,True,True,False,30.01,"above prior close, not overextended",23,False
+AUR,20,🔴 PASS,6.37,09:50:00,6.37,6.425,0.86,2.35,-0.31,False,False,False,False,5.5,"above open, not overextended",25,False
+AVO,20,🔴 PASS,11.32,09:50:00,11.35,11.71,3.17,3.39,-0.26,False,False,False,False,36.0,"above VWAP, not overextended",27,False
+AVR,20,🔴 PASS,9.509,09:50:00,9.509,10.28,8.11,11.05,0.0,True,False,False,False,77.1,"above open, not overextended",28,False
+BOLD,20,🔴 PASS,2.28,09:50:00,2.2803,2.6,14.02,20.6,-1.33,True,True,False,False,31.97,"above prior close, not overextended",36,False
+BTCZ,20,🔴 PASS,5.9399,09:50:00,5.94,5.94,0.0,0.84,-1.35,False,False,False,False,0.0,"above prior close, not overextended",38,False
+GERN,20,🔴 PASS,1.3201,09:50:00,1.325,1.355,2.26,2.64,-2.64,False,False,False,False,3.0,"above open, not overextended",67,False
+GORO,20,🔴 PASS,1.295,09:50:00,1.3,1.315,1.15,2.31,-2.31,False,False,False,False,1.5,"above VWAP, not overextended",72,False
+GOSS,20,🔴 PASS,0.16,09:50:00,0.1616,0.1736,7.43,10.71,-0.99,True,False,False,False,1.2,"above VWAP, not overextended",73,False
+IRT,20,🔴 PASS,16.13,09:50:00,16.13,16.26,0.81,1.15,-0.03,False,False,False,False,13.0,"above prior close, not overextended",84,False
+KVUE,20,🔴 PASS,18.05,09:50:00,18.045,18.395,1.94,2.19,-0.11,False,False,False,False,35.0,"above prior close, not overextended",90,False
+MSTZ,20,🔴 PASS,11.68,09:50:00,11.67,12.29,5.31,5.83,-1.63,False,False,False,False,62.0,"above prior close, not overextended",104,False
+NBIZ,20,🔴 PASS,7.08,09:50:00,7.08,7.14,0.85,3.11,-12.22,False,False,False,True,6.0,"above prior close, not overextended",107,False
+NIXX,20,🔴 PASS,1.47,09:50:00,1.47,1.5058,2.44,12.93,-6.8,True,False,False,False,3.58,"above open, above prior close",109,False
+NVD,20,🔴 PASS,5.085,09:50:00,5.08,5.22,2.76,2.76,-0.59,False,False,False,False,14.0,"above prior close, not overextended",113,False
+OLMA,20,🔴 PASS,9.995,09:50:00,10.0,10.53,5.3,10.1,-0.1,True,False,False,False,53.0,"above open, not overextended",117,False
+PRME,20,🔴 PASS,3.345,09:50:00,3.345,3.23,-3.44,5.98,-3.44,False,False,False,False,-11.5,"above open, not overextended",127,False
+QID,20,🔴 PASS,14.4006,09:50:00,14.4,14.575,1.22,1.6,-1.35,False,False,False,False,17.5,"above prior close, not overextended",130,False
+RKLZ,20,🔴 PASS,3.125,09:50:00,3.13,3.33,6.39,6.87,-6.39,False,False,False,False,20.0,"above prior close, not overextended",137,False
+RUN,20,🔴 PASS,13.275,09:50:00,13.26,12.805,-3.43,0.49,-3.7,False,False,False,False,-45.5,"above open, not overextended",140,False
+SLDE,20,🔴 PASS,17.1,09:50:00,17.02,17.46,2.59,3.64,-0.24,False,False,False,False,44.0,"above prior close, not overextended",149,False
+TECS,20,🔴 PASS,6.75,09:50:00,6.74,6.85,1.63,2.37,-2.67,False,False,False,False,11.0,"above prior close, not overextended",155,False
+UA,20,🔴 PASS,5.66,09:50:00,5.65,5.615,-0.62,1.24,-1.59,False,False,False,False,-3.5,"above VWAP, not overextended",157,False
+XRAY,20,🔴 PASS,10.1217,09:50:00,10.125,10.18,0.54,1.78,-0.69,False,False,False,False,5.5,"above VWAP, not overextended",167,False
+BBBY,15,🔴 PASS,6.515,09:50:00,6.5,6.6,1.54,3.15,-4.69,False,False,False,False,10.0,"above open, above prior close, above VWAP, too extended",29,False
+CRMT,15,🔴 PASS,3.5956,09:50:00,3.6,3.86,7.22,15.56,-7.59,True,False,False,False,26.0,"above open, above prior close, above VWAP, too extended",48,False
+AMZD,10,🔴 PASS,9.59,09:50:00,9.5999,9.63,0.31,0.78,-0.83,False,False,False,False,3.01,not overextended,15,False
+ATEC,10,🔴 PASS,8.53,09:50:00,8.531,8.495,-0.42,1.98,-1.24,False,False,False,False,-3.6,not overextended,22,False
+BKD,10,🔴 PASS,13.8788,09:50:00,13.88,13.835,-0.32,1.62,-0.72,False,False,False,False,-4.5,not overextended,34,False
+CGEM,10,🔴 PASS,16.99,09:50:00,17.0,17.725,4.26,5.76,-0.53,False,False,False,False,72.5,not overextended,42,False
+DOMO,10,🔴 PASS,2.21,09:50:00,2.21,2.225,0.68,5.43,-1.36,False,False,False,False,1.5,not overextended,53,False
+DRIP,10,🔴 PASS,5.32,09:50:00,5.32,5.29,-0.56,0.94,-1.69,False,False,False,False,-3.0,not overextended,55,False
+GETY,10,🔴 PASS,1.0499,09:50:00,1.04,0.9832,-5.46,7.69,-13.46,False,False,False,True,-5.68,not overextended,68,False
+GGLS,10,🔴 PASS,5.885,09:50:00,5.89,5.915,0.42,0.85,-0.42,False,False,False,False,2.5,not overextended,69,False
+IONZ,10,🔴 PASS,2.18,09:50:00,2.1633,2.33,7.71,12.32,-4.47,True,False,False,False,16.67,not overextended,82,False
+JBI,10,🔴 PASS,5.28,09:50:00,5.28,5.245,-0.66,1.04,-0.85,False,False,False,False,-3.5,not overextended,85,False
+LYFT,10,🔴 PASS,14.16,09:50:00,14.164,13.825,-2.39,1.17,-2.75,False,False,False,False,-33.9,not overextended,96,False
+MBC,10,🔴 PASS,8.54,09:50:00,8.54,8.37,-1.99,2.99,-2.11,False,False,False,False,-17.0,not overextended,97,False
+QBTZ,10,🔴 PASS,3.39,09:50:00,3.3301,3.69,10.81,14.71,-4.51,True,False,False,False,35.99,not overextended,129,False
+SKYQ,10,🔴 PASS,1.66,09:50:00,1.64,1.6417,0.1,1.83,-7.93,False,False,False,False,0.17,not overextended,147,False
+SMCX,10,🔴 PASS,11.83,09:50:00,11.83,11.74,-0.76,6.09,-4.06,False,False,False,False,-9.0,not overextended,150,False
+WEN,10,🔴 PASS,6.105,09:50:00,6.1,6.2501,2.46,3.44,-0.49,False,False,False,False,15.01,not overextended,164,False
+ZONE,10,🔴 PASS,0.92,09:50:00,0.92,0.9201,0.01,4.32,-4.33,False,False,False,False,0.01,not overextended,168,False

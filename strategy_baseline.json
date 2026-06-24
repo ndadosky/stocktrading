@@ -1,0 +1,38 @@
+{
+  "version": "baseline-v1",
+  "frozen_on": "2026-06-24",
+  "success_definition": "Reached +10% target before -8% stop",
+  "morning_weights": {
+    "early_weekly_momentum": 8,
+    "controlled_daily_move": 6,
+    "healthy_rsi": 7,
+    "above_sma20": 6,
+    "above_sma50": 5,
+    "near_breakout": 7,
+    "compression": 6,
+    "accumulation": 5,
+    "manageable_downside": 5,
+    "volume_confirmation": 4,
+    "daily_overextension_penalty": -15,
+    "weekly_overextension_penalty": -12,
+    "high_rsi_penalty": -10,
+    "volume_mania_penalty": -8
+  },
+  "confirmation_weights": {
+    "above_open": 10,
+    "above_prior_close": 10,
+    "above_vwap": 10,
+    "first_15m_breakout": 10,
+    "not_overextended": 10,
+    "too_extended_penalty": -15
+  },
+  "risk": {
+    "take_profit_pct": 10,
+    "stop_loss_pct": 8,
+    "max_holding_days": 10,
+    "max_sector_exposure_pct": 25
+  },
+  "execution": {
+    "slippage_bps": 10
+  }
+}
