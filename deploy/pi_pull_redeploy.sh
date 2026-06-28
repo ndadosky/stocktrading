@@ -43,6 +43,11 @@ log "Rebuilding app v${APP_VERSION} (${APP_GIT_COMMIT})"
 "${REPO_DIR}/deploy/compose.sh" -f docker-compose.pi.yml up -d >>"$LOG_FILE" 2>&1
 log "Redeploy complete — v${APP_VERSION} (${APP_GIT_COMMIT})"
 
+if sudo docker ps --format '{{.Names}}' 2>/dev/null | grep -qx stock_app_1; then
+  log "Refreshing dashboard from PostgreSQL"
+  sudo docker exec stock_app_1 python3 /app/dashboard.py >>"$LOG_FILE" 2>&1 || log "WARN: dashboard refresh failed"
+fi
+
 if [ -x "${REPO_DIR}/deploy/install_systemd_jobs.sh" ]; then
   "${REPO_DIR}/deploy/install_systemd_jobs.sh" >>"$LOG_FILE" 2>&1 || log "WARN: systemd job install failed"
 fi

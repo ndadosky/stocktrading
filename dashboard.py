@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from html import escape
 import json
+import threading
 from pathlib import Path
 from typing import List
 
@@ -742,6 +743,20 @@ a{{color:var(--blue)}}
     DASHBOARD_FILE.write_text(html, encoding="utf-8")
     print(f"Updated overall dashboard: {DASHBOARD_FILE}")
     return DASHBOARD_FILE
+
+
+_DASHBOARD_HTTP_LOCK = threading.Lock()
+
+
+def dashboard_http_html() -> bytes:
+    """Build dashboard HTML from PostgreSQL on each request (never serve stale exports)."""
+    from daily_report import calculate_performance, load_trades
+
+    with _DASHBOARD_HTTP_LOCK:
+        performance = calculate_performance(load_trades())
+        as_of = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
+        build_dashboard(performance, as_of)
+        return DASHBOARD_FILE.read_bytes()
 
 
 def main() -> int:

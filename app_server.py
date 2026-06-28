@@ -1704,7 +1704,16 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
             return
         elif path == "/dashboard":
-            self.path = "/" + str(DASHBOARD_FILE.relative_to(PROJECT_DIR))
+            from dashboard import dashboard_http_html
+
+            body = dashboard_http_html()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store, max-age=0")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         elif path == "/api/status":
             self.send_json(status_payload())
             return
