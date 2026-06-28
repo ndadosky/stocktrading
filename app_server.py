@@ -541,9 +541,9 @@ a{{color:var(--blue)}}
   </section>
   <section class="panel">
     <h2>Codex probe</h2>
-    <p class="sub">Send a read-only Codex exec prompt to verify the CLI is wired up. Uses <code>codex exec --sandbox read-only</code>.</p>
+    <p class="sub">Ask about trades or performance — each prompt includes live PostgreSQL ledger and report snapshots. Uses <code>codex exec --sandbox read-only</code>.</p>
     <div class="codex-box">
-      <textarea id="codex-input" placeholder="Example: Summarize today's paper trading pipeline in two sentences."></textarea>
+      <textarea id="codex-input" placeholder="Example: Summarize yesterday's trades and performance."></textarea>
       <button id="codex-send">Send to Codex</button>
       <div id="codex-output">Enter a prompt above and click Send to Codex.</div>
     </div>
@@ -561,7 +561,7 @@ document.getElementById('codex-send').onclick=async()=>{{
     const res=await fetch('/api/codex/chat',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{message}})}});
     const data=await res.json();
     if(data.ok){{
-      out.textContent=(data.response||'(empty response)')+(data.warnings&&data.warnings.length?'\\n\\nWarnings:\\n'+data.warnings.join('\\n'):'')+'\\n\\n['+data.duration_ms+' ms]';
+      out.textContent=(data.response||'(empty response)')+(data.warnings&&data.warnings.length?'\\n\\nWarnings:\\n'+data.warnings.join('\\n'):'')+'\\n\\n['+data.duration_ms+' ms'+(data.context_chars?', '+data.context_chars+' chars DB context':'')+']';
     }}else{{
       out.textContent='Error: '+(data.error||'unknown')+(data.warnings&&data.warnings.length?'\\n\\nWarnings:\\n'+data.warnings.join('\\n'):'');
     }}

@@ -13,6 +13,7 @@ from typing import Optional
 
 import pandas as pd
 
+from codex_context import codex_prompt_with_context, build_trading_context
 from db import connect, database_url
 from job_storage import job_health
 from pipeline_health import health_snapshot
@@ -324,6 +325,7 @@ def codex_chat(message: str) -> dict:
         }
 
     started = time.time()
+    prompt = codex_prompt_with_context(message)
     try:
         completed = subprocess.run(
             [
@@ -332,7 +334,7 @@ def codex_chat(message: str) -> dict:
                 "--ephemeral",
                 "--sandbox",
                 "read-only",
-                message,
+                prompt,
             ],
             cwd=PROJECT_DIR,
             text=True,
@@ -361,6 +363,7 @@ def codex_chat(message: str) -> dict:
             "stderr_tail": "\n".join(errors)[-2000:] if errors else "",
             "duration_ms": duration_ms,
             "binary": binary,
+            "context_chars": len(build_trading_context()),
         }
     except subprocess.TimeoutExpired:
         return {"ok": False, "error": f"Codex timed out after {CODEX_TIMEOUT_SECONDS}s"}
