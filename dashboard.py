@@ -443,7 +443,7 @@ def strategy_review_panel() -> str:
     return (
         f"<div class='decision-badge {escape(dec_status)}'>{escape(decision)}</div>"
         "<div class='review-grid'>" + rows + "</div>"
-        f"<p class='review-links'>{' · '.join(links)} · Latest: {escape(latest.name)}</p>"
+        f"<p class='review-links'>{' · '.join(links)} · Latest: {escape(str(review_date or '—'))}</p>"
     )
 
 
