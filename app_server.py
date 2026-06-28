@@ -1333,13 +1333,14 @@ function render(data){
   if(data.running){ri.className='run-indicator';document.getElementById('run-label').textContent='Running: '+data.running}
   else{ri.className='run-indicator hidden'}
   const dis=data.running?'disabled':'';
+  const MANUAL_SKIP=new Set(['dashboard']);
   document.getElementById('jobs').innerHTML=Object.entries(data.jobs).map(([name,job])=>`<tr>
     <td><b>${esc(name.replace(/_/g,' '))}</b><div class="job-desc">${esc(job.description)}</div></td>
     <td class="ts">${esc(job.schedule_time||'manual')}</td>
     <td class="ts" title="${esc(job.next_run||'')}">${fmtNext(job.next_run)}</td>
     <td>${jb(job.last_run)}</td>
     <td class="ts" title="${esc(job.last_run?.finished_at||'')}">${fmtTime(job.last_run?.finished_at)}</td>
-    <td><button data-job="${esc(name)}" ${dis}>Run now</button></td>
+    <td>${MANUAL_SKIP.has(name)?'<span class="ts">auto</span>':`<button data-job="${esc(name)}" ${dis}>Run now</button>`}</td>
   </tr>`).join('');
   document.getElementById('history').innerHTML=data.history.map(run=>`<tr>
     <td class="ts" title="${esc(run.finished_at)}">${fmtTime(run.finished_at)}</td>
