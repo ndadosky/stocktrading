@@ -1,0 +1,11 @@
+#!/usr/bin/expect -f
+set timeout 30
+set user "admin"
+set password "password"
+set host "raspberrypi.local"
+spawn ssh -o StrictHostKeyChecking=no ${user}@${host} {sudo docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'; echo '---'; systemctl is-active stocktrading-pull.timer 2>/dev/null; ps aux | grep -E 'app_server|python3.*app' | grep -v grep | head -3}
+expect {
+  -re "password:" { send "$password\r"; exp_continue }
+  -re "sudo.*password" { send "$password\r"; exp_continue }
+  eof
+}

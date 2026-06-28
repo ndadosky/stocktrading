@@ -1,0 +1,10 @@
+#!/usr/bin/expect -f
+set timeout 60
+set user "admin"
+set password "password"
+set host "raspberrypi.local"
+spawn ssh -o StrictHostKeyChecking=no ${user}@${host} {sudo docker exec stock_app_1 python3 /app/dashboard.py 2>&1 | tail -5}
+expect {
+  -re "password:" { send "$password\r"; exp_continue }
+  eof
+}

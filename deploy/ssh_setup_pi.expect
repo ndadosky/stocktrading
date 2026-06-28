@@ -1,0 +1,28 @@
+#!/usr/bin/expect -f
+set timeout 1200
+set user "admin"
+set password "password"
+set host "raspberrypi.local"
+
+proc run_ssh {cmd} {
+    global user password host
+    spawn ssh -o StrictHostKeyChecking=no ${user}@${host} $cmd
+    expect {
+        -re "password:" { send "$password\r"; exp_continue }
+        -re "\\\[sudo\\\] password" { send "$password\r"; exp_continue }
+        -re "sudo.*password for" { send "$password\r"; exp_continue }
+        eof
+    }
+    catch wait result
+    return [lindex $result 3]
+}
+
+set rc [run_ssh "cd /home/admin/stock && git reset --hard origin/main && git pull origin main"]
+puts "reset/pull rc=$rc"
+
+set rc [run_ssh {cd /home/admin/stock && chmod +x deploy/compose.sh deploy/pi_pull_redeploy.sh deploy/pi_bootstrap.sh && export APP_VERSION=$(sed 's/[[:space:]]//g' VERSION) APP_GIT_COMMIT=$(git rev-parse --short HEAD) APP_BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ) && sudo -E ./deploy/compose.sh -f docker-compose.pi.yml up -d --build}]
+puts "compose rc=$rc"
+
+run_ssh "curl -s -o /dev/null -w 'http=%{http_code}\n' http://127.0.0.1/; sudo docker ps --format '{{.Names}} {{.Status}}'; tail -5 /home/admin/stock/logs/pull_redeploy.log 2>/dev/null || true"
+
+exit $rc

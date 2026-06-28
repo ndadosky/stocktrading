@@ -3,7 +3,7 @@
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.cards div{background:white;padding:12px}.cards span{display:block;font-size:19px;margin-top:5px}
 table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{background:#17202a;color:white}th,td{padding:8px;border-bottom:1px solid #ddd;text-align:left}
 .pos{color:#16803c;font-weight:bold}.neg{color:#c62828;font-weight:bold}</style></head><body><h1>9:45 strategy backtest — 2026-06-23</h1>
-<p class="warning"><b>Universe note:</b> LOOK-AHEAD-BIASED APPROXIMATION: the candidate snapshot is from a later date. Confirmation and price outcomes use only the requested date, but candidate selection does not. Source: /Users/dadon003/code/stock/exports/finviz_raw_2026-06-24.csv</p><div class="cards"><div><b>Trades</b><span>20</span></div><div><b>Capital deployed</b><span>$24,051.77</span></div><div><b>Close P/L</b><span>$216.73</span></div><div><b>Close return</b><span>0.90%</span></div><div><b>Winners / losers</b><span>14 / 6</span></div><div><b>Touched 10/20/30%</b><span>1 / 0 / 0</span></div><div><b>Touched -8% stop</b><span>0</span></div></div><table class="dataframe">
+<p class="warning"><b>Universe note:</b> LOOK-AHEAD-BIASED APPROXIMATION: the candidate snapshot is from a later date. Confirmation and price outcomes use only the requested date, but candidate selection does not. Historical bid/ask is unavailable; 10-bps slippage is used. Earnings are enforced only when present in the saved snapshot. Source: /Users/dadon003/code/stock/exports/finviz_raw_2026-06-24.csv</p><div class="cards"><div><b>Trades</b><span>1</span></div><div><b>Capital deployed</b><span>$1,669.67</span></div><div><b>Close P/L</b><span>$33.33</span></div><div><b>Strategy return</b><span>2.00%</span></div><div><b>Winners / losers</b><span>1 / 0</span></div><div><b>Scaled 10/20/30</b><span>0 / 0 / 0</span></div><div><b>Stopped / time exit</b><span>0 / 0</span></div></div><table class="dataframe">
   <thead>
     <tr style="text-align: right;">
       <th>ticker</th>
@@ -11,19 +11,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <th>signal</th>
       <th>confirmation_price</th>
       <th>entry_time</th>
-      <th>entry_price</th>
       <th>close_price</th>
-      <th>close_return_%</th>
       <th>max_gain_%</th>
       <th>max_drawdown_%</th>
-      <th>hit_10</th>
-      <th>hit_20</th>
-      <th>hit_30</th>
-      <th>stop_8_hit</th>
-      <th>p_l_100_shares</th>
       <th>notes</th>
+      <th>entry_price</th>
+      <th>mark_price</th>
+      <th>remaining_shares</th>
+      <th>shares_sold_10</th>
+      <th>shares_sold_20</th>
+      <th>shares_sold_30</th>
+      <th>shares_sold_protect</th>
+      <th>shares_sold_stop</th>
+      <th>shares_sold_time</th>
+      <th>exit_reason</th>
+      <th>resolved</th>
+      <th>success</th>
+      <th>p_l_100_shares</th>
+      <th>strategy_return_%</th>
       <th>candidate_rank</th>
+      <th>sector</th>
+      <th>earnings_blocked</th>
       <th>selected</th>
+      <th>selection_note</th>
+      <th>position_shares</th>
+      <th>position_cost</th>
+      <th>position_risk</th>
+      <th>sized_p_l</th>
     </tr>
   </thead>
   <tbody>
@@ -33,19 +47,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>16.6700</td>
       <td>09:50:00</td>
-      <td>16.6800</td>
       <td>16.6150</td>
-      <td><span class='neg'>-0.39%</span></td>
-      <td>1.02</td>
-      <td>-0.48</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-6.50</td>
+      <td>2.18</td>
+      <td>-2.38</td>
       <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
-      <td>17</td>
+      <td>16.6967</td>
+      <td>17.0300</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
+      <td>False</td>
+      <td>False</td>
+      <td>33.33</td>
+      <td><span class='pos'>2.00%</span></td>
+      <td>16</td>
+      <td>Real Estate</td>
+      <td>False</td>
       <td>True</td>
+      <td>selected</td>
+      <td>92</td>
+      <td>1536.1</td>
+      <td>124.3</td>
+      <td>30.72</td>
     </tr>
     <tr>
       <td>BGC</td>
@@ -53,19 +81,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>12.1950</td>
       <td>09:50:00</td>
-      <td>12.1950</td>
       <td>12.5750</td>
-      <td><span class='pos'>3.12%</span></td>
-      <td>3.32</td>
-      <td>-0.04</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>38.00</td>
+      <td>5.55</td>
+      <td>-7.72</td>
       <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
-      <td>33</td>
-      <td>True</td>
+      <td>12.2072</td>
+      <td>11.4525</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
+      <td>False</td>
+      <td>False</td>
+      <td>-75.47</td>
+      <td><span class='neg'>-6.18%</span></td>
+      <td>32</td>
+      <td>Financial</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>BRBR</td>
@@ -73,19 +115,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>10.5850</td>
       <td>09:50:00</td>
-      <td>10.5850</td>
       <td>11.2700</td>
-      <td><span class='pos'>6.47%</span></td>
-      <td>8.12</td>
-      <td>-0.80</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>68.50</td>
+      <td>18.40</td>
+      <td>-0.90</td>
       <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
-      <td>37</td>
+      <td>10.5956</td>
+      <td>11.5500</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
+      <td>False</td>
       <td>True</td>
+      <td>100.12</td>
+      <td><span class='pos'>9.45%</span></td>
+      <td>36</td>
+      <td>Consumer Defensive</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>CAG</td>
@@ -93,19 +149,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>13.2100</td>
       <td>09:50:00</td>
-      <td>13.2000</td>
       <td>13.4350</td>
-      <td><span class='pos'>1.78%</span></td>
-      <td>3.03</td>
-      <td>-1.06</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>23.50</td>
+      <td>6.52</td>
+      <td>-1.16</td>
       <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
-      <td>39</td>
-      <td>True</td>
+      <td>13.2132</td>
+      <td>14.0550</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
+      <td>False</td>
+      <td>False</td>
+      <td>84.18</td>
+      <td><span class='pos'>6.37%</span></td>
+      <td>37</td>
+      <td>Consumer Defensive</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>DHC</td>
@@ -113,19 +183,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>8.9750</td>
       <td>09:50:00</td>
-      <td>8.9750</td>
       <td>9.1350</td>
-      <td><span class='pos'>1.78%</span></td>
-      <td>3.18</td>
-      <td>-0.17</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>16.00</td>
+      <td>7.13</td>
+      <td>-0.27</td>
       <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
-      <td>52</td>
-      <td>True</td>
+      <td>8.9840</td>
+      <td>9.5100</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
+      <td>False</td>
+      <td>False</td>
+      <td>52.60</td>
+      <td><span class='pos'>5.86%</span></td>
+      <td>50</td>
+      <td>Real Estate</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>DRH</td>
@@ -133,19 +217,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>12.3150</td>
       <td>09:50:00</td>
-      <td>12.3300</td>
       <td>12.2850</td>
-      <td><span class='neg'>-0.36%</span></td>
-      <td>0.81</td>
-      <td>-0.49</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-4.50</td>
+      <td>1.60</td>
+      <td>-1.96</td>
       <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
-      <td>54</td>
-      <td>True</td>
+      <td>12.3423</td>
+      <td>12.4700</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
+      <td>False</td>
+      <td>False</td>
+      <td>12.77</td>
+      <td><span class='pos'>1.03%</span></td>
+      <td>52</td>
+      <td>Real Estate</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>FLG</td>
@@ -153,19 +251,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>15.0550</td>
       <td>09:50:00</td>
-      <td>15.0550</td>
       <td>15.0450</td>
-      <td><span class='neg'>-0.07%</span></td>
-      <td>0.17</td>
-      <td>-1.20</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-1.00</td>
+      <td>1.56</td>
+      <td>-1.29</td>
       <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
-      <td>60</td>
-      <td>True</td>
+      <td>15.0701</td>
+      <td>15.2600</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
+      <td>False</td>
+      <td>False</td>
+      <td>18.99</td>
+      <td><span class='pos'>1.26%</span></td>
+      <td>57</td>
+      <td>Financial</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>FNB</td>
@@ -173,39 +285,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>18.4650</td>
       <td>09:50:00</td>
-      <td>18.4700</td>
       <td>18.7600</td>
-      <td><span class='pos'>1.57%</span></td>
-      <td>1.92</td>
-      <td>-0.05</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>29.00</td>
+      <td>4.50</td>
+      <td>-0.15</td>
       <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
-      <td>63</td>
-      <td>True</td>
-    </tr>
-    <tr>
-      <td>GAB</td>
-      <td>50</td>
-      <td>🔥 BUY TODAY</td>
-      <td>5.5635</td>
-      <td>09:50:00</td>
-      <td>5.5600</td>
-      <td>5.5300</td>
-      <td><span class='neg'>-0.54%</span></td>
-      <td>0.90</td>
-      <td>-0.54</td>
+      <td>18.4885</td>
+      <td>19.2200</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
       <td>False</td>
+      <td>73.15</td>
+      <td><span class='pos'>3.96%</span></td>
+      <td>60</td>
+      <td>Financial</td>
       <td>False</td>
       <td>False</td>
-      <td>-3.00</td>
-      <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
-      <td>66</td>
-      <td>True</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>GNW</td>
@@ -213,19 +319,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>9.0600</td>
       <td>09:50:00</td>
-      <td>9.0600</td>
       <td>9.1700</td>
-      <td><span class='pos'>1.21%</span></td>
-      <td>1.32</td>
-      <td>-0.17</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>11.00</td>
+      <td>5.36</td>
+      <td>-0.27</td>
       <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
-      <td>71</td>
-      <td>True</td>
+      <td>9.0691</td>
+      <td>9.4700</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
+      <td>False</td>
+      <td>False</td>
+      <td>40.09</td>
+      <td><span class='pos'>4.42%</span></td>
+      <td>66</td>
+      <td>Financial</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>HBAN</td>
@@ -233,19 +353,67 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>17.1450</td>
       <td>09:50:00</td>
-      <td>17.1450</td>
       <td>17.4150</td>
-      <td><span class='pos'>1.57%</span></td>
-      <td>1.78</td>
-      <td>-0.35</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>27.00</td>
+      <td>5.81</td>
+      <td>-0.45</td>
       <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
-      <td>76</td>
+      <td>17.1621</td>
+      <td>17.8050</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
+      <td>False</td>
+      <td>False</td>
+      <td>64.29</td>
+      <td><span class='pos'>3.75%</span></td>
+      <td>71</td>
+      <td>Financial</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>IBRX</td>
+      <td>50</td>
+      <td>🔥 BUY TODAY</td>
+      <td>7.3407</td>
+      <td>09:50:00</td>
+      <td>7.3100</td>
+      <td>20.37</td>
+      <td>-1.26</td>
+      <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
+      <td>7.3523</td>
+      <td>8.6900</td>
+      <td>25.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +20%</td>
+      <td>False</td>
       <td>True</td>
+      <td>106.34</td>
+      <td><span class='pos'>14.46%</span></td>
+      <td>74</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>JUNS</td>
@@ -253,19 +421,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>0.2293</td>
       <td>09:50:00</td>
-      <td>0.2277</td>
       <td>0.2400</td>
-      <td><span class='pos'>5.40%</span></td>
-      <td>12.87</td>
-      <td>0.00</td>
-      <td>True</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>1.23</td>
+      <td>30.85</td>
+      <td>-1.84</td>
       <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
-      <td>87</td>
+      <td>0.2279</td>
+      <td>0.2821</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>PROTECT +10%</td>
       <td>True</td>
+      <td>True</td>
+      <td>2.82</td>
+      <td><span class='pos'>12.39%</span></td>
+      <td>82</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>MIR</td>
@@ -273,19 +455,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>18.7300</td>
       <td>09:50:00</td>
-      <td>18.7300</td>
       <td>18.7800</td>
-      <td><span class='pos'>0.27%</span></td>
-      <td>4.38</td>
-      <td>-1.23</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>5.00</td>
+      <td>4.27</td>
+      <td>-3.83</td>
       <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
-      <td>100</td>
-      <td>True</td>
+      <td>18.7487</td>
+      <td>18.4400</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
+      <td>False</td>
+      <td>False</td>
+      <td>-30.87</td>
+      <td><span class='neg'>-1.65%</span></td>
+      <td>95</td>
+      <td>Industrials</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>PCG</td>
@@ -293,19 +489,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>16.7050</td>
       <td>09:50:00</td>
-      <td>16.7050</td>
       <td>16.7800</td>
-      <td><span class='pos'>0.45%</span></td>
-      <td>1.29</td>
-      <td>-0.66</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>7.50</td>
+      <td>4.12</td>
+      <td>-0.76</td>
       <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
-      <td>121</td>
-      <td>True</td>
+      <td>16.7217</td>
+      <td>17.3450</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
+      <td>False</td>
+      <td>False</td>
+      <td>62.33</td>
+      <td><span class='pos'>3.73%</span></td>
+      <td>114</td>
+      <td>Utilities</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>RC</td>
@@ -313,19 +523,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>1.6650</td>
       <td>09:50:00</td>
-      <td>1.6650</td>
       <td>1.6850</td>
-      <td><span class='pos'>1.20%</span></td>
-      <td>2.10</td>
-      <td>-0.90</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>2.00</td>
+      <td>9.19</td>
+      <td>-1.00</td>
       <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
-      <td>133</td>
-      <td>True</td>
+      <td>1.6667</td>
+      <td>1.7750</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
+      <td>False</td>
+      <td>False</td>
+      <td>10.83</td>
+      <td><span class='pos'>6.50%</span></td>
+      <td>123</td>
+      <td>Real Estate</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>SBRA</td>
@@ -333,19 +557,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>18.4550</td>
       <td>09:50:00</td>
-      <td>18.4550</td>
       <td>18.6250</td>
-      <td><span class='pos'>0.92%</span></td>
-      <td>1.16</td>
-      <td>-0.57</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>17.00</td>
+      <td>6.26</td>
+      <td>-0.67</td>
       <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
-      <td>143</td>
-      <td>True</td>
+      <td>18.4735</td>
+      <td>19.5200</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
+      <td>False</td>
+      <td>False</td>
+      <td>104.65</td>
+      <td><span class='pos'>5.67%</span></td>
+      <td>132</td>
+      <td>Real Estate</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>XERS</td>
@@ -353,19 +591,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>7.0400</td>
       <td>09:50:00</td>
-      <td>7.0500</td>
       <td>7.2100</td>
-      <td><span class='pos'>2.27%</span></td>
-      <td>3.55</td>
-      <td>0.00</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>16.00</td>
+      <td>9.68</td>
+      <td>-0.10</td>
       <td>above open, above prior close, above VWAP, broke first 15m high, not overextended</td>
-      <td>166</td>
-      <td>True</td>
+      <td>7.0571</td>
+      <td>7.6500</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
+      <td>False</td>
+      <td>False</td>
+      <td>59.29</td>
+      <td><span class='pos'>8.40%</span></td>
+      <td>153</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>AAL</td>
@@ -373,19 +625,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>16.1550</td>
       <td>09:50:00</td>
-      <td>16.1550</td>
       <td>16.1350</td>
-      <td><span class='neg'>-0.12%</span></td>
-      <td>1.24</td>
-      <td>-0.84</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-2.00</td>
+      <td>11.56</td>
+      <td>-0.93</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>1</td>
+      <td>16.1712</td>
+      <td>17.8700</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
+      <td>False</td>
       <td>True</td>
+      <td>164.91</td>
+      <td><span class='pos'>10.20%</span></td>
+      <td>1</td>
+      <td>Industrials</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>ADPT</td>
@@ -393,19 +659,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>17.5800</td>
       <td>09:50:00</td>
-      <td>17.5700</td>
       <td>17.2250</td>
-      <td><span class='neg'>-1.96%</span></td>
-      <td>1.82</td>
-      <td>-1.99</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-34.50</td>
+      <td>19.40</td>
+      <td>-2.09</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>5</td>
+      <td>17.5876</td>
+      <td>20.9300</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
+      <td>False</td>
       <td>True</td>
+      <td>254.09</td>
+      <td><span class='pos'>14.45%</span></td>
+      <td>5</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>AGNT</td>
@@ -413,19 +693,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>4.7050</td>
       <td>09:50:00</td>
-      <td>4.7050</td>
       <td>4.7700</td>
-      <td><span class='pos'>1.38%</span></td>
-      <td>1.59</td>
-      <td>-1.34</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>6.50</td>
+      <td>18.69</td>
+      <td>-1.44</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>7</td>
+      <td>4.7097</td>
+      <td>5.5100</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
+      <td>False</td>
       <td>True</td>
+      <td>63.30</td>
+      <td><span class='pos'>13.44%</span></td>
+      <td>7</td>
+      <td>Real Estate</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>ALDX</td>
@@ -433,19 +727,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>2.0850</td>
       <td>09:50:00</td>
-      <td>2.0850</td>
       <td>2.0250</td>
-      <td><span class='neg'>-2.88%</span></td>
-      <td>6.00</td>
-      <td>-3.60</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-6.00</td>
+      <td>5.89</td>
+      <td>-18.07</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>9</td>
+      <td>2.0871</td>
+      <td>1.8500</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-16.89</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>9</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>ALKT</td>
@@ -453,19 +761,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>14.9300</td>
       <td>09:50:00</td>
-      <td>14.9059</td>
       <td>15.0600</td>
-      <td><span class='pos'>1.03%</span></td>
-      <td>1.24</td>
-      <td>-2.39</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>15.41</td>
+      <td>11.19</td>
+      <td>-2.49</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>10</td>
+      <td>14.9208</td>
+      <td>16.4050</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>147.99</td>
+      <td><span class='pos'>9.92%</span></td>
+      <td>10</td>
+      <td>Technology</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>AMLX</td>
@@ -473,19 +795,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>16.4000</td>
       <td>09:50:00</td>
-      <td>16.4000</td>
       <td>16.3500</td>
-      <td><span class='neg'>-0.30%</span></td>
-      <td>4.66</td>
-      <td>-0.30</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-5.00</td>
+      <td>14.15</td>
+      <td>-1.68</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>13</td>
+      <td>16.4164</td>
+      <td>17.7850</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>149.61</td>
+      <td><span class='pos'>9.11%</span></td>
+      <td>13</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>AMRX</td>
@@ -493,19 +829,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>16.3250</td>
       <td>09:50:00</td>
-      <td>16.3250</td>
       <td>16.6450</td>
-      <td><span class='pos'>1.96%</span></td>
-      <td>2.48</td>
-      <td>-0.21</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>32.00</td>
+      <td>9.29</td>
+      <td>-0.31</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>14</td>
+      <td>16.3413</td>
+      <td>17.2500</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>90.87</td>
+      <td><span class='pos'>5.56%</span></td>
+      <td>14</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>ANNX</td>
@@ -513,19 +863,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>5.1100</td>
       <td>09:50:00</td>
-      <td>5.1050</td>
       <td>5.2700</td>
-      <td><span class='pos'>3.23%</span></td>
-      <td>5.58</td>
-      <td>0.00</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>16.50</td>
+      <td>9.49</td>
+      <td>-1.18</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>16</td>
+      <td>5.1101</td>
+      <td>5.4600</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>34.99</td>
+      <td><span class='pos'>6.85%</span></td>
+      <td>15</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>APPS</td>
@@ -533,19 +897,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>9.5000</td>
       <td>09:50:00</td>
-      <td>9.5000</td>
       <td>9.2550</td>
-      <td><span class='neg'>-2.58%</span></td>
-      <td>2.00</td>
-      <td>-3.58</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-24.50</td>
+      <td>17.93</td>
+      <td>-3.99</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>18</td>
+      <td>9.5095</td>
+      <td>11.0800</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>125.55</td>
+      <td><span class='pos'>13.20%</span></td>
+      <td>17</td>
+      <td>Technology</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>ARHS</td>
@@ -553,19 +931,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>7.0400</td>
       <td>09:50:00</td>
-      <td>7.0400</td>
       <td>7.0700</td>
-      <td><span class='pos'>0.43%</span></td>
-      <td>1.49</td>
-      <td>-0.99</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>3.00</td>
+      <td>19.98</td>
+      <td>-1.09</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>20</td>
+      <td>7.0470</td>
+      <td>8.4550</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>105.25</td>
+      <td><span class='pos'>14.93%</span></td>
+      <td>19</td>
+      <td>Consumer Cyclical</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>ATYR</td>
@@ -573,19 +965,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>0.4803</td>
       <td>09:50:00</td>
-      <td>0.4803</td>
       <td>0.5382</td>
-      <td><span class='pos'>12.05%</span></td>
-      <td>16.57</td>
-      <td>-0.67</td>
-      <td>True</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>5.79</td>
+      <td>23.71</td>
+      <td>-0.77</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>24</td>
+      <td>0.4808</td>
+      <td>0.5550</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>PROTECT +10%</td>
+      <td>True</td>
+      <td>True</td>
+      <td>5.96</td>
+      <td><span class='pos'>12.39%</span></td>
+      <td>23</td>
+      <td>Healthcare</td>
       <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>AVAH</td>
@@ -593,19 +999,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>8.1000</td>
       <td>09:50:00</td>
-      <td>8.0950</td>
       <td>8.2100</td>
-      <td><span class='pos'>1.42%</span></td>
-      <td>1.48</td>
-      <td>-0.93</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>11.50</td>
+      <td>8.48</td>
+      <td>-1.03</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>26</td>
+      <td>8.1031</td>
+      <td>8.6550</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>55.19</td>
+      <td><span class='pos'>6.81%</span></td>
+      <td>25</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>BCRX</td>
@@ -613,19 +1033,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>9.2700</td>
       <td>09:50:00</td>
-      <td>9.2800</td>
       <td>9.3100</td>
-      <td><span class='pos'>0.32%</span></td>
-      <td>2.37</td>
-      <td>-0.97</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>3.00</td>
+      <td>17.77</td>
+      <td>-1.07</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>30</td>
+      <td>9.2893</td>
+      <td>9.9600</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>79.47</td>
+      <td><span class='pos'>8.56%</span></td>
+      <td>29</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>BDTX</td>
@@ -633,19 +1067,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>1.6500</td>
       <td>09:50:00</td>
-      <td>1.6500</td>
       <td>1.6050</td>
-      <td><span class='neg'>-2.73%</span></td>
-      <td>2.42</td>
-      <td>-3.03</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-4.50</td>
+      <td>16.25</td>
+      <td>-3.12</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>31</td>
+      <td>1.6516</td>
+      <td>1.7130</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>11.23</td>
+      <td><span class='pos'>6.80%</span></td>
+      <td>30</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>BLZE</td>
@@ -653,19 +1101,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>10.5750</td>
       <td>09:50:00</td>
-      <td>10.5800</td>
       <td>11.6750</td>
-      <td><span class='pos'>10.35%</span></td>
-      <td>11.96</td>
-      <td>-8.22</td>
-      <td>True</td>
-      <td>False</td>
-      <td>False</td>
-      <td>True</td>
-      <td>109.50</td>
+      <td>38.38</td>
+      <td>-8.31</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>35</td>
+      <td>10.5906</td>
+      <td>14.5550</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-85.70</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>34</td>
+      <td>Technology</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>CATX</td>
@@ -673,19 +1135,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>3.1000</td>
       <td>09:50:00</td>
-      <td>3.1000</td>
       <td>2.9900</td>
-      <td><span class='neg'>-3.55%</span></td>
-      <td>1.61</td>
-      <td>-3.71</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-11.00</td>
+      <td>1.51</td>
+      <td>-6.55</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>40</td>
+      <td>3.1031</td>
+      <td>3.0200</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>-8.31</td>
+      <td><span class='neg'>-2.68%</span></td>
+      <td>38</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>CERS</td>
@@ -693,19 +1169,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>2.6150</td>
       <td>09:50:00</td>
-      <td>2.6150</td>
       <td>2.5700</td>
-      <td><span class='neg'>-1.72%</span></td>
-      <td>1.72</td>
-      <td>-1.91</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-4.50</td>
+      <td>14.61</td>
+      <td>-2.01</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>41</td>
+      <td>2.6176</td>
+      <td>2.9100</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>27.56</td>
+      <td><span class='pos'>10.53%</span></td>
+      <td>39</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>CHWY</td>
@@ -713,19 +1203,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>18.0350</td>
       <td>09:50:00</td>
-      <td>18.0220</td>
       <td>17.8500</td>
-      <td><span class='neg'>-0.95%</span></td>
-      <td>1.71</td>
-      <td>-1.90</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-17.20</td>
+      <td>5.88</td>
+      <td>-2.00</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>43</td>
+      <td>18.0400</td>
+      <td>18.5450</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>50.50</td>
+      <td><span class='pos'>2.80%</span></td>
+      <td>41</td>
+      <td>Consumer Cyclical</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>CHYM</td>
@@ -733,19 +1237,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>17.1100</td>
       <td>09:50:00</td>
-      <td>17.0800</td>
       <td>16.6450</td>
-      <td><span class='neg'>-2.55%</span></td>
-      <td>0.47</td>
-      <td>-3.63</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-43.50</td>
+      <td>20.25</td>
+      <td>-3.73</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>44</td>
+      <td>17.0971</td>
+      <td>20.2600</td>
+      <td>25.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +20%</td>
       <td>False</td>
+      <td>True</td>
+      <td>248.59</td>
+      <td><span class='pos'>14.54%</span></td>
+      <td>42</td>
+      <td>Technology</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>CLOV</td>
@@ -753,19 +1271,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>5.2102</td>
       <td>09:50:00</td>
-      <td>5.2100</td>
       <td>5.0500</td>
-      <td><span class='neg'>-3.07%</span></td>
-      <td>2.69</td>
-      <td>-4.61</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-16.00</td>
+      <td>5.27</td>
+      <td>-4.70</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>45</td>
+      <td>5.2152</td>
+      <td>5.4100</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>19.48</td>
+      <td><span class='pos'>3.74%</span></td>
+      <td>43</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>COMP</td>
@@ -773,19 +1305,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>9.7800</td>
       <td>09:50:00</td>
-      <td>9.7800</td>
       <td>9.8850</td>
-      <td><span class='pos'>1.07%</span></td>
-      <td>2.56</td>
-      <td>-0.10</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>10.50</td>
+      <td>17.98</td>
+      <td>-0.20</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>46</td>
+      <td>9.7898</td>
+      <td>11.3900</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>128.42</td>
+      <td><span class='pos'>13.12%</span></td>
+      <td>44</td>
+      <td>Real Estate</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>CTKB</td>
@@ -793,19 +1339,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>3.9650</td>
       <td>09:50:00</td>
-      <td>3.9700</td>
       <td>4.0750</td>
-      <td><span class='pos'>2.64%</span></td>
-      <td>3.65</td>
-      <td>-0.13</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>10.50</td>
+      <td>16.51</td>
+      <td>-0.23</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>49</td>
+      <td>3.9740</td>
+      <td>4.4550</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>43.70</td>
+      <td><span class='pos'>11.00%</span></td>
+      <td>47</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>ELDN</td>
@@ -813,19 +1373,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>4.0399</td>
       <td>09:50:00</td>
-      <td>4.0400</td>
       <td>3.9400</td>
-      <td><span class='neg'>-2.48%</span></td>
-      <td>4.21</td>
-      <td>-5.32</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-10.00</td>
+      <td>6.33</td>
+      <td>-10.48</td>
       <td>above open, above prior close, above VWAP, broke first 15m high</td>
-      <td>57</td>
+      <td>4.0440</td>
+      <td>3.7350</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-32.72</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>54</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>FLO</td>
@@ -833,19 +1407,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>7.5150</td>
       <td>09:50:00</td>
-      <td>7.5100</td>
       <td>7.5550</td>
-      <td><span class='pos'>0.60%</span></td>
-      <td>1.33</td>
-      <td>-0.73</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>4.50</td>
+      <td>6.68</td>
+      <td>-0.83</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>61</td>
+      <td>7.5175</td>
+      <td>7.9600</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>44.25</td>
+      <td><span class='pos'>5.89%</span></td>
+      <td>58</td>
+      <td>Consumer Defensive</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>FTRE</td>
@@ -853,19 +1441,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>15.6050</td>
       <td>09:50:00</td>
-      <td>15.6050</td>
       <td>16.4500</td>
-      <td><span class='pos'>5.41%</span></td>
-      <td>5.86</td>
-      <td>0.00</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>84.50</td>
+      <td>16.26</td>
+      <td>-0.10</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>64</td>
+      <td>15.6206</td>
+      <td>17.6200</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>177.21</td>
+      <td><span class='pos'>11.34%</span></td>
+      <td>61</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>HAPN</td>
@@ -873,19 +1475,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>18.8800</td>
       <td>09:50:00</td>
-      <td>18.9300</td>
       <td>18.9500</td>
-      <td><span class='pos'>0.11%</span></td>
-      <td>0.82</td>
-      <td>-1.48</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>2.00</td>
+      <td>6.44</td>
+      <td>-1.58</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>74</td>
+      <td>18.9489</td>
+      <td>20.1000</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>115.11</td>
+      <td><span class='pos'>6.07%</span></td>
+      <td>69</td>
+      <td>Financial</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>IMMX</td>
@@ -893,19 +1509,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>9.6500</td>
       <td>09:50:00</td>
-      <td>9.6500</td>
       <td>9.8950</td>
-      <td><span class='pos'>2.54%</span></td>
-      <td>5.80</td>
-      <td>-0.41</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>24.50</td>
+      <td>8.70</td>
+      <td>-0.62</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>79</td>
+      <td>9.6596</td>
+      <td>9.9800</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>32.03</td>
+      <td><span class='pos'>3.32%</span></td>
+      <td>75</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>IMNM</td>
@@ -913,19 +1543,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>19.3600</td>
       <td>09:50:00</td>
-      <td>19.4500</td>
       <td>19.3450</td>
-      <td><span class='neg'>-0.54%</span></td>
-      <td>0.57</td>
-      <td>-2.21</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-10.50</td>
+      <td>8.30</td>
+      <td>-2.31</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>80</td>
+      <td>19.4695</td>
+      <td>19.9600</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>49.05</td>
+      <td><span class='pos'>2.52%</span></td>
+      <td>76</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>JBLU</td>
@@ -933,19 +1577,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>5.5336</td>
       <td>09:50:00</td>
-      <td>5.5350</td>
       <td>5.5250</td>
-      <td><span class='neg'>-0.18%</span></td>
-      <td>2.80</td>
-      <td>-0.99</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-1.00</td>
+      <td>12.26</td>
+      <td>-1.09</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>86</td>
+      <td>5.5405</td>
+      <td>5.9950</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>50.12</td>
+      <td><span class='pos'>9.05%</span></td>
+      <td>81</td>
+      <td>Industrials</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>KSS</td>
@@ -953,19 +1611,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>17.5750</td>
       <td>09:50:00</td>
-      <td>17.6100</td>
       <td>17.5150</td>
-      <td><span class='neg'>-0.54%</span></td>
-      <td>0.88</td>
-      <td>-1.08</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-9.50</td>
+      <td>11.30</td>
+      <td>-1.18</td>
       <td>above open, above VWAP, broke first 15m high, not overextended</td>
-      <td>89</td>
+      <td>17.6276</td>
+      <td>19.2200</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>166.79</td>
+      <td><span class='pos'>9.46%</span></td>
+      <td>84</td>
+      <td>Consumer Cyclical</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>KVYO</td>
@@ -973,19 +1645,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>13.2050</td>
       <td>09:50:00</td>
-      <td>13.2100</td>
       <td>13.4900</td>
-      <td><span class='pos'>2.12%</span></td>
-      <td>3.26</td>
-      <td>-0.34</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>28.00</td>
+      <td>13.97</td>
+      <td>-0.44</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>91</td>
+      <td>13.2232</td>
+      <td>14.8800</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>148.23</td>
+      <td><span class='pos'>11.21%</span></td>
+      <td>86</td>
+      <td>Technology</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>LEG</td>
@@ -993,19 +1679,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>10.6800</td>
       <td>09:50:00</td>
-      <td>10.6837</td>
       <td>10.9100</td>
-      <td><span class='pos'>2.12%</span></td>
-      <td>3.60</td>
-      <td>0.00</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>22.63</td>
+      <td>9.87</td>
+      <td>-0.10</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>92</td>
+      <td>10.6944</td>
+      <td>11.6400</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>94.56</td>
+      <td><span class='pos'>8.84%</span></td>
+      <td>87</td>
+      <td>Consumer Cyclical</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>LPRO</td>
@@ -1013,19 +1713,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>3.1300</td>
       <td>09:50:00</td>
-      <td>3.1201</td>
       <td>3.1200</td>
-      <td><span class='pos'>-0.00%</span></td>
-      <td>0.32</td>
-      <td>-0.32</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-0.01</td>
+      <td>0.22</td>
+      <td>-0.42</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>94</td>
+      <td>3.1232</td>
+      <td>3.1150</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>-0.82</td>
+      <td><span class='neg'>-0.26%</span></td>
+      <td>89</td>
+      <td>Financial</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>LXRX</td>
@@ -1034,18 +1748,32 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>2.1550</td>
       <td>09:50:00</td>
       <td>2.1550</td>
-      <td>2.1550</td>
-      <td><span class='pos'>0.00%</span></td>
-      <td>3.71</td>
-      <td>-0.70</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>0.00</td>
+      <td>18.21</td>
+      <td>-0.80</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>95</td>
+      <td>2.1572</td>
+      <td>2.5400</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>29.81</td>
+      <td><span class='pos'>13.82%</span></td>
+      <td>90</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>MFA</td>
@@ -1053,19 +1781,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>9.4190</td>
       <td>09:50:00</td>
-      <td>9.4100</td>
       <td>9.4150</td>
-      <td><span class='pos'>0.05%</span></td>
-      <td>0.32</td>
-      <td>-0.32</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>0.50</td>
+      <td>4.22</td>
+      <td>-0.42</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>98</td>
+      <td>9.4194</td>
+      <td>9.8000</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>38.06</td>
+      <td><span class='pos'>4.04%</span></td>
+      <td>93</td>
+      <td>Real Estate</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>MITK</td>
@@ -1073,19 +1815,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>17.3300</td>
       <td>09:50:00</td>
-      <td>17.4150</td>
       <td>17.3150</td>
-      <td><span class='neg'>-0.57%</span></td>
-      <td>2.33</td>
-      <td>-1.00</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-10.00</td>
+      <td>12.84</td>
+      <td>-2.74</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>101</td>
+      <td>17.4324</td>
+      <td>19.2700</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>178.08</td>
+      <td><span class='pos'>10.22%</span></td>
+      <td>96</td>
+      <td>Technology</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>MRVI</td>
@@ -1093,19 +1849,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>5.3500</td>
       <td>09:50:00</td>
-      <td>5.3580</td>
       <td>5.3650</td>
-      <td><span class='pos'>0.13%</span></td>
-      <td>1.16</td>
-      <td>-1.36</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>0.70</td>
+      <td>17.28</td>
+      <td>-1.46</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>103</td>
+      <td>5.3634</td>
+      <td>6.2050</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>68.60</td>
+      <td><span class='pos'>12.79%</span></td>
+      <td>98</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>MYGN</td>
@@ -1113,19 +1883,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>4.5300</td>
       <td>09:50:00</td>
-      <td>4.5400</td>
       <td>4.6350</td>
-      <td><span class='pos'>2.09%</span></td>
-      <td>3.72</td>
-      <td>-0.99</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>9.50</td>
+      <td>29.83</td>
+      <td>-1.09</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>105</td>
+      <td>4.5445</td>
+      <td>5.8600</td>
+      <td>25.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +20%</td>
       <td>False</td>
+      <td>True</td>
+      <td>77.95</td>
+      <td><span class='pos'>17.15%</span></td>
+      <td>99</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>NEO</td>
@@ -1133,19 +1917,67 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>11.2400</td>
       <td>09:50:00</td>
-      <td>11.2350</td>
       <td>11.4700</td>
-      <td><span class='pos'>2.09%</span></td>
-      <td>3.87</td>
-      <td>0.00</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>23.50</td>
+      <td>26.53</td>
+      <td>-0.10</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>108</td>
+      <td>11.2462</td>
+      <td>14.1600</td>
+      <td>25.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +20%</td>
       <td>False</td>
+      <td>True</td>
+      <td>184.35</td>
+      <td><span class='pos'>16.39%</span></td>
+      <td>101</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>NRIX</td>
+      <td>40</td>
+      <td>🔥 BUY TODAY</td>
+      <td>18.7100</td>
+      <td>09:50:00</td>
+      <td>18.8700</td>
+      <td>26.76</td>
+      <td>-1.28</td>
+      <td>above open, above prior close, above VWAP, not overextended</td>
+      <td>18.7087</td>
+      <td>22.9200</td>
+      <td>25.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +20%</td>
+      <td>False</td>
+      <td>True</td>
+      <td>290.78</td>
+      <td><span class='pos'>15.54%</span></td>
+      <td>103</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>NTSK</td>
@@ -1153,19 +1985,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>9.1900</td>
       <td>09:50:00</td>
-      <td>9.1800</td>
       <td>9.5250</td>
-      <td><span class='pos'>3.76%</span></td>
-      <td>5.34</td>
-      <td>-0.27</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>34.50</td>
+      <td>12.52</td>
+      <td>-0.37</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>110</td>
+      <td>9.1892</td>
+      <td>10.2800</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>99.98</td>
+      <td><span class='pos'>10.88%</span></td>
+      <td>104</td>
+      <td>Technology</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>NUVB</td>
@@ -1173,19 +2019,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>5.8672</td>
       <td>09:50:00</td>
-      <td>5.8641</td>
       <td>6.0200</td>
-      <td><span class='pos'>2.66%</span></td>
-      <td>3.85</td>
-      <td>-0.06</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>15.59</td>
+      <td>12.44</td>
+      <td>-6.64</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>112</td>
+      <td>5.8700</td>
+      <td>5.6050</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>PROTECT BREAKEVEN</td>
+      <td>True</td>
+      <td>True</td>
+      <td>16.25</td>
+      <td><span class='pos'>2.77%</span></td>
+      <td>106</td>
+      <td>Healthcare</td>
       <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>NWBI</td>
@@ -1193,19 +2053,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>14.7050</td>
       <td>09:50:00</td>
-      <td>14.7050</td>
       <td>14.8700</td>
-      <td><span class='pos'>1.12%</span></td>
-      <td>1.33</td>
-      <td>-0.07</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>16.50</td>
+      <td>4.21</td>
+      <td>-0.17</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>114</td>
+      <td>14.7197</td>
+      <td>15.1300</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>41.03</td>
+      <td><span class='pos'>2.79%</span></td>
+      <td>107</td>
+      <td>Financial</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>NWL</td>
@@ -1213,19 +2087,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>5.0450</td>
       <td>09:50:00</td>
-      <td>5.0450</td>
       <td>5.1250</td>
-      <td><span class='pos'>1.59%</span></td>
-      <td>3.27</td>
-      <td>-1.68</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>8.00</td>
+      <td>21.88</td>
+      <td>-1.78</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>115</td>
+      <td>5.0500</td>
+      <td>5.8700</td>
+      <td>25.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +20%</td>
       <td>False</td>
+      <td>True</td>
+      <td>70.57</td>
+      <td><span class='pos'>13.97%</span></td>
+      <td>108</td>
+      <td>Consumer Defensive</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>OPTU</td>
@@ -1233,19 +2121,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>1.2850</td>
       <td>09:50:00</td>
-      <td>1.2900</td>
       <td>1.3750</td>
-      <td><span class='pos'>6.59%</span></td>
-      <td>6.98</td>
-      <td>-0.39</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>8.50</td>
+      <td>35.52</td>
+      <td>-0.49</td>
       <td>above open, above prior close, above VWAP, broke first 15m high</td>
-      <td>118</td>
+      <td>1.2913</td>
+      <td>1.6600</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>FINAL +30%</td>
+      <td>True</td>
+      <td>True</td>
+      <td>22.45</td>
+      <td><span class='pos'>17.38%</span></td>
+      <td>111</td>
+      <td>Communication Services</td>
       <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>OVID</td>
@@ -1253,19 +2155,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>2.2960</td>
       <td>09:50:00</td>
-      <td>2.2960</td>
       <td>2.3200</td>
-      <td><span class='pos'>1.05%</span></td>
-      <td>1.26</td>
-      <td>-2.00</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>2.40</td>
+      <td>13.13</td>
+      <td>-2.10</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>119</td>
+      <td>2.2983</td>
+      <td>2.5500</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>23.95</td>
+      <td><span class='pos'>10.42%</span></td>
+      <td>112</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>PACB</td>
@@ -1273,19 +2189,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>1.3350</td>
       <td>09:50:00</td>
-      <td>1.3350</td>
       <td>1.3100</td>
-      <td><span class='neg'>-1.87%</span></td>
-      <td>2.62</td>
-      <td>-3.00</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-2.50</td>
+      <td>27.97</td>
+      <td>-3.09</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>120</td>
+      <td>1.3363</td>
+      <td>1.6500</td>
+      <td>25.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +20%</td>
       <td>False</td>
+      <td>True</td>
+      <td>21.09</td>
+      <td><span class='pos'>15.78%</span></td>
+      <td>113</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>PDYN</td>
@@ -1293,19 +2223,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>6.8800</td>
       <td>09:50:00</td>
-      <td>6.8800</td>
       <td>6.4700</td>
-      <td><span class='neg'>-5.96%</span></td>
-      <td>2.43</td>
-      <td>-7.41</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-41.00</td>
+      <td>2.33</td>
+      <td>-19.12</td>
       <td>above open, above prior close, above VWAP, broke first 15m high</td>
-      <td>122</td>
+      <td>6.8869</td>
+      <td>5.8020</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-55.73</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>115</td>
+      <td>Technology</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>PGEN</td>
@@ -1313,19 +2257,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>5.4000</td>
       <td>09:50:00</td>
-      <td>5.4000</td>
       <td>5.3500</td>
-      <td><span class='neg'>-0.93%</span></td>
-      <td>3.52</td>
-      <td>-2.50</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-5.00</td>
+      <td>10.08</td>
+      <td>-2.69</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>123</td>
+      <td>5.4054</td>
+      <td>5.8650</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>49.71</td>
+      <td><span class='pos'>9.20%</span></td>
+      <td>116</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>PMT</td>
@@ -1333,19 +2291,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>10.0350</td>
       <td>09:50:00</td>
-      <td>10.0350</td>
       <td>10.0600</td>
-      <td><span class='pos'>0.25%</span></td>
-      <td>0.75</td>
-      <td>-0.35</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>2.50</td>
+      <td>8.21</td>
+      <td>-0.45</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>125</td>
+      <td>10.0450</td>
+      <td>10.7500</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>70.50</td>
+      <td><span class='pos'>7.02%</span></td>
+      <td>117</td>
+      <td>Real Estate</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>PRCH</td>
@@ -1353,19 +2325,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>12.4050</td>
       <td>09:50:00</td>
-      <td>12.4050</td>
       <td>12.9100</td>
-      <td><span class='pos'>4.07%</span></td>
-      <td>4.39</td>
-      <td>-1.05</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>50.50</td>
+      <td>12.66</td>
+      <td>-1.15</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>126</td>
+      <td>12.4174</td>
+      <td>13.8450</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>132.78</td>
+      <td><span class='pos'>10.69%</span></td>
+      <td>118</td>
+      <td>Financial</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>REAL</td>
@@ -1373,19 +2359,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>12.4650</td>
       <td>09:50:00</td>
-      <td>12.4700</td>
       <td>12.2100</td>
-      <td><span class='neg'>-2.09%</span></td>
-      <td>0.72</td>
-      <td>-3.65</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-26.00</td>
+      <td>6.19</td>
+      <td>-3.75</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>134</td>
+      <td>12.4825</td>
+      <td>12.1600</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>-32.25</td>
+      <td><span class='neg'>-2.58%</span></td>
+      <td>124</td>
+      <td>Consumer Cyclical</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>RGNX</td>
@@ -1393,19 +2393,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>9.5000</td>
       <td>09:50:00</td>
-      <td>9.5207</td>
       <td>9.9500</td>
-      <td><span class='pos'>4.51%</span></td>
-      <td>8.61</td>
-      <td>-0.59</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>42.93</td>
+      <td>15.21</td>
+      <td>-0.68</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>136</td>
+      <td>9.5302</td>
+      <td>10.5000</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>95.62</td>
+      <td><span class='pos'>10.03%</span></td>
+      <td>126</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>RKT</td>
@@ -1413,19 +2427,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>13.3800</td>
       <td>09:50:00</td>
-      <td>13.3851</td>
       <td>13.4800</td>
-      <td><span class='pos'>0.71%</span></td>
-      <td>2.54</td>
-      <td>-0.26</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>9.49</td>
+      <td>15.95</td>
+      <td>-0.36</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>138</td>
+      <td>13.3985</td>
+      <td>14.9800</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>145.33</td>
+      <td><span class='pos'>10.85%</span></td>
+      <td>127</td>
+      <td>Financial</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>SBH</td>
@@ -1433,19 +2461,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>13.3500</td>
       <td>09:50:00</td>
-      <td>13.3300</td>
       <td>13.3200</td>
-      <td><span class='neg'>-0.08%</span></td>
-      <td>1.31</td>
-      <td>-0.38</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-1.00</td>
+      <td>8.52</td>
+      <td>-0.47</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>142</td>
+      <td>13.3433</td>
+      <td>14.4500</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>110.67</td>
+      <td><span class='pos'>8.29%</span></td>
+      <td>131</td>
+      <td>Consumer Cyclical</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>SHC</td>
@@ -1453,19 +2495,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>15.8300</td>
       <td>09:50:00</td>
-      <td>15.8550</td>
       <td>15.8300</td>
-      <td><span class='neg'>-0.16%</span></td>
-      <td>0.38</td>
-      <td>-1.10</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-2.50</td>
+      <td>9.63</td>
+      <td>-1.20</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>145</td>
+      <td>15.8709</td>
+      <td>17.3750</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>150.41</td>
+      <td><span class='pos'>9.48%</span></td>
+      <td>134</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>SHLS</td>
@@ -1473,19 +2529,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>10.7100</td>
       <td>09:50:00</td>
-      <td>10.7100</td>
       <td>10.2950</td>
-      <td><span class='neg'>-3.87%</span></td>
-      <td>1.40</td>
-      <td>-5.21</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-41.50</td>
+      <td>1.30</td>
+      <td>-16.66</td>
       <td>above open, above VWAP, broke first 15m high, not overextended</td>
-      <td>146</td>
+      <td>10.7207</td>
+      <td>9.0000</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-86.75</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>135</td>
+      <td>Technology</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>SLDB</td>
@@ -1493,19 +2563,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>8.6150</td>
       <td>09:50:00</td>
-      <td>8.6150</td>
       <td>8.7800</td>
-      <td><span class='pos'>1.92%</span></td>
-      <td>6.67</td>
-      <td>-0.17</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>16.50</td>
+      <td>13.29</td>
+      <td>-0.27</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>148</td>
+      <td>8.6236</td>
+      <td>9.2680</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>74.86</td>
+      <td><span class='pos'>8.68%</span></td>
+      <td>137</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>SMMT</td>
@@ -1513,19 +2597,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>14.3600</td>
       <td>09:50:00</td>
-      <td>14.3650</td>
       <td>14.2600</td>
-      <td><span class='neg'>-0.73%</span></td>
-      <td>3.10</td>
-      <td>-1.29</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-10.50</td>
+      <td>2.99</td>
+      <td>-3.47</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>151</td>
+      <td>14.3794</td>
+      <td>14.0300</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>-34.94</td>
+      <td><span class='neg'>-2.43%</span></td>
+      <td>139</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>SNDX</td>
@@ -1533,19 +2631,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>19.4200</td>
       <td>09:50:00</td>
-      <td>19.4400</td>
       <td>19.6100</td>
-      <td><span class='pos'>0.87%</span></td>
-      <td>2.88</td>
-      <td>0.00</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>17.00</td>
+      <td>9.77</td>
+      <td>-0.10</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>152</td>
+      <td>19.4594</td>
+      <td>21.3100</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>185.06</td>
+      <td><span class='pos'>9.51%</span></td>
+      <td>140</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>SPRY</td>
@@ -1553,19 +2665,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>10.2200</td>
       <td>09:50:00</td>
-      <td>10.2200</td>
       <td>10.2500</td>
-      <td><span class='pos'>0.29%</span></td>
-      <td>2.25</td>
-      <td>-3.03</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>3.00</td>
+      <td>6.25</td>
+      <td>-26.59</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>153</td>
+      <td>10.2302</td>
+      <td>8.4450</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-238.81</td>
+      <td><span class='neg'>-23.34%</span></td>
+      <td>141</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>SVRA</td>
@@ -1573,19 +2699,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>5.7500</td>
       <td>09:50:00</td>
-      <td>5.7450</td>
       <td>5.7700</td>
-      <td><span class='pos'>0.44%</span></td>
-      <td>2.61</td>
-      <td>-0.52</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>2.50</td>
+      <td>7.73</td>
+      <td>-0.71</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>154</td>
+      <td>5.7507</td>
+      <td>5.9000</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>14.93</td>
+      <td><span class='pos'>2.60%</span></td>
+      <td>142</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>TRVI</td>
@@ -1593,19 +2733,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>17.8000</td>
       <td>09:50:00</td>
-      <td>17.8700</td>
       <td>17.3500</td>
-      <td><span class='neg'>-2.91%</span></td>
-      <td>1.62</td>
-      <td>-2.91</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-52.00</td>
+      <td>2.42</td>
+      <td>-3.23</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>156</td>
+      <td>17.8879</td>
+      <td>18.0900</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>20.21</td>
+      <td><span class='pos'>1.13%</span></td>
+      <td>143</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>UTZ</td>
@@ -1613,19 +2767,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>7.0600</td>
       <td>09:50:00</td>
-      <td>7.0450</td>
       <td>7.0600</td>
-      <td><span class='pos'>0.21%</span></td>
-      <td>1.28</td>
-      <td>-1.14</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>1.50</td>
+      <td>9.90</td>
+      <td>-1.23</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>159</td>
+      <td>7.0520</td>
+      <td>7.7200</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>66.80</td>
+      <td><span class='pos'>9.47%</span></td>
+      <td>146</td>
+      <td>Consumer Defensive</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>VIR</td>
@@ -1633,19 +2801,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔥 BUY TODAY</td>
       <td>9.7300</td>
       <td>09:50:00</td>
-      <td>9.7200</td>
       <td>10.1450</td>
-      <td><span class='pos'>4.37%</span></td>
-      <td>4.73</td>
-      <td>0.00</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>42.50</td>
+      <td>6.74</td>
+      <td>-0.10</td>
       <td>above open, above prior close, above VWAP, not overextended</td>
-      <td>160</td>
+      <td>9.7297</td>
+      <td>10.0900</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>36.03</td>
+      <td><span class='pos'>3.70%</span></td>
+      <td>147</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>daily limit</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>ABSI</td>
@@ -1653,19 +2835,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>8.0700</td>
       <td>09:50:00</td>
-      <td>8.0700</td>
       <td>7.3750</td>
-      <td><span class='neg'>-8.61%</span></td>
-      <td>2.17</td>
-      <td>-8.67</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>True</td>
-      <td>-69.50</td>
+      <td>40.63</td>
+      <td>-8.76</td>
       <td>above open, above VWAP, not overextended</td>
-      <td>2</td>
+      <td>8.0781</td>
+      <td>10.8900</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-65.37</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>2</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>ACRS</td>
@@ -1673,19 +2869,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>4.8300</td>
       <td>09:50:00</td>
-      <td>4.8510</td>
       <td>4.9050</td>
-      <td><span class='pos'>1.11%</span></td>
-      <td>5.44</td>
-      <td>-0.54</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>5.40</td>
+      <td>5.85</td>
+      <td>-3.11</td>
       <td>above open, above VWAP, not overextended</td>
-      <td>4</td>
+      <td>4.8559</td>
+      <td>5.0000</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>14.41</td>
+      <td><span class='pos'>2.97%</span></td>
+      <td>4</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>AEO</td>
@@ -1693,19 +2903,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>17.6700</td>
       <td>09:50:00</td>
-      <td>17.6800</td>
       <td>17.7200</td>
-      <td><span class='pos'>0.23%</span></td>
-      <td>1.47</td>
-      <td>-0.34</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>4.00</td>
+      <td>6.17</td>
+      <td>-0.58</td>
       <td>above open, above VWAP, not overextended</td>
-      <td>6</td>
+      <td>17.6977</td>
+      <td>17.8650</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>16.73</td>
+      <td><span class='pos'>0.95%</span></td>
+      <td>6</td>
+      <td>Consumer Cyclical</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>AIRJ</td>
@@ -1713,19 +2937,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>4.8100</td>
       <td>09:50:00</td>
-      <td>4.8100</td>
       <td>5.0350</td>
-      <td><span class='pos'>4.68%</span></td>
-      <td>10.81</td>
-      <td>0.00</td>
-      <td>True</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>22.50</td>
+      <td>10.70</td>
+      <td>-8.82</td>
       <td>above open, above VWAP, not overextended</td>
+      <td>4.8148</td>
+      <td>4.5500</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>PROTECT BREAKEVEN</td>
+      <td>True</td>
+      <td>True</td>
+      <td>23.57</td>
+      <td><span class='pos'>4.89%</span></td>
       <td>8</td>
+      <td>Industrials</td>
       <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>ALOY</td>
@@ -1733,19 +2971,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>19.3550</td>
       <td>09:50:00</td>
-      <td>19.4200</td>
       <td>19.1750</td>
-      <td><span class='neg'>-1.26%</span></td>
-      <td>6.02</td>
-      <td>-5.41</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-24.50</td>
+      <td>5.92</td>
+      <td>-31.58</td>
       <td>above open, above VWAP, broke first 15m high</td>
-      <td>11</td>
+      <td>19.4394</td>
+      <td>14.6550</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-157.30</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>11</td>
+      <td>Basic Materials</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>ALTO</td>
@@ -1753,19 +3005,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>5.1450</td>
       <td>09:50:00</td>
-      <td>5.1450</td>
       <td>5.1100</td>
-      <td><span class='neg'>-0.68%</span></td>
-      <td>2.82</td>
-      <td>-1.36</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-3.50</td>
+      <td>2.72</td>
+      <td>-5.83</td>
       <td>above open, above VWAP, not overextended</td>
-      <td>12</td>
+      <td>5.1501</td>
+      <td>5.1700</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>1.99</td>
+      <td><span class='pos'>0.39%</span></td>
+      <td>12</td>
+      <td>Basic Materials</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>AQST</td>
@@ -1773,19 +3039,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>4.9850</td>
       <td>09:50:00</td>
-      <td>4.9900</td>
       <td>5.0250</td>
-      <td><span class='pos'>0.70%</span></td>
-      <td>2.30</td>
-      <td>-0.90</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>3.50</td>
+      <td>3.60</td>
+      <td>-16.72</td>
       <td>above open, above prior close, above VWAP</td>
-      <td>19</td>
+      <td>4.9950</td>
+      <td>4.3625</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-40.42</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>18</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>ASPI</td>
@@ -1793,19 +3073,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>7.4100</td>
       <td>09:50:00</td>
-      <td>7.4250</td>
       <td>7.0700</td>
-      <td><span class='neg'>-4.78%</span></td>
-      <td>1.41</td>
-      <td>-5.39</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-35.50</td>
+      <td>1.31</td>
+      <td>-21.16</td>
       <td>above open, above prior close, above VWAP</td>
-      <td>21</td>
+      <td>7.4324</td>
+      <td>6.1400</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-60.14</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>20</td>
+      <td>Basic Materials</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>BFLY</td>
@@ -1813,19 +3107,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>7.2900</td>
       <td>09:50:00</td>
-      <td>7.2800</td>
       <td>7.6650</td>
-      <td><span class='pos'>5.29%</span></td>
-      <td>8.86</td>
-      <td>0.00</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>38.50</td>
+      <td>21.99</td>
+      <td>-0.10</td>
       <td>above open, above prior close, above VWAP</td>
-      <td>32</td>
+      <td>7.2873</td>
+      <td>8.8800</td>
+      <td>25.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +20%</td>
       <td>False</td>
+      <td>True</td>
+      <td>112.07</td>
+      <td><span class='pos'>15.38%</span></td>
+      <td>31</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>COUR</td>
@@ -1833,19 +3141,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>5.2300</td>
       <td>09:50:00</td>
-      <td>5.2300</td>
       <td>5.4100</td>
-      <td><span class='pos'>3.44%</span></td>
-      <td>4.40</td>
-      <td>-0.57</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>18.00</td>
+      <td>19.58</td>
+      <td>-0.67</td>
       <td>above open, above VWAP, not overextended</td>
-      <td>47</td>
+      <td>5.2352</td>
+      <td>5.7500</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>51.63</td>
+      <td><span class='pos'>9.86%</span></td>
+      <td>45</td>
+      <td>Consumer Defensive</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>CTM</td>
@@ -1853,19 +3175,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>0.7538</td>
       <td>09:50:00</td>
-      <td>0.7550</td>
       <td>0.7317</td>
-      <td><span class='neg'>-3.09%</span></td>
       <td>1.80</td>
-      <td>-3.97</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-2.33</td>
+      <td>-8.27</td>
       <td>above open, above VWAP, not overextended</td>
-      <td>50</td>
+      <td>0.7558</td>
+      <td>0.7078</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-6.12</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>48</td>
+      <td>Technology</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>CTMX</td>
@@ -1873,19 +3209,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>3.0450</td>
       <td>09:50:00</td>
-      <td>3.0500</td>
       <td>3.1700</td>
-      <td><span class='pos'>3.93%</span></td>
-      <td>5.57</td>
-      <td>0.00</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>12.00</td>
+      <td>13.99</td>
+      <td>-0.10</td>
       <td>above open, above prior close, not overextended</td>
-      <td>51</td>
+      <td>3.0530</td>
+      <td>3.3801</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>31.45</td>
+      <td><span class='pos'>10.30%</span></td>
+      <td>49</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>EDIT</td>
@@ -1893,19 +3243,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>2.8200</td>
       <td>09:50:00</td>
-      <td>2.8150</td>
       <td>2.7550</td>
-      <td><span class='neg'>-2.13%</span></td>
-      <td>2.18</td>
-      <td>-3.37</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-6.00</td>
+      <td>5.40</td>
+      <td>-6.13</td>
       <td>above open, above prior close, not overextended</td>
-      <td>56</td>
+      <td>2.8178</td>
+      <td>2.8650</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>4.72</td>
+      <td><span class='pos'>1.67%</span></td>
+      <td>53</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>EXFY</td>
@@ -1913,19 +3277,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>1.6350</td>
       <td>09:50:00</td>
-      <td>1.6300</td>
       <td>1.5500</td>
-      <td><span class='neg'>-4.91%</span></td>
-      <td>0.00</td>
-      <td>-9.82</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>True</td>
-      <td>-8.00</td>
+      <td>-0.10</td>
+      <td>-16.34</td>
       <td>above open, above VWAP, not overextended</td>
-      <td>58</td>
+      <td>1.6316</td>
+      <td>1.6250</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-13.20</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>55</td>
+      <td>Technology</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>FATE</td>
@@ -1933,19 +3311,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>2.2300</td>
       <td>09:50:00</td>
-      <td>2.2300</td>
       <td>2.1650</td>
-      <td><span class='neg'>-2.91%</span></td>
-      <td>3.81</td>
-      <td>-7.17</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-6.50</td>
+      <td>4.83</td>
+      <td>-18.80</td>
       <td>above open, above prior close, above VWAP</td>
-      <td>59</td>
+      <td>2.2322</td>
+      <td>2.0950</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-18.33</td>
+      <td><span class='neg'>-8.21%</span></td>
+      <td>56</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>FLYW</td>
@@ -1953,19 +3345,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>15.4300</td>
       <td>09:50:00</td>
-      <td>15.4100</td>
       <td>15.6200</td>
-      <td><span class='pos'>1.36%</span></td>
-      <td>1.75</td>
-      <td>-1.23</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>21.00</td>
+      <td>14.75</td>
+      <td>-1.33</td>
       <td>above open, above prior close, not overextended</td>
-      <td>62</td>
+      <td>15.4254</td>
+      <td>17.5000</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>180.01</td>
+      <td><span class='pos'>11.67%</span></td>
+      <td>59</td>
+      <td>Technology</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>FULC</td>
@@ -1973,19 +3379,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>3.8000</td>
       <td>09:50:00</td>
-      <td>3.8000</td>
       <td>3.8300</td>
-      <td><span class='pos'>0.79%</span></td>
-      <td>1.58</td>
-      <td>-2.11</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>3.00</td>
+      <td>5.55</td>
+      <td>-6.67</td>
       <td>above open, above prior close, not overextended</td>
-      <td>65</td>
+      <td>3.8038</td>
+      <td>3.8050</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>0.12</td>
+      <td><span class='pos'>0.03%</span></td>
+      <td>62</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>HAYW</td>
@@ -1993,19 +3413,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>14.6900</td>
       <td>09:50:00</td>
-      <td>14.6950</td>
       <td>14.7900</td>
-      <td><span class='pos'>0.65%</span></td>
-      <td>1.60</td>
-      <td>-0.27</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>9.50</td>
+      <td>12.51</td>
+      <td>-0.37</td>
       <td>above open, above VWAP, not overextended</td>
-      <td>75</td>
+      <td>14.7097</td>
+      <td>16.4900</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>161.75</td>
+      <td><span class='pos'>11.00%</span></td>
+      <td>70</td>
+      <td>Industrials</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>HIVE</td>
@@ -2013,19 +3447,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>4.7450</td>
       <td>09:50:00</td>
-      <td>4.7450</td>
       <td>4.6250</td>
-      <td><span class='neg'>-2.53%</span></td>
-      <td>2.63</td>
-      <td>-4.32</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-12.00</td>
+      <td>2.53</td>
+      <td>-24.00</td>
       <td>above open, above VWAP, not overextended</td>
-      <td>77</td>
+      <td>4.7497</td>
+      <td>4.0500</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-38.43</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>72</td>
+      <td>Financial</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>HRTX</td>
@@ -2033,19 +3481,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>0.4260</td>
       <td>09:50:00</td>
-      <td>0.4235</td>
       <td>0.4189</td>
-      <td><span class='neg'>-1.09%</span></td>
-      <td>2.55</td>
-      <td>-2.41</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-0.46</td>
+      <td>8.14</td>
+      <td>-4.46</td>
       <td>above open, above VWAP, not overextended</td>
-      <td>78</td>
+      <td>0.4239</td>
+      <td>0.4235</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>-0.04</td>
+      <td><span class='neg'>-0.10%</span></td>
+      <td>73</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>INFQ</td>
@@ -2053,19 +3515,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>15.5200</td>
       <td>09:50:00</td>
-      <td>15.5271</td>
       <td>15.9600</td>
-      <td><span class='pos'>2.79%</span></td>
-      <td>6.82</td>
-      <td>-2.43</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>43.29</td>
+      <td>6.71</td>
+      <td>-18.50</td>
       <td>above open, above prior close, above VWAP</td>
-      <td>81</td>
+      <td>15.5426</td>
+      <td>13.6400</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-125.77</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>77</td>
+      <td>Technology</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>KEEL</td>
@@ -2073,19 +3549,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>6.4850</td>
       <td>09:50:00</td>
-      <td>6.4850</td>
       <td>6.5900</td>
-      <td><span class='pos'>1.62%</span></td>
-      <td>6.01</td>
-      <td>-1.03</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>10.50</td>
+      <td>6.29</td>
+      <td>-15.35</td>
       <td>above open, above VWAP, broke first 15m high</td>
-      <td>88</td>
+      <td>6.4915</td>
+      <td>5.9999</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-52.53</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>83</td>
+      <td>Technology</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>LILAK</td>
@@ -2093,19 +3583,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>5.5800</td>
       <td>09:50:00</td>
-      <td>5.5800</td>
       <td>5.8900</td>
-      <td><span class='pos'>5.56%</span></td>
-      <td>7.08</td>
-      <td>-1.88</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>31.00</td>
+      <td>29.53</td>
+      <td>-1.98</td>
       <td>above open, above prior close, above VWAP</td>
-      <td>93</td>
+      <td>5.5856</td>
+      <td>7.0500</td>
+      <td>25.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +20%</td>
       <td>False</td>
+      <td>True</td>
+      <td>91.99</td>
+      <td><span class='pos'>16.47%</span></td>
+      <td>88</td>
+      <td>Communication Services</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>MGNX</td>
@@ -2113,19 +3617,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>4.8300</td>
       <td>09:50:00</td>
-      <td>4.8300</td>
       <td>4.6950</td>
-      <td><span class='neg'>-2.80%</span></td>
-      <td>2.28</td>
-      <td>-5.69</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-13.50</td>
+      <td>5.07</td>
+      <td>-5.79</td>
       <td>above open, above prior close, above VWAP</td>
-      <td>99</td>
+      <td>4.8348</td>
+      <td>4.8000</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>-3.48</td>
+      <td><span class='neg'>-0.72%</span></td>
+      <td>94</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>MQ</td>
@@ -2133,19 +3651,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>3.8160</td>
       <td>09:50:00</td>
-      <td>3.8150</td>
       <td>3.8200</td>
-      <td><span class='pos'>0.13%</span></td>
-      <td>0.66</td>
-      <td>-1.44</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>0.50</td>
+      <td>10.24</td>
+      <td>-1.54</td>
       <td>above open, above prior close, not overextended</td>
-      <td>102</td>
+      <td>3.8188</td>
+      <td>4.1800</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>36.94</td>
+      <td><span class='pos'>9.67%</span></td>
+      <td>97</td>
+      <td>Technology</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>NAVI</td>
@@ -2153,19 +3685,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>7.9800</td>
       <td>09:50:00</td>
-      <td>8.0000</td>
       <td>7.9900</td>
-      <td><span class='neg'>-0.13%</span></td>
-      <td>0.81</td>
-      <td>-1.25</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-1.00</td>
+      <td>9.64</td>
+      <td>-1.35</td>
       <td>above prior close, above VWAP, not overextended</td>
-      <td>106</td>
+      <td>8.0080</td>
+      <td>8.6800</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>67.20</td>
+      <td><span class='pos'>8.39%</span></td>
+      <td>100</td>
+      <td>Financial</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>NUAI</td>
@@ -2173,19 +3719,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>6.4550</td>
       <td>09:50:00</td>
-      <td>6.4700</td>
       <td>6.1600</td>
-      <td><span class='neg'>-4.79%</span></td>
-      <td>2.78</td>
-      <td>-4.95</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-31.00</td>
+      <td>2.68</td>
+      <td>-15.70</td>
       <td>above open, above VWAP, not overextended</td>
-      <td>111</td>
+      <td>6.4765</td>
+      <td>5.8900</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-52.41</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>105</td>
+      <td>Technology</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>OI</td>
@@ -2194,38 +3754,32 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>9.0700</td>
       <td>09:50:00</td>
       <td>9.1000</td>
-      <td>9.1000</td>
-      <td><span class='pos'>0.00%</span></td>
-      <td>2.64</td>
-      <td>-0.60</td>
+      <td>7.86</td>
+      <td>-0.70</td>
+      <td>above open, above VWAP, not overextended</td>
+      <td>9.1091</td>
+      <td>9.7100</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
       <td>False</td>
+      <td>60.09</td>
+      <td><span class='pos'>6.60%</span></td>
+      <td>109</td>
+      <td>Consumer Cyclical</td>
       <td>False</td>
       <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
       <td>0.00</td>
-      <td>above open, above VWAP, not overextended</td>
-      <td>116</td>
-      <td>False</td>
-    </tr>
-    <tr>
-      <td>PLTD</td>
-      <td>30</td>
-      <td>👀 WAIT</td>
-      <td>8.6800</td>
-      <td>09:50:00</td>
-      <td>8.6899</td>
-      <td>8.9000</td>
-      <td><span class='pos'>2.42%</span></td>
-      <td>2.94</td>
-      <td>-0.92</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>21.01</td>
-      <td>above open, above VWAP, not overextended</td>
-      <td>124</td>
-      <td>False</td>
     </tr>
     <tr>
       <td>PSNL</td>
@@ -2233,19 +3787,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>10.1800</td>
       <td>09:50:00</td>
-      <td>10.1800</td>
       <td>10.0600</td>
-      <td><span class='neg'>-1.18%</span></td>
-      <td>3.73</td>
-      <td>-1.82</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-12.00</td>
+      <td>31.20</td>
+      <td>-1.92</td>
       <td>above open, above VWAP, not overextended</td>
-      <td>128</td>
+      <td>10.1902</td>
+      <td>12.9600</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>FINAL +30%</td>
+      <td>True</td>
+      <td>True</td>
+      <td>177.13</td>
+      <td><span class='pos'>17.38%</span></td>
+      <td>120</td>
+      <td>Healthcare</td>
       <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>QS</td>
@@ -2253,19 +3821,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>7.4050</td>
       <td>09:50:00</td>
-      <td>7.4000</td>
       <td>7.4200</td>
-      <td><span class='pos'>0.27%</span></td>
-      <td>4.32</td>
-      <td>-0.81</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>2.00</td>
+      <td>4.22</td>
+      <td>-6.58</td>
       <td>above open, above VWAP, not overextended</td>
-      <td>131</td>
+      <td>7.4074</td>
+      <td>7.1550</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>-25.24</td>
+      <td><span class='neg'>-3.41%</span></td>
+      <td>121</td>
+      <td>Consumer Cyclical</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>QTRX</td>
@@ -2273,19 +3855,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>3.5096</td>
       <td>09:50:00</td>
-      <td>3.5100</td>
       <td>3.2200</td>
-      <td><span class='neg'>-8.26%</span></td>
-      <td>1.99</td>
-      <td>-9.12</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>True</td>
-      <td>-29.00</td>
+      <td>24.09</td>
+      <td>-9.21</td>
       <td>above open, above prior close, not overextended</td>
-      <td>132</td>
+      <td>3.5135</td>
+      <td>4.3100</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-28.43</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>122</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>REAX</td>
@@ -2293,19 +3889,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>1.7350</td>
       <td>09:50:00</td>
-      <td>1.7350</td>
       <td>1.7550</td>
-      <td><span class='pos'>1.15%</span></td>
-      <td>2.59</td>
-      <td>-1.31</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>2.00</td>
+      <td>7.68</td>
+      <td>-1.41</td>
       <td>above open, above prior close, not overextended</td>
-      <td>135</td>
+      <td>1.7367</td>
+      <td>1.8700</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>13.33</td>
+      <td><span class='pos'>7.67%</span></td>
+      <td>125</td>
+      <td>Real Estate</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>RLAY</td>
@@ -2313,19 +3923,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>17.1600</td>
       <td>09:50:00</td>
-      <td>17.1490</td>
       <td>17.4300</td>
-      <td><span class='pos'>1.64%</span></td>
-      <td>3.21</td>
-      <td>-0.17</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>28.10</td>
+      <td>10.33</td>
+      <td>-0.27</td>
       <td>above open, above VWAP, not overextended</td>
-      <td>139</td>
+      <td>17.1661</td>
+      <td>18.5400</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>153.58</td>
+      <td><span class='pos'>8.95%</span></td>
+      <td>128</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>RZLT</td>
@@ -2333,19 +3957,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>5.1250</td>
       <td>09:50:00</td>
-      <td>5.1200</td>
       <td>4.8850</td>
-      <td><span class='neg'>-4.59%</span></td>
-      <td>2.73</td>
-      <td>-4.69</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-23.50</td>
+      <td>2.63</td>
+      <td>-5.17</td>
       <td>above open, above VWAP, not overextended</td>
-      <td>141</td>
+      <td>5.1251</td>
+      <td>5.0250</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>-10.01</td>
+      <td><span class='neg'>-1.95%</span></td>
+      <td>130</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>SFIX</td>
@@ -2353,19 +3991,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>4.2450</td>
       <td>09:50:00</td>
-      <td>4.2400</td>
       <td>4.3350</td>
-      <td><span class='pos'>2.24%</span></td>
-      <td>2.36</td>
-      <td>-2.83</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>9.50</td>
+      <td>7.91</td>
+      <td>-2.93</td>
       <td>above open, above prior close, above VWAP</td>
-      <td>144</td>
+      <td>4.2442</td>
+      <td>4.5350</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>29.08</td>
+      <td><span class='pos'>6.85%</span></td>
+      <td>133</td>
+      <td>Consumer Cyclical</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>UAA</td>
@@ -2373,19 +4025,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>5.8150</td>
       <td>09:50:00</td>
-      <td>5.8150</td>
       <td>5.7850</td>
-      <td><span class='neg'>-0.52%</span></td>
-      <td>1.63</td>
-      <td>-1.38</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-3.00</td>
+      <td>9.26</td>
+      <td>-1.47</td>
       <td>above open, above VWAP, not overextended</td>
-      <td>158</td>
+      <td>5.8208</td>
+      <td>6.2800</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>45.92</td>
+      <td><span class='pos'>7.89%</span></td>
+      <td>145</td>
+      <td>Consumer Cyclical</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>VLY</td>
@@ -2393,19 +4059,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>14.2450</td>
       <td>09:50:00</td>
-      <td>14.2500</td>
       <td>14.3850</td>
-      <td><span class='pos'>0.95%</span></td>
-      <td>1.09</td>
-      <td>-0.21</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>13.50</td>
+      <td>4.74</td>
+      <td>-0.31</td>
       <td>above open, above VWAP, not overextended</td>
-      <td>161</td>
+      <td>14.2642</td>
+      <td>14.7100</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>44.58</td>
+      <td><span class='pos'>3.12%</span></td>
+      <td>148</td>
+      <td>Financial</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>VTAK</td>
@@ -2413,19 +4093,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>1.0978</td>
       <td>09:50:00</td>
-      <td>1.0999</td>
       <td>0.9420</td>
-      <td><span class='neg'>-14.36%</span></td>
-      <td>2.74</td>
-      <td>-14.54</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>True</td>
-      <td>-15.79</td>
+      <td>62.58</td>
+      <td>-16.44</td>
       <td>above prior close, above VWAP, not overextended</td>
-      <td>162</td>
+      <td>1.1010</td>
+      <td>1.1100</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-8.91</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>149</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>WAY</td>
@@ -2433,19 +4127,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>17.8400</td>
       <td>09:50:00</td>
-      <td>17.7650</td>
       <td>18.4200</td>
-      <td><span class='pos'>3.69%</span></td>
-      <td>5.04</td>
-      <td>0.00</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>65.50</td>
+      <td>12.50</td>
+      <td>-0.10</td>
       <td>above open, above prior close, not overextended</td>
-      <td>163</td>
+      <td>17.7828</td>
+      <td>19.8700</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>192.30</td>
+      <td><span class='pos'>10.81%</span></td>
+      <td>150</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>WKSP</td>
@@ -2453,19 +4161,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>0.8604</td>
       <td>09:50:00</td>
-      <td>0.8627</td>
       <td>0.8785</td>
-      <td><span class='pos'>1.83%</span></td>
-      <td>6.64</td>
-      <td>-5.80</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>1.58</td>
+      <td>50.53</td>
+      <td>-5.89</td>
       <td>above open, above prior close, above VWAP</td>
-      <td>165</td>
+      <td>0.8636</td>
+      <td>1.1800</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>FINAL +30%</td>
+      <td>True</td>
+      <td>True</td>
+      <td>15.01</td>
+      <td><span class='pos'>17.38%</span></td>
+      <td>152</td>
+      <td>Consumer Cyclical</td>
       <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>IOVA</td>
@@ -2473,19 +4195,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>👀 WAIT</td>
       <td>4.3200</td>
       <td>09:50:00</td>
-      <td>4.3201</td>
       <td>4.4377</td>
-      <td><span class='pos'>2.72%</span></td>
-      <td>4.63</td>
-      <td>-1.39</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>11.76</td>
+      <td>10.04</td>
+      <td>-4.61</td>
       <td>above open, above prior close, above VWAP, broke first 15m high, too extended</td>
-      <td>83</td>
+      <td>4.3244</td>
+      <td>4.2300</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>PROTECT BREAKEVEN</td>
+      <td>True</td>
+      <td>True</td>
+      <td>21.17</td>
+      <td><span class='pos'>4.90%</span></td>
+      <td>78</td>
+      <td>Healthcare</td>
       <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>ABUS</td>
@@ -2493,19 +4229,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>4.4800</td>
       <td>09:50:00</td>
-      <td>4.4850</td>
       <td>4.4450</td>
-      <td><span class='neg'>-0.89%</span></td>
-      <td>2.01</td>
-      <td>-2.01</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-4.00</td>
+      <td>3.13</td>
+      <td>-3.89</td>
       <td>above VWAP, not overextended</td>
-      <td>3</td>
+      <td>4.4895</td>
+      <td>4.5750</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>8.55</td>
+      <td><span class='pos'>1.90%</span></td>
+      <td>3</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>ATLN</td>
@@ -2513,19 +4263,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>1.0102</td>
       <td>09:50:00</td>
-      <td>1.0199</td>
       <td>1.3200</td>
-      <td><span class='pos'>29.42%</span></td>
-      <td>78.45</td>
-      <td>-2.83</td>
-      <td>True</td>
-      <td>True</td>
-      <td>True</td>
-      <td>False</td>
-      <td>30.01</td>
+      <td>78.27</td>
+      <td>-36.13</td>
       <td>above prior close, not overextended</td>
-      <td>23</td>
+      <td>1.0209</td>
+      <td>0.9140</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>PROTECT +10%</td>
+      <td>True</td>
+      <td>True</td>
+      <td>11.70</td>
+      <td><span class='pos'>11.46%</span></td>
+      <td>22</td>
+      <td>Industrials</td>
       <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>AUR</td>
@@ -2533,19 +4297,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>6.3700</td>
       <td>09:50:00</td>
-      <td>6.3700</td>
       <td>6.4250</td>
-      <td><span class='pos'>0.86%</span></td>
-      <td>2.35</td>
-      <td>-0.31</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>5.50</td>
+      <td>3.27</td>
+      <td>-7.31</td>
       <td>above open, not overextended</td>
-      <td>25</td>
+      <td>6.3764</td>
+      <td>6.3700</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>-0.64</td>
+      <td><span class='neg'>-0.10%</span></td>
+      <td>24</td>
+      <td>Consumer Cyclical</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>AVO</td>
@@ -2553,19 +4331,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>11.3200</td>
       <td>09:50:00</td>
-      <td>11.3500</td>
       <td>11.7100</td>
-      <td><span class='pos'>3.17%</span></td>
-      <td>3.39</td>
-      <td>-0.26</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>36.00</td>
+      <td>8.83</td>
+      <td>-0.36</td>
       <td>above VWAP, not overextended</td>
-      <td>27</td>
+      <td>11.3614</td>
+      <td>12.2700</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>90.87</td>
+      <td><span class='pos'>8.00%</span></td>
+      <td>26</td>
+      <td>Consumer Defensive</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>AVR</td>
@@ -2573,19 +4365,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>9.5090</td>
       <td>09:50:00</td>
-      <td>9.5090</td>
       <td>10.2800</td>
-      <td><span class='pos'>8.11%</span></td>
-      <td>11.05</td>
-      <td>0.00</td>
-      <td>True</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>77.10</td>
+      <td>10.94</td>
+      <td>-0.19</td>
       <td>above open, not overextended</td>
-      <td>28</td>
+      <td>9.5185</td>
+      <td>9.6500</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>PROTECT BREAKEVEN</td>
+      <td>True</td>
+      <td>True</td>
+      <td>46.59</td>
+      <td><span class='pos'>4.89%</span></td>
+      <td>27</td>
+      <td>Healthcare</td>
       <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>BOLD</td>
@@ -2593,39 +4399,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>2.2800</td>
       <td>09:50:00</td>
-      <td>2.2803</td>
       <td>2.6000</td>
-      <td><span class='pos'>14.02%</span></td>
-      <td>20.60</td>
-      <td>-1.33</td>
-      <td>True</td>
-      <td>True</td>
-      <td>False</td>
-      <td>False</td>
-      <td>31.97</td>
+      <td>22.23</td>
+      <td>-1.43</td>
       <td>above prior close, not overextended</td>
-      <td>36</td>
+      <td>2.2826</td>
+      <td>2.5450</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>PROTECT +10%</td>
+      <td>True</td>
+      <td>True</td>
+      <td>28.28</td>
+      <td><span class='pos'>12.39%</span></td>
+      <td>35</td>
+      <td>Healthcare</td>
       <td>False</td>
-    </tr>
-    <tr>
-      <td>BTCZ</td>
-      <td>20</td>
-      <td>🔴 PASS</td>
-      <td>5.9399</td>
-      <td>09:50:00</td>
-      <td>5.9400</td>
-      <td>5.9400</td>
-      <td><span class='pos'>0.00%</span></td>
-      <td>0.84</td>
-      <td>-1.35</td>
       <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
       <td>0.00</td>
-      <td>above prior close, not overextended</td>
-      <td>38</td>
-      <td>False</td>
     </tr>
     <tr>
       <td>GERN</td>
@@ -2633,19 +4433,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>1.3201</td>
       <td>09:50:00</td>
-      <td>1.3250</td>
       <td>1.3550</td>
-      <td><span class='pos'>2.26%</span></td>
-      <td>2.64</td>
-      <td>-2.64</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>3.00</td>
+      <td>10.83</td>
+      <td>-3.49</td>
       <td>above open, not overextended</td>
-      <td>67</td>
+      <td>1.3263</td>
+      <td>1.3200</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>PROTECT BREAKEVEN</td>
+      <td>True</td>
+      <td>True</td>
+      <td>6.49</td>
+      <td><span class='pos'>4.89%</span></td>
+      <td>63</td>
+      <td>Healthcare</td>
       <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>GORO</td>
@@ -2653,19 +4467,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>1.2950</td>
       <td>09:50:00</td>
-      <td>1.3000</td>
       <td>1.3150</td>
-      <td><span class='pos'>1.15%</span></td>
-      <td>2.31</td>
-      <td>-2.31</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>1.50</td>
+      <td>8.35</td>
+      <td>-8.17</td>
       <td>above VWAP, not overextended</td>
-      <td>72</td>
+      <td>1.3013</td>
+      <td>1.3800</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-10.53</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>67</td>
+      <td>Basic Materials</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>GOSS</td>
@@ -2673,19 +4501,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>0.1600</td>
       <td>09:50:00</td>
-      <td>0.1616</td>
       <td>0.1736</td>
-      <td><span class='pos'>7.43%</span></td>
-      <td>10.71</td>
-      <td>-0.99</td>
-      <td>True</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>1.20</td>
+      <td>12.05</td>
+      <td>-6.61</td>
       <td>above VWAP, not overextended</td>
-      <td>73</td>
+      <td>0.1618</td>
+      <td>0.1587</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>PROTECT BREAKEVEN</td>
+      <td>True</td>
+      <td>True</td>
+      <td>0.79</td>
+      <td><span class='pos'>4.89%</span></td>
+      <td>68</td>
+      <td>Healthcare</td>
       <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>IRT</td>
@@ -2693,19 +4535,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>16.1300</td>
       <td>09:50:00</td>
-      <td>16.1300</td>
       <td>16.2600</td>
-      <td><span class='pos'>0.81%</span></td>
-      <td>1.15</td>
-      <td>-0.03</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>13.00</td>
+      <td>5.47</td>
+      <td>-0.13</td>
       <td>above prior close, not overextended</td>
-      <td>84</td>
+      <td>16.1461</td>
+      <td>16.9000</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>75.39</td>
+      <td><span class='pos'>4.67%</span></td>
+      <td>79</td>
+      <td>Real Estate</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>KVUE</td>
@@ -2713,59 +4569,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>18.0500</td>
       <td>09:50:00</td>
-      <td>18.0450</td>
       <td>18.3950</td>
-      <td><span class='pos'>1.94%</span></td>
-      <td>2.19</td>
-      <td>-0.11</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>35.00</td>
+      <td>6.18</td>
+      <td>-0.21</td>
       <td>above prior close, not overextended</td>
-      <td>90</td>
-      <td>False</td>
-    </tr>
-    <tr>
-      <td>MSTZ</td>
-      <td>20</td>
-      <td>🔴 PASS</td>
-      <td>11.6800</td>
-      <td>09:50:00</td>
-      <td>11.6700</td>
-      <td>12.2900</td>
-      <td><span class='pos'>5.31%</span></td>
-      <td>5.83</td>
-      <td>-1.63</td>
+      <td>18.0630</td>
+      <td>19.1250</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
       <td>False</td>
+      <td>106.20</td>
+      <td><span class='pos'>5.88%</span></td>
+      <td>85</td>
+      <td>Consumer Defensive</td>
       <td>False</td>
       <td>False</td>
-      <td>62.00</td>
-      <td>above prior close, not overextended</td>
-      <td>104</td>
-      <td>False</td>
-    </tr>
-    <tr>
-      <td>NBIZ</td>
-      <td>20</td>
-      <td>🔴 PASS</td>
-      <td>7.0800</td>
-      <td>09:50:00</td>
-      <td>7.0800</td>
-      <td>7.1400</td>
-      <td><span class='pos'>0.85%</span></td>
-      <td>3.11</td>
-      <td>-12.22</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>True</td>
-      <td>6.00</td>
-      <td>above prior close, not overextended</td>
-      <td>107</td>
-      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>NIXX</td>
@@ -2773,39 +4603,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>1.4700</td>
       <td>09:50:00</td>
-      <td>1.4700</td>
       <td>1.5058</td>
-      <td><span class='pos'>2.44%</span></td>
-      <td>12.93</td>
-      <td>-6.80</td>
-      <td>True</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>3.58</td>
+      <td>13.49</td>
+      <td>-14.37</td>
       <td>above open, above prior close</td>
-      <td>109</td>
+      <td>1.4715</td>
+      <td>1.3800</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>PROTECT BREAKEVEN</td>
+      <td>True</td>
+      <td>True</td>
+      <td>7.13</td>
+      <td><span class='pos'>4.85%</span></td>
+      <td>102</td>
+      <td>Industrials</td>
       <td>False</td>
-    </tr>
-    <tr>
-      <td>NVD</td>
-      <td>20</td>
-      <td>🔴 PASS</td>
-      <td>5.0850</td>
-      <td>09:50:00</td>
-      <td>5.0800</td>
-      <td>5.2200</td>
-      <td><span class='pos'>2.76%</span></td>
-      <td>2.76</td>
-      <td>-0.59</td>
       <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>14.00</td>
-      <td>above prior close, not overextended</td>
-      <td>113</td>
-      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>OLMA</td>
@@ -2813,19 +4637,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>9.9950</td>
       <td>09:50:00</td>
-      <td>10.0000</td>
       <td>10.5300</td>
-      <td><span class='pos'>5.30%</span></td>
-      <td>10.10</td>
-      <td>-0.10</td>
-      <td>True</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>53.00</td>
+      <td>17.88</td>
+      <td>-0.20</td>
       <td>above open, not overextended</td>
-      <td>117</td>
+      <td>10.0100</td>
+      <td>11.3500</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>116.50</td>
+      <td><span class='pos'>11.64%</span></td>
+      <td>110</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>PRME</td>
@@ -2833,59 +4671,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>3.3450</td>
       <td>09:50:00</td>
-      <td>3.3450</td>
       <td>3.2300</td>
-      <td><span class='neg'>-3.44%</span></td>
-      <td>5.98</td>
-      <td>-3.44</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-11.50</td>
+      <td>5.87</td>
+      <td>-9.80</td>
       <td>above open, not overextended</td>
-      <td>127</td>
+      <td>3.3483</td>
+      <td>3.4300</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
-    </tr>
-    <tr>
-      <td>QID</td>
-      <td>20</td>
-      <td>🔴 PASS</td>
-      <td>14.4006</td>
-      <td>09:50:00</td>
-      <td>14.4000</td>
-      <td>14.5750</td>
-      <td><span class='pos'>1.22%</span></td>
-      <td>1.60</td>
-      <td>-1.35</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>17.50</td>
-      <td>above prior close, not overextended</td>
-      <td>130</td>
-      <td>False</td>
-    </tr>
-    <tr>
-      <td>RKLZ</td>
-      <td>20</td>
-      <td>🔴 PASS</td>
-      <td>3.1250</td>
-      <td>09:50:00</td>
-      <td>3.1300</td>
-      <td>3.3300</td>
-      <td><span class='pos'>6.39%</span></td>
-      <td>6.87</td>
-      <td>-6.39</td>
+      <td>-27.09</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>119</td>
+      <td>Healthcare</td>
       <td>False</td>
       <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>20.00</td>
-      <td>above prior close, not overextended</td>
-      <td>137</td>
-      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>RUN</td>
@@ -2893,19 +4705,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>13.2750</td>
       <td>09:50:00</td>
-      <td>13.2600</td>
       <td>12.8050</td>
-      <td><span class='neg'>-3.43%</span></td>
-      <td>0.49</td>
-      <td>-3.70</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-45.50</td>
+      <td>26.49</td>
+      <td>-3.79</td>
       <td>above open, not overextended</td>
-      <td>140</td>
+      <td>13.2733</td>
+      <td>13.4850</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>PROTECT +10%</td>
+      <td>True</td>
+      <td>True</td>
+      <td>164.42</td>
+      <td><span class='pos'>12.39%</span></td>
+      <td>129</td>
+      <td>Technology</td>
       <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>SLDE</td>
@@ -2913,39 +4739,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>17.1000</td>
       <td>09:50:00</td>
-      <td>17.0200</td>
       <td>17.4600</td>
-      <td><span class='pos'>2.59%</span></td>
-      <td>3.64</td>
-      <td>-0.24</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>44.00</td>
+      <td>12.87</td>
+      <td>-0.33</td>
       <td>above prior close, not overextended</td>
-      <td>149</td>
+      <td>17.0370</td>
+      <td>19.0900</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
-    </tr>
-    <tr>
-      <td>TECS</td>
-      <td>20</td>
-      <td>🔴 PASS</td>
-      <td>6.7500</td>
-      <td>09:50:00</td>
-      <td>6.7400</td>
-      <td>6.8500</td>
-      <td><span class='pos'>1.63%</span></td>
-      <td>2.37</td>
-      <td>-2.67</td>
+      <td>True</td>
+      <td>186.90</td>
+      <td><span class='pos'>10.97%</span></td>
+      <td>138</td>
+      <td>Financial</td>
       <td>False</td>
       <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>11.00</td>
-      <td>above prior close, not overextended</td>
-      <td>155</td>
-      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>UA</td>
@@ -2953,19 +4773,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>5.6600</td>
       <td>09:50:00</td>
-      <td>5.6500</td>
       <td>5.6150</td>
-      <td><span class='neg'>-0.62%</span></td>
-      <td>1.24</td>
-      <td>-1.59</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-3.50</td>
+      <td>9.01</td>
+      <td>-1.69</td>
       <td>above VWAP, not overextended</td>
-      <td>157</td>
+      <td>5.6557</td>
+      <td>6.0550</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>39.93</td>
+      <td><span class='pos'>7.06%</span></td>
+      <td>144</td>
+      <td>Consumer Cyclical</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>XRAY</td>
@@ -2973,19 +4807,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>10.1217</td>
       <td>09:50:00</td>
-      <td>10.1250</td>
       <td>10.1800</td>
-      <td><span class='pos'>0.54%</span></td>
-      <td>1.78</td>
-      <td>-0.69</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>5.50</td>
+      <td>10.01</td>
+      <td>-0.79</td>
       <td>above VWAP, not overextended</td>
-      <td>167</td>
+      <td>10.1351</td>
+      <td>11.0150</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>94.11</td>
+      <td><span class='pos'>9.29%</span></td>
+      <td>154</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>BBBY</td>
@@ -2993,19 +4841,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>6.5150</td>
       <td>09:50:00</td>
-      <td>6.5000</td>
       <td>6.6000</td>
-      <td><span class='pos'>1.54%</span></td>
-      <td>3.15</td>
-      <td>-4.69</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>10.00</td>
+      <td>9.28</td>
+      <td>-7.78</td>
       <td>above open, above prior close, above VWAP, too extended</td>
-      <td>29</td>
+      <td>6.5065</td>
+      <td>6.2800</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>-22.65</td>
+      <td><span class='neg'>-3.48%</span></td>
+      <td>28</td>
+      <td>Consumer Cyclical</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>CRMT</td>
@@ -3013,39 +4875,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>3.5956</td>
       <td>09:50:00</td>
-      <td>3.6000</td>
       <td>3.8600</td>
-      <td><span class='pos'>7.22%</span></td>
-      <td>15.56</td>
-      <td>-7.59</td>
-      <td>True</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>26.00</td>
+      <td>17.66</td>
+      <td>-36.87</td>
       <td>above open, above prior close, above VWAP, too extended</td>
-      <td>48</td>
+      <td>3.6036</td>
+      <td>2.5750</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>PROTECT BREAKEVEN</td>
+      <td>True</td>
+      <td>True</td>
+      <td>17.64</td>
+      <td><span class='pos'>4.90%</span></td>
+      <td>46</td>
+      <td>Consumer Cyclical</td>
       <td>False</td>
-    </tr>
-    <tr>
-      <td>AMZD</td>
-      <td>10</td>
-      <td>🔴 PASS</td>
-      <td>9.5900</td>
-      <td>09:50:00</td>
-      <td>9.5999</td>
-      <td>9.6300</td>
-      <td><span class='pos'>0.31%</span></td>
-      <td>0.78</td>
-      <td>-0.83</td>
       <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>3.01</td>
-      <td>not overextended</td>
-      <td>15</td>
-      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>ATEC</td>
@@ -3053,19 +4909,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>8.5300</td>
       <td>09:50:00</td>
-      <td>8.5310</td>
       <td>8.4950</td>
-      <td><span class='neg'>-0.42%</span></td>
-      <td>1.98</td>
-      <td>-1.24</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-3.60</td>
+      <td>9.37</td>
+      <td>-5.15</td>
       <td>not overextended</td>
-      <td>22</td>
+      <td>8.5395</td>
+      <td>9.3200</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>78.05</td>
+      <td><span class='pos'>9.14%</span></td>
+      <td>21</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>BKD</td>
@@ -3073,19 +4943,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>13.8788</td>
       <td>09:50:00</td>
-      <td>13.8800</td>
       <td>13.8350</td>
-      <td><span class='neg'>-0.32%</span></td>
-      <td>1.62</td>
-      <td>-0.72</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-4.50</td>
+      <td>13.90</td>
+      <td>-0.82</td>
       <td>not overextended</td>
-      <td>34</td>
+      <td>13.8939</td>
+      <td>15.6900</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>158.51</td>
+      <td><span class='pos'>11.41%</span></td>
+      <td>33</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>CGEM</td>
@@ -3093,19 +4977,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>16.9900</td>
       <td>09:50:00</td>
-      <td>17.0000</td>
       <td>17.7250</td>
-      <td><span class='pos'>4.26%</span></td>
-      <td>5.76</td>
-      <td>-0.53</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>72.50</td>
+      <td>14.18</td>
+      <td>-0.63</td>
       <td>not overextended</td>
-      <td>42</td>
+      <td>17.0170</td>
+      <td>18.3200</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
+      <td>True</td>
+      <td>149.30</td>
+      <td><span class='pos'>8.77%</span></td>
+      <td>40</td>
+      <td>Healthcare</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>DOMO</td>
@@ -3113,39 +5011,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>2.2100</td>
       <td>09:50:00</td>
-      <td>2.2100</td>
       <td>2.2250</td>
-      <td><span class='pos'>0.68%</span></td>
-      <td>5.43</td>
-      <td>-1.36</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>1.50</td>
+      <td>36.41</td>
+      <td>-1.46</td>
       <td>not overextended</td>
-      <td>53</td>
+      <td>2.2122</td>
+      <td>2.9250</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>PROTECT +10%</td>
+      <td>True</td>
+      <td>True</td>
+      <td>27.40</td>
+      <td><span class='pos'>12.39%</span></td>
+      <td>51</td>
+      <td>Technology</td>
       <td>False</td>
-    </tr>
-    <tr>
-      <td>DRIP</td>
-      <td>10</td>
-      <td>🔴 PASS</td>
-      <td>5.3200</td>
-      <td>09:50:00</td>
-      <td>5.3200</td>
-      <td>5.2900</td>
-      <td><span class='neg'>-0.56%</span></td>
-      <td>0.94</td>
-      <td>-1.69</td>
       <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-3.00</td>
-      <td>not overextended</td>
-      <td>55</td>
-      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>GETY</td>
@@ -3153,59 +5045,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>1.0499</td>
       <td>09:50:00</td>
-      <td>1.0400</td>
       <td>0.9832</td>
-      <td><span class='neg'>-5.46%</span></td>
-      <td>7.69</td>
-      <td>-13.46</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>True</td>
-      <td>-5.68</td>
+      <td>7.59</td>
+      <td>-14.77</td>
       <td>not overextended</td>
-      <td>68</td>
-      <td>False</td>
-    </tr>
-    <tr>
-      <td>GGLS</td>
-      <td>10</td>
-      <td>🔴 PASS</td>
-      <td>5.8850</td>
-      <td>09:50:00</td>
-      <td>5.8900</td>
-      <td>5.9150</td>
-      <td><span class='pos'>0.42%</span></td>
-      <td>0.85</td>
-      <td>-0.42</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>2.50</td>
-      <td>not overextended</td>
-      <td>69</td>
-      <td>False</td>
-    </tr>
-    <tr>
-      <td>IONZ</td>
-      <td>10</td>
-      <td>🔴 PASS</td>
-      <td>2.1800</td>
-      <td>09:50:00</td>
-      <td>2.1633</td>
-      <td>2.3300</td>
-      <td><span class='pos'>7.71%</span></td>
-      <td>12.32</td>
-      <td>-4.47</td>
+      <td>1.0410</td>
+      <td>0.9288</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
       <td>True</td>
       <td>False</td>
+      <td>-8.42</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>64</td>
+      <td>Communication Services</td>
       <td>False</td>
       <td>False</td>
-      <td>16.67</td>
-      <td>not overextended</td>
-      <td>82</td>
-      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>JBI</td>
@@ -3213,19 +5079,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>5.2800</td>
       <td>09:50:00</td>
-      <td>5.2800</td>
       <td>5.2450</td>
-      <td><span class='neg'>-0.66%</span></td>
-      <td>1.04</td>
-      <td>-0.85</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-3.50</td>
+      <td>8.60</td>
+      <td>-0.95</td>
       <td>not overextended</td>
-      <td>85</td>
+      <td>5.2853</td>
+      <td>5.4700</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>18.47</td>
+      <td><span class='pos'>3.49%</span></td>
+      <td>80</td>
+      <td>Industrials</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>LYFT</td>
@@ -3233,19 +5113,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>14.1600</td>
       <td>09:50:00</td>
-      <td>14.1640</td>
       <td>13.8250</td>
-      <td><span class='neg'>-2.39%</span></td>
-      <td>1.17</td>
-      <td>-2.75</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-33.90</td>
+      <td>4.32</td>
+      <td>-2.84</td>
       <td>not overextended</td>
-      <td>96</td>
+      <td>14.1782</td>
+      <td>14.2500</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>OPEN</td>
       <td>False</td>
+      <td>False</td>
+      <td>7.18</td>
+      <td><span class='pos'>0.51%</span></td>
+      <td>91</td>
+      <td>Technology</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>MBC</td>
@@ -3253,39 +5147,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>8.5400</td>
       <td>09:50:00</td>
-      <td>8.5400</td>
       <td>8.3700</td>
-      <td><span class='neg'>-1.99%</span></td>
-      <td>2.99</td>
-      <td>-2.11</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-17.00</td>
+      <td>15.81</td>
+      <td>-2.21</td>
       <td>not overextended</td>
-      <td>97</td>
+      <td>8.5485</td>
+      <td>9.8600</td>
+      <td>50.0</td>
+      <td>50.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>SCALE +10%</td>
       <td>False</td>
-    </tr>
-    <tr>
-      <td>QBTZ</td>
-      <td>10</td>
-      <td>🔴 PASS</td>
-      <td>3.3900</td>
-      <td>09:50:00</td>
-      <td>3.3301</td>
-      <td>3.6900</td>
-      <td><span class='pos'>10.81%</span></td>
-      <td>14.71</td>
-      <td>-4.51</td>
       <td>True</td>
+      <td>107.85</td>
+      <td><span class='pos'>12.62%</span></td>
+      <td>92</td>
+      <td>Consumer Cyclical</td>
       <td>False</td>
       <td>False</td>
-      <td>False</td>
-      <td>35.99</td>
-      <td>not overextended</td>
-      <td>129</td>
-      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>SKYQ</td>
@@ -3293,39 +5181,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>1.6600</td>
       <td>09:50:00</td>
-      <td>1.6400</td>
       <td>1.6417</td>
-      <td><span class='pos'>0.10%</span></td>
-      <td>1.83</td>
-      <td>-7.93</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>0.17</td>
+      <td>111.99</td>
+      <td>-8.02</td>
       <td>not overextended</td>
-      <td>147</td>
+      <td>1.6416</td>
+      <td>2.8850</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
-    </tr>
-    <tr>
-      <td>SMCX</td>
-      <td>10</td>
-      <td>🔴 PASS</td>
-      <td>11.8300</td>
-      <td>09:50:00</td>
-      <td>11.8300</td>
-      <td>11.7400</td>
-      <td><span class='neg'>-0.76%</span></td>
-      <td>6.09</td>
-      <td>-4.06</td>
+      <td>-13.28</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>136</td>
+      <td>Energy</td>
       <td>False</td>
       <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>-9.00</td>
-      <td>not overextended</td>
-      <td>150</td>
-      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>WEN</td>
@@ -3333,19 +5215,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>6.1050</td>
       <td>09:50:00</td>
-      <td>6.1000</td>
       <td>6.2501</td>
-      <td><span class='pos'>2.46%</span></td>
-      <td>3.44</td>
-      <td>-0.49</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>15.01</td>
+      <td>48.54</td>
+      <td>-0.59</td>
       <td>not overextended</td>
-      <td>164</td>
+      <td>6.1061</td>
+      <td>7.8050</td>
+      <td>0.0</td>
+      <td>50.0</td>
+      <td>25.0</td>
+      <td>25.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>FINAL +30%</td>
+      <td>True</td>
+      <td>True</td>
+      <td>106.14</td>
+      <td><span class='pos'>17.38%</span></td>
+      <td>151</td>
+      <td>Consumer Cyclical</td>
       <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
     <tr>
       <td>ZONE</td>
@@ -3353,19 +5249,33 @@ table{background:white;border-collapse:collapse;width:100%;margin-top:20px}th{ba
       <td>🔴 PASS</td>
       <td>0.9200</td>
       <td>09:50:00</td>
-      <td>0.9200</td>
       <td>0.9201</td>
-      <td><span class='pos'>0.01%</span></td>
-      <td>4.32</td>
-      <td>-4.33</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>False</td>
-      <td>0.01</td>
+      <td>4.21</td>
+      <td>-20.75</td>
       <td>not overextended</td>
-      <td>168</td>
+      <td>0.9209</td>
+      <td>0.7499</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>100.0</td>
+      <td>0.0</td>
+      <td>STOP -8%</td>
+      <td>True</td>
       <td>False</td>
+      <td>-7.45</td>
+      <td><span class='neg'>-8.09%</span></td>
+      <td>155</td>
+      <td>Industrials</td>
+      <td>False</td>
+      <td>False</td>
+      <td>score below 40</td>
+      <td>0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.00</td>
     </tr>
   </tbody>
 </table></body></html>

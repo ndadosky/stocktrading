@@ -1,0 +1,12 @@
+#!/usr/bin/expect -f
+set timeout 120
+set user "admin"
+set password "password"
+set host "raspberrypi.local"
+
+spawn ssh -o StrictHostKeyChecking=no ${user}@${host} {sed -i 's/POSTGRES_PASSWORD=change-me/POSTGRES_PASSWORD=stockpass/' /home/admin/stock/.env && cd /home/admin/stock && sudo -E ./deploy/compose.sh -f docker-compose.pi.yml up -d --force-recreate && sleep 8 && curl -s -o /dev/null -w 'http=%{http_code}\n' http://127.0.0.1/ && sudo docker logs stock_app_1 2>&1 | tail -8}
+expect {
+  -re "password:" { send "$password\r"; exp_continue }
+  -re "sudo.*password" { send "$password\r"; exp_continue }
+  eof
+}

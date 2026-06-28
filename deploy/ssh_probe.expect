@@ -1,0 +1,11 @@
+#!/usr/bin/expect -f
+set timeout 120
+set user "admin"
+set password "password"
+set host "raspberrypi.local"
+
+spawn ssh -o StrictHostKeyChecking=no ${user}@${host} {bash -lc {which git docker docker-compose 2>/dev/null; git --version 2>/dev/null; docker --version 2>/dev/null; ls -la /home/admin/stock 2>/dev/null | head -5; groups}}
+expect {
+  -re "password:" { send "$password\r"; exp_continue }
+  eof
+}

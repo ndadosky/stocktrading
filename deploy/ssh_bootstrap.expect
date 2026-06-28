@@ -1,0 +1,47 @@
+#!/usr/bin/expect -f
+set timeout 300
+set host "raspberrypi.local"
+set user "admin"
+set password "password"
+
+proc ssh_cmd {cmd} {
+    global host user password
+    spawn ssh -o StrictHostKeyChecking=no ${user}@${host} $cmd
+    expect {
+        -re "password:" { send "$password\r"; exp_continue }
+        eof
+    }
+    catch wait result
+    return [lindex $result 3]
+}
+
+# Check basics
+set rc [ssh_cmd "echo connected && uname -a && command -v docker && command -v git"]
+if {$rc != 0} { exit $rc }
+
+# Clone or update repo
+set rc [ssh_cmd "test -d /home/admin/stock/.git || git clone https://github.com/ndadosky/stocktrading.git /home/admin/stock"]
+if {$rc != 0} { exit $rc }
+
+set rc [ssh_cmd "cd /home/admin/stock && git pull origin main"]
+if {$rc != 0} { exit $rc }
+
+# Bootstrap postgres + docker + timer (may prompt for sudo password)
+spawn ssh -o StrictHostKeyChecking=no ${user}@${host} "cd /home/admin/stock && chmod +x deploy/pi_bootstrap.sh deploy/pi_pull_redeploy.sh && ./deploy/pi_bootstrap.sh"
+expect {
+    -re "password:" { send "$password\r"; exp_continue }
+    -re "\\\[sudo\\\] password" { send "$password\r"; exp_continue }
+    -re "sudo.*password" { send "$password\r"; exp_continue }
+    eof
+}
+catch wait result
+set rc [lindex $result 3]
+
+# Verify
+spawn ssh -o StrictHostKeyChecking=no ${user}@${host} "systemctl is-active stocktrading-pull.timer 2>/dev/null; curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/; echo; tail -5 /home/admin/stock/logs/pull_redeploy.log 2>/dev/null || true"
+expect {
+    -re "password:" { send "$password\r"; exp_continue }
+    eof
+}
+
+exit $rc
