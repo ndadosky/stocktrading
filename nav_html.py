@@ -16,8 +16,8 @@ def html_head_meta() -> str:
 
 PAGE_LAYOUT_CSS = """
 main{width:100%;max-width:1280px;margin-left:auto;margin-right:auto;padding:24px 24px 64px}
-main.dash-frame-main{width:100%;max-width:1280px;margin-left:auto;margin-right:auto;padding:0;height:calc(100vh - 52px)}
-main.dash-frame-main iframe{width:100%;height:100%;border:0;border-radius:0;background:transparent}
+main.dash-frame-main{width:100%;max-width:1280px;margin-left:auto;margin-right:auto;padding:0;height:auto}
+main.dash-frame-main iframe{display:block;width:100%;height:auto;min-height:0;border:0;border-radius:0;background:transparent;overflow:hidden}
 """
 
 
@@ -61,8 +61,8 @@ table{max-width:100%}
   .metric-row,.status-grid{grid-template-columns:1fr 1fr!important}
   .mix{grid-template-columns:1fr!important}
   .watch-shell{grid-template-columns:1fr!important}
-  main.dash-frame-main{padding:0;height:calc(100dvh - 88px);min-height:320px}
-  .dash-frame-main iframe{border-radius:0;min-height:calc(100dvh - 88px)}
+  main.dash-frame-main{padding:0;height:auto;min-height:0}
+  .dash-frame-main iframe{border-radius:0;min-height:0}
 }
 @media(max-width:480px){
   .meta{grid-template-columns:1fr}

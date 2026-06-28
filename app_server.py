@@ -1257,9 +1257,23 @@ main.dash-frame-main iframe{width:100%;height:100%;border:1px solid var(--line);
   <nav class="hdr-nav">__HEADER_NAV__</nav>
   <div class="hdr-right"><div id="market-badge" class="badge">Market —</div><span id="clock" class="clock-txt">—</span></div>
 </header>
-<main class="dash-frame-main"><iframe id="dash-frame" src="/dashboard" title="Strategy dashboard"></iframe></main>
+<main class="dash-frame-main"><iframe id="dash-frame" src="/dashboard" title="Strategy dashboard" scrolling="no"></iframe></main>
 <script>
 function fmtTime(iso){if(!iso)return '—';return new Date(iso).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+const dashFrame=document.getElementById('dash-frame');
+function sizeDashboardFrame(){
+  try{
+    const doc=dashFrame.contentDocument;
+    if(!doc?.body)return;
+    doc.documentElement.style.overflow='hidden';
+    doc.body.style.overflow='hidden';
+    dashFrame.style.height='1px';
+    const height=Math.max(doc.documentElement.scrollHeight,doc.body.scrollHeight);
+    dashFrame.style.height=`${height}px`;
+  }catch(e){}
+}
+dashFrame.addEventListener('load',sizeDashboardFrame);
+window.addEventListener('resize',()=>requestAnimationFrame(sizeDashboardFrame));
 async function refresh(){
   try{
     const s=await fetch('/api/status').then(r=>r.json());
