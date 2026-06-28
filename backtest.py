@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 from datetime import date, datetime, timedelta
 from html import escape
+from math import floor
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -17,11 +18,16 @@ import pandas as pd
 import yfinance as yf
 
 from scanner_config import (
-    CONFIRMATION_WEIGHTS, MAX_DAILY_PAPER_TRADES, MAX_HOLDING_DAYS, MAX_PORTFOLIO_HEAT_PCT,
-    MAX_SECTOR_EXPOSURE_PCT, SCALE_OUT_10_PCT, SCALE_OUT_20_PCT, SHARES_PER_TRADE,
-    SLIPPAGE_BPS, STARTING_CAPITAL, STOP_LOSS_PCT, TAKE_PROFIT_PCT,
+    BREAKEVEN_AFTER_TARGET_10_PCT, CONFIRMATION_WEIGHTS, FINAL_LOT_FALLBACK_PCT,
+    MAX_DAILY_PAPER_TRADES, MAX_HOLDING_DAYS, MAX_PORTFOLIO_HEAT_PCT,
+    MAX_POSITION_EXPOSURE_PCT, MAX_SECTOR_EXPOSURE_PCT, MAX_SECTOR_POSITIONS,
+    MINIMUM_CASH_RESERVE_PCT, RISK_PER_TRADE_PCT, SCALE_OUT_10_PCT,
+    SCALE_OUT_20_PCT, SLIPPAGE_BPS, STARTING_CAPITAL, STOP_LOSS_PCT,
+    TAKE_PROFIT_PCT,
     WATCHLIST_EXPORT_DIR, ensure_directories,
 )
+
+REFERENCE_SHARES = 100
 
 
 def parse_args() -> argparse.Namespace:
@@ -93,7 +99,7 @@ def simulate_scaled_exit(entry_quote: float, bars: pd.DataFrame) -> dict:
     entry = entry_quote * (1 + SLIPPAGE_BPS / 10_000)
     target10, target20, target30 = entry * 1.10, entry * 1.20, entry * 1.30
     stop = entry * (1 - STOP_LOSS_PCT / 100)
-    remaining = float(SHARES_PER_TRADE)
+    remaining = float(REFERENCE_SHARES)
     proceeds = 0.0
     sold10 = sold20 = sold30 = sold_protect = sold_stop = sold_time = 0.0
     exit_reason = "OPEN"
@@ -117,16 +123,25 @@ def simulate_scaled_exit(entry_quote: float, bars: pd.DataFrame) -> dict:
         if remaining <= 0:
             break
         low, high, opening = float(bar["Low"]), float(bar["High"]), float(bar["Open"])
-        if low <= stop:
-            sold_stop += sell(remaining, min(stop, opening), "STOP -8%")
-            break
-        if sold20 > 0 and low <= target10:
-            sold_protect += sell(remaining, min(target10, opening), "PROTECT +10%")
+        active_stop = target10 if sold20 > 0 else entry * (1 + BREAKEVEN_AFTER_TARGET_10_PCT / 100) if sold10 > 0 else stop
+        if low <= active_stop:
+            if sold20 > 0:
+                reason = "PROTECT +10%"
+            elif sold10 > 0:
+                reason = "PROTECT BREAKEVEN"
+            else:
+                reason = "STOP -8%"
+            bucket = "protect" if sold10 > 0 else "stop"
+            sold = sell(remaining, min(active_stop, opening), reason)
+            if bucket == "protect":
+                sold_protect += sold
+            else:
+                sold_stop += sold
             break
         if sold10 <= 0 and high >= target10:
-            sold10 += sell(round(SHARES_PER_TRADE * SCALE_OUT_10_PCT / 100), target10, "SCALE +10%")
+            sold10 += sell(max(1, round(REFERENCE_SHARES * SCALE_OUT_10_PCT / 100)), target10, "SCALE +10%")
         if remaining > 0 and sold20 <= 0 and high >= target20:
-            sold20 += sell(round(SHARES_PER_TRADE * SCALE_OUT_20_PCT / 100), target20, "SCALE +20%")
+            sold20 += sell(max(1, round(REFERENCE_SHARES * SCALE_OUT_20_PCT / 100)), target20, "SCALE +20%")
         if remaining > 0 and sold20 > 0 and high >= target30:
             sold30 += sell(remaining, target30, "FINAL +30%")
             break
@@ -134,7 +149,7 @@ def simulate_scaled_exit(entry_quote: float, bars: pd.DataFrame) -> dict:
     mark = float(test_bars["Close"].iloc[-1]) if not test_bars.empty else entry
     if remaining > 0 and complete_window:
         sold_time += sell(remaining, mark, f"TIME EXIT {MAX_HOLDING_DAYS}D")
-    realized = proceeds - (SHARES_PER_TRADE - remaining) * entry
+    realized = proceeds - (REFERENCE_SHARES - remaining) * entry
     unrealized = remaining * (mark - entry)
     pnl = realized + unrealized
     return {
@@ -144,7 +159,7 @@ def simulate_scaled_exit(entry_quote: float, bars: pd.DataFrame) -> dict:
         "shares_sold_stop": sold_stop, "shares_sold_time": sold_time,
         "exit_reason": exit_reason, "resolved": remaining <= 0,
         "success": sold10 > 0, "p_l_100_shares": round(pnl, 2),
-        "strategy_return_%": round(pnl / (entry * SHARES_PER_TRADE) * 100, 2),
+        "strategy_return_%": round(pnl / (entry * REFERENCE_SHARES) * 100, 2),
     }
 
 
@@ -271,25 +286,46 @@ def main() -> int:
     results["selection_note"] = "score below 40"
     cash, heat = STARTING_CAPITAL, 0.0
     sector_used: Dict[str, float] = {}
+    sector_positions: Dict[str, int] = {}
+    results["position_shares"] = 0
+    results["position_cost"] = 0.0
+    results["position_risk"] = 0.0
+    results["sized_p_l"] = 0.0
     selected_count = 0
     for index, row in results[results["confirmation_score"] >= 40].iterrows():
         if selected_count >= max(args.limit, 0):
             results.at[index, "selection_note"] = "daily limit"
             continue
-        cost = float(row["entry_price"]) * SHARES_PER_TRADE
-        risk = float(row["entry_price"]) * STOP_LOSS_PCT / 100 * SHARES_PER_TRADE
+        entry = float(row["entry_price"])
+        stop_fill = entry * (1 - STOP_LOSS_PCT / 100) * (1 - SLIPPAGE_BPS / 10_000)
+        risk_per_share = entry - stop_fill
+        deployable_cash = max(0.0, cash - STARTING_CAPITAL * MINIMUM_CASH_RESERVE_PCT / 100)
+        shares = max(0, min(
+            floor((STARTING_CAPITAL * RISK_PER_TRADE_PCT / 100) / risk_per_share),
+            floor((STARTING_CAPITAL * MAX_POSITION_EXPOSURE_PCT / 100) / entry),
+            floor(deployable_cash / entry),
+        )) if risk_per_share > 0 else 0
+        cost = entry * shares
+        risk = risk_per_share * shares
         sector = str(row["sector"])
         if str(row["earnings_blocked"]).strip().lower() in {"true", "1", "yes"}:
             results.at[index, "selection_note"] = "earnings blackout"; continue
-        if cost > cash:
-            results.at[index, "selection_note"] = "cash limit"; continue
+        if shares < 1 or cost > cash:
+            results.at[index, "selection_note"] = "risk sizing/cash reserve"; continue
         if sector_used.get(sector, 0) + cost > STARTING_CAPITAL * MAX_SECTOR_EXPOSURE_PCT / 100:
             results.at[index, "selection_note"] = "sector limit"; continue
+        if sector_positions.get(sector, 0) >= MAX_SECTOR_POSITIONS:
+            results.at[index, "selection_note"] = "sector position limit"; continue
         if heat + risk > STARTING_CAPITAL * MAX_PORTFOLIO_HEAT_PCT / 100:
             results.at[index, "selection_note"] = "portfolio heat"; continue
         results.at[index, "selected"] = True
         results.at[index, "selection_note"] = "selected"
+        results.at[index, "position_shares"] = shares
+        results.at[index, "position_cost"] = round(cost, 2)
+        results.at[index, "position_risk"] = round(risk, 2)
+        results.at[index, "sized_p_l"] = round(float(row["strategy_return_%"]) / 100 * cost, 2)
         cash -= cost; heat += risk; sector_used[sector] = sector_used.get(sector, 0) + cost
+        sector_positions[sector] = sector_positions.get(sector, 0) + 1
         selected_count += 1
     csv_path = WATCHLIST_EXPORT_DIR / f"backtest_{target}.csv"
     html_path = csv_path.with_suffix(".html")
@@ -299,8 +335,8 @@ def main() -> int:
     selected = results[results["selected"]]
     print(f"Saved {len(results)} confirmations and {len(selected)} selected trades to {csv_path}")
     if not selected.empty:
-        print(selected[["ticker", "confirmation_score", "entry_price", "exit_reason", "strategy_return_%", "p_l_100_shares"]].to_string(index=False))
-        print(f"Total close P/L: ${selected['p_l_100_shares'].sum():,.2f}")
+        print(selected[["ticker", "confirmation_score", "entry_price", "position_shares", "exit_reason", "strategy_return_%", "sized_p_l"]].to_string(index=False))
+        print(f"Total sized P/L: ${selected['sized_p_l'].sum():,.2f}")
     if biased:
         print("WARNING: candidate universe comes from a different date; results have look-ahead bias.")
     return 0

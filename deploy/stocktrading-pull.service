@@ -1,0 +1,10 @@
+[Unit]
+Description=Pull stock-trading app from git and redeploy if changed
+
+[Service]
+Type=oneshot
+User=admin
+WorkingDirectory=/home/admin/stock
+Environment=STOCK_REPO_DIR=/home/admin/stock
+Environment=STOCK_GIT_BRANCH=main
+ExecStart=/home/admin/stock/deploy/pi_pull_redeploy.sh

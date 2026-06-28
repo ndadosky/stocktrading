@@ -1,0 +1,29 @@
+# Raspberry Pi: use the host PostgreSQL already installed on the Pi.
+# The app container uses host networking so http://raspberrypi.local serves on port 80.
+services:
+  app:
+    build:
+      context: .
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+        APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
+        APP_BUILT_AT: ${APP_BUILT_AT:-}
+    network_mode: host
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:-127.0.0.1}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_USER: ${POSTGRES_USER:-stock}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stockpass}
+      POSTGRES_DB: ${POSTGRES_DB:-stocktrading}
+      HOST: 0.0.0.0
+      PORT: 80
+      APP_VERSION: ${APP_VERSION:-dev}
+      APP_GIT_COMMIT: ${APP_GIT_COMMIT:-unknown}
+      APP_BUILT_AT: ${APP_BUILT_AT:-}
+      STOCK_STARTING_CAPITAL: ${STOCK_STARTING_CAPITAL:-25000}
+      STOCK_IMAGE_PYTHON: ${STOCK_IMAGE_PYTHON:-python3}
+      TZ: America/New_York
+    volumes:
+      - ./exports:/app/exports
+      - ./logs:/app/logs
+    restart: unless-stopped

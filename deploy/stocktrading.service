@@ -1,0 +1,15 @@
+[Unit]
+Description=Stock paper-trading Docker stack
+After=docker.service postgresql.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/admin/stock
+ExecStart=/usr/bin/docker compose -f docker-compose.pi.yml up -d --build
+ExecStop=/usr/bin/docker compose -f docker-compose.pi.yml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target

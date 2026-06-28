@@ -1,0 +1,20 @@
+#!/usr/bin/expect -f
+set timeout 120
+set host [expr {[info exists env(PI_HOST)] ? $env(PI_HOST) : "raspberrypi.local"}]
+set user [expr {[info exists env(PI_USER)] ? $env(PI_USER) : "admin"}]
+set password $env(PI_PASSWORD)
+set src [expr {[info exists env(PI_SRC)] ? $env(PI_SRC) : [pwd]}]
+set dest [expr {[info exists env(PI_DEST)] ? $env(PI_DEST) : "/home/admin/stock"}]
+
+spawn rsync -az --delete --exclude .git --exclude exports --exclude logs --exclude __pycache__ "$src/" ${user}@${host}:${dest}/
+expect {
+  -re "password:" { send "$password\r"; exp_continue }
+  eof
+}
+
+spawn ssh -o StrictHostKeyChecking=no ${user}@${host} "mkdir -p $dest/exports $dest/logs && cd $dest && chmod +x deploy/pi_bootstrap.sh && ./deploy/pi_bootstrap.sh"
+expect {
+  -re "password:" { send "$password\r"; exp_continue }
+  -re "sudo.*password" { send "$password\r"; exp_continue }
+  eof
+}

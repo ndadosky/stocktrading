@@ -5,6 +5,13 @@
   "maximum_adopted_changes_per_day": 1,
   "target_success_rate_pct": 80,
   "target_window_resolved_trades": 50,
+  "primary_metrics_in_order": [
+    "average_realized_return",
+    "profit_factor",
+    "maximum_drawdown",
+    "target_10_hit_rate",
+    "sessions_to_target_10"
+  ],
   "weekly_human_review_required": true,
   "baseline_file": "strategy_baseline.json",
   "active_settings_file": "strategy_settings.json"

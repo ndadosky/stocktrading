@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from datetime import date, datetime
 from html import escape
 from pathlib import Path
@@ -32,6 +33,8 @@ FINVIZ_FILTERS = {
     "Country": "USA",
     "Industry": "Stocks only (ex-Funds)",
 }
+FINVIZ_FETCH_ATTEMPTS = 3
+FINVIZ_RETRY_SECONDS = 10
 
 
 def exclude_etfs(frame: pd.DataFrame) -> pd.DataFrame:
@@ -154,7 +157,22 @@ tr:hover{{background:#f4f6f7}}</style></head><body><h1>{escape(title)}</h1>{tabl
 def get_finviz_candidates() -> pd.DataFrame:
     screener = Overview()
     screener.set_filter(filters_dict=FINVIZ_FILTERS)
-    return screener.screener_view()
+    last_error: Optional[Exception] = None
+    for attempt in range(1, FINVIZ_FETCH_ATTEMPTS + 1):
+        try:
+            return screener.screener_view()
+        except Exception as exc:
+            last_error = exc
+            if attempt == FINVIZ_FETCH_ATTEMPTS:
+                break
+            print(
+                f"Finviz fetch failed on attempt {attempt}/{FINVIZ_FETCH_ATTEMPTS}: {exc}; "
+                f"retrying in {FINVIZ_RETRY_SECONDS}s"
+            )
+            time.sleep(FINVIZ_RETRY_SECONDS)
+    raise RuntimeError(
+        f"Finviz fetch failed after {FINVIZ_FETCH_ATTEMPTS} attempts: {last_error}"
+    ) from last_error
 
 
 def earnings_context(ticker: str, as_of: date) -> dict:
@@ -183,7 +201,12 @@ def main() -> int:
     if not market_gate("morning"):
         return 0
     today = datetime.now().astimezone().strftime("%Y-%m-%d")
-    raw = exclude_etfs(get_finviz_candidates())
+    try:
+        raw = exclude_etfs(get_finviz_candidates())
+    except Exception as exc:
+        record_stage("morning", "FAILED", 0, str(exc))
+        print(f"Finviz fetch failed; no files were overwritten: {exc}")
+        return 1
     if raw.empty or "Ticker" not in raw.columns:
         record_stage("morning", "FAILED", 0, "Finviz returned no usable candidates")
         print("Finviz returned no usable candidates; no files were overwritten.")

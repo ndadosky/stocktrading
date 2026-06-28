@@ -1,0 +1,1141 @@
+"""Local web app and scheduler for the stock paper-trading workflow."""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import threading
+import time
+from dataclasses import dataclass
+from datetime import datetime, time as day_time, timedelta
+from html import escape
+from http import HTTPStatus
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Optional
+from urllib.parse import parse_qs, unquote, urlparse
+
+from market_calendar import is_market_session
+from db import database_url, init_schema, wait_for_database
+from job_storage import (
+    job_history,
+    job_rows_for_date,
+    last_run,
+    last_runs,
+    record_job_run,
+    scheduled_already_ran,
+)
+from scanner_config import DASHBOARD_FILE, PAPER_TRADES_FILE, PIPELINE_STATE_FILE, WATCHLIST_EXPORT_DIR, ensure_directories
+from stock_storage import add_bankroll_deposit, bankroll_base, query_rows, total_bankroll_deposits
+
+
+PROJECT_DIR = Path(__file__).resolve().parent
+LOGS_DIR = PROJECT_DIR / "logs"
+SERVER_LOG = LOGS_DIR / "app_server.log"
+PYTHON = os.getenv("PYTHON", "python3")
+IMAGE_PYTHON = os.getenv("STOCK_IMAGE_PYTHON", PYTHON)
+LIVE_UPDATE_SECONDS = int(os.getenv("STOCK_LIVE_UPDATE_SECONDS", "300"))
+POLL_SECONDS = int(os.getenv("STOCK_CRON_POLL_SECONDS", "30"))
+JOB_TIMEOUT_SECONDS = int(os.getenv("STOCK_JOB_TIMEOUT_SECONDS", "1800"))
+
+
+@dataclass(frozen=True)
+class Job:
+    name: str
+    command: list[str]
+    schedule_time: Optional[day_time] = None
+    description: str = ""
+
+
+JOBS: dict[str, Job] = {
+    "morning": Job("morning", [PYTHON, "morning_candidates.py"], day_time(8, 45), "Fetch and score the Finviz universe."),
+    "confirmation": Job("confirmation", [PYTHON, "confirm_945.py"], day_time(9, 50), "Run 9:45 confirmation and live quote checks."),
+    "report": Job("report", [PYTHON, "daily_report.py"], day_time(10, 10), "Update paper trades, analytics, and dashboard."),
+    "strategy_review": Job("strategy_review", [PYTHON, "strategy_review.py"], day_time(10, 30), "Review database and strategy evidence for safe improvements."),
+    "pnl_flashcard": Job("pnl_flashcard", [IMAGE_PYTHON, "pnl_flashcard.py"], day_time(16, 15), "Generate the post-market P/L flash-card infographic."),
+    "health": Job("health", [PYTHON, "system_health.py"], None, "Write the latest pipeline health snapshot."),
+    "dashboard": Job("dashboard", [PYTHON, "dashboard.py"], None, "Rebuild the dashboard from local outputs."),
+}
+
+
+class AppState:
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.running: Optional[str] = None
+        self.scheduler_started_at = datetime.now().astimezone().isoformat(timespec="seconds")
+        self.live_updates = os.getenv("STOCK_DISABLE_LIVE_UPDATES", "").lower() not in {"1", "true", "yes"}
+
+
+STATE = AppState()
+
+
+def append_log(message: str) -> None:
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().astimezone().isoformat(timespec="seconds")
+    with SERVER_LOG.open("a", encoding="utf-8") as handle:
+        handle.write(f"[{stamp}] {message}\n")
+
+
+def today_key() -> str:
+    return datetime.now().astimezone().date().isoformat()
+
+
+def market_open_now() -> bool:
+    now = datetime.now().astimezone()
+    return is_market_session(now.date()) and day_time(9, 30) <= now.time() <= day_time(16, 5)
+
+
+def confirmation_ready() -> bool:
+    return (WATCHLIST_EXPORT_DIR / f"confirm_945_{today_key()}.csv").exists()
+
+
+def run_job(name: str, reason: str = "manual") -> dict:
+    if name not in JOBS:
+        return {"ok": False, "error": f"Unknown job: {name}"}
+    job = JOBS[name]
+    with STATE.lock:
+        if STATE.running:
+            return {"ok": False, "error": f"Job already running: {STATE.running}"}
+        STATE.running = name
+    started = datetime.now().astimezone()
+    append_log(f"START {name} ({reason}): {' '.join(job.command)}")
+    try:
+        completed = subprocess.run(
+            job.command,
+            cwd=PROJECT_DIR,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=JOB_TIMEOUT_SECONDS,
+        )
+        output = completed.stdout[-12000:] if completed.stdout else ""
+        result = {
+            "ok": completed.returncode == 0,
+            "returncode": completed.returncode,
+            "started_at": started.isoformat(timespec="seconds"),
+            "finished_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "reason": reason,
+            "run_date": today_key(),
+            "output_tail": output,
+        }
+        if reason == "scheduled":
+            result["scheduled_for"] = today_key()
+        append_log(f"END {name}: rc={completed.returncode}\n{output}")
+    except subprocess.TimeoutExpired as exc:
+        result = {
+            "ok": False,
+            "returncode": None,
+            "started_at": started.isoformat(timespec="seconds"),
+            "finished_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "reason": reason,
+            "run_date": today_key(),
+            "output_tail": f"Timed out after {JOB_TIMEOUT_SECONDS}s\n{exc.stdout or ''}",
+        }
+        if reason == "scheduled":
+            result["scheduled_for"] = today_key()
+        append_log(f"TIMEOUT {name} after {JOB_TIMEOUT_SECONDS}s")
+    except Exception as exc:
+        result = {
+            "ok": False,
+            "returncode": None,
+            "started_at": started.isoformat(timespec="seconds"),
+            "finished_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "reason": reason,
+            "run_date": today_key(),
+            "output_tail": str(exc),
+        }
+        if reason == "scheduled":
+            result["scheduled_for"] = today_key()
+        append_log(f"ERROR {name}: {exc}")
+    with STATE.lock:
+        result = record_job_run(name, result)
+        STATE.running = None
+    return result
+
+
+def next_run_for(job: Job) -> Optional[str]:
+    if job.schedule_time is None:
+        return None
+    now = datetime.now().astimezone()
+    candidate = datetime.combine(now.date(), job.schedule_time, tzinfo=now.tzinfo)
+    if candidate <= now:
+        candidate += timedelta(days=1)
+    return candidate.isoformat(timespec="seconds")
+
+
+def scheduler_loop() -> None:
+    append_log("Scheduler loop started")
+    last_live = 0.0
+    while True:
+        now = datetime.now().astimezone()
+        run_date = now.date().isoformat()
+        if is_market_session(now.date()):
+            for name, job in JOBS.items():
+                if job.schedule_time is None:
+                    continue
+                due = now.time() >= job.schedule_time
+                if due and not scheduled_already_ran(name, run_date):
+                    run_job(name, "scheduled")
+        if STATE.live_updates and market_open_now() and time.time() - last_live >= LIVE_UPDATE_SECONDS:
+            last_live = time.time()
+            if confirmation_ready():
+                run_job("report", "live-update")
+            else:
+                run_job("dashboard", "live-dashboard-refresh")
+        time.sleep(POLL_SECONDS)
+
+
+def newest_path(pattern: str) -> Optional[Path]:
+    files = sorted(WATCHLIST_EXPORT_DIR.glob(pattern))
+    return files[-1] if files else None
+
+
+def file_info(path: Path) -> dict:
+    exists = path.exists()
+    info = {"exists": exists, "path": str(path)}
+    if exists:
+        stat = path.stat()
+        info.update({"bytes": stat.st_size, "modified_at": datetime.fromtimestamp(stat.st_mtime).astimezone().isoformat(timespec="seconds")})
+    return info
+
+
+def pipeline_state() -> dict:
+    try:
+        return json.loads(PIPELINE_STATE_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {"stages": {}}
+
+
+def status_payload() -> dict:
+    today = today_key()
+    files = {
+        "dashboard": file_info(DASHBOARD_FILE),
+        "paper_trades": file_info(PAPER_TRADES_FILE),
+        "database_url": database_url().split("@")[-1],
+        "morning": file_info(WATCHLIST_EXPORT_DIR / f"morning_candidates_{today}.csv"),
+        "confirmation": file_info(WATCHLIST_EXPORT_DIR / f"confirm_945_{today}.csv"),
+        "paper_performance": file_info(WATCHLIST_EXPORT_DIR / f"paper_performance_{today}.csv"),
+        "latest_optimizer_review": file_info(newest_path("strategy_optimizer_review_*.html") or WATCHLIST_EXPORT_DIR / "strategy_optimizer_review_missing.html"),
+        "latest_strategy_review": file_info(newest_path("strategy_review_*.html") or WATCHLIST_EXPORT_DIR / "strategy_review_missing.html"),
+    }
+    runs = last_runs(list(JOBS.keys()))
+    with STATE.lock:
+        running = STATE.running
+    return {
+        "server_time": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "market_session": is_market_session(datetime.now().astimezone().date()),
+        "market_open_now": market_open_now(),
+        "live_updates": STATE.live_updates,
+        "bankroll": {
+            "base": bankroll_base(),
+            "deposits": total_bankroll_deposits(),
+            "injection_amount": 25000.0,
+        },
+        "running": running,
+        "jobs": {
+            name: {
+                "description": job.description,
+                "schedule_time": job.schedule_time.isoformat(timespec="minutes") if job.schedule_time else None,
+                "next_run": next_run_for(job),
+                "last_run": runs.get(name),
+            }
+            for name, job in JOBS.items()
+        },
+        "pipeline": pipeline_state(),
+        "files": files,
+    }
+
+
+def jobs_payload() -> dict:
+    status = status_payload()
+    return {
+        "server_time": status["server_time"],
+        "running": status["running"],
+        "market_session": status["market_session"],
+        "market_open_now": status["market_open_now"],
+        "live_updates": status["live_updates"],
+        "database_url": database_url().split("@")[-1],
+        "jobs": status["jobs"],
+        "history": job_history(80),
+    }
+
+
+def normalized_date(value: str | None) -> str:
+    if not value:
+        return today_key()
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
+    except ValueError:
+        return today_key()
+
+
+def day_payload(target_date: str) -> dict:
+    target_date = normalized_date(target_date)
+    paper_performance = query_rows("paper_performance", "WHERE report_date = ?", (target_date,), 500)
+    score_band = query_rows("score_band_performance", "WHERE report_date = ?", (target_date,), 100)
+    components = query_rows("component_performance", "WHERE report_date = ?", (target_date,), 100)
+    strategy_reviews = query_rows(
+        "strategy_reviews",
+        "WHERE stored_review_date = ? OR review_date = ?",
+        (target_date, target_date),
+        200,
+    )
+    paper_trades = query_rows("paper_trades", "WHERE trade_date <= ?", (target_date,), 500)
+    jobs = job_rows_for_date(target_date)
+    pipeline = pipeline_state()
+    stages = {
+        name: value for name, value in pipeline.get("stages", {}).items()
+        if value.get("date") == target_date
+    }
+    open_positions = sum(1 for row in paper_performance if float(row.get("remaining_shares") or 0) > 0)
+    resolved = sum(1 for row in paper_performance if float(row.get("remaining_shares") or 0) <= 0)
+    failed_jobs = sum(1 for row in jobs if not bool(row.get("ok")))
+    decision_rows = [row for row in strategy_reviews if row.get("section") == "decision"]
+    decision = decision_rows[-1].get("value") if decision_rows else "no strategy review"
+    return {
+        "date": target_date,
+        "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "bankroll": {"base": bankroll_base(), "deposits": total_bankroll_deposits()},
+        "summary": {
+            "paper_rows": len(paper_performance),
+            "current_trade_rows": len(paper_trades),
+            "open_positions": open_positions,
+            "resolved_trades": resolved,
+            "job_runs": len(jobs),
+            "failed_jobs": failed_jobs,
+            "strategy_decision": decision,
+        },
+        "pipeline_stages": stages,
+        "jobs": jobs,
+        "strategy_reviews": strategy_reviews,
+        "paper_performance": paper_performance,
+        "score_band": score_band,
+        "components": components,
+        "paper_trades": paper_trades,
+    }
+
+
+def latest_report_date() -> str:
+    rows = query_rows("paper_performance", "ORDER BY report_date DESC", (), 1)
+    if rows and rows[0].get("report_date"):
+        return str(rows[0]["report_date"])
+    return today_key()
+
+
+def live_infographic_payload(target_date: str | None = None) -> dict:
+    target_date = normalized_date(target_date) if target_date else latest_report_date()
+    rows = query_rows("paper_performance", "WHERE report_date = ?", (target_date,), 500)
+    if not rows and target_date != today_key():
+        target_date = today_key()
+        rows = query_rows("paper_performance", "WHERE report_date = ?", (target_date,), 500)
+
+    deposits = total_bankroll_deposits()
+    base = bankroll_base()
+    total_cost = sum(float(row.get("cost") or 0) for row in rows)
+    total_market_value = sum(float(row.get("market_value") or 0) for row in rows)
+    realized_proceeds = sum(float(row.get("realized_proceeds") or 0) for row in rows)
+    total_pl = sum(float(row.get("p_l") or 0) for row in rows)
+    cash = base - total_cost + realized_proceeds
+    equity = cash + total_market_value
+    open_rows = [row for row in rows if str(row.get("status") or "").upper() == "OPEN"]
+    closed_rows = [row for row in rows if str(row.get("status") or "").upper() != "OPEN"]
+    heat = (
+        sum(
+            float(row.get("initial_risk") or 0)
+            * (float(row.get("remaining_shares") or 0) / max(float(row.get("shares") or 1), 1.0))
+            for row in open_rows
+        )
+        / base
+        * 100
+        if base else 0.0
+    )
+    return_on_bankroll = total_pl / base * 100 if base else 0.0
+    return_on_deployed = total_pl / total_cost * 100 if total_cost else 0.0
+    winners = sum(1 for row in rows if float(row.get("p_l") or 0) > 0)
+    losers = sum(1 for row in rows if float(row.get("p_l") or 0) < 0)
+    flat = len(rows) - winners - losers
+    best = max(rows, key=lambda row: float(row.get("p_l_%") or 0), default=None)
+    worst = min(rows, key=lambda row: float(row.get("p_l_%") or 0), default=None)
+    pipeline = pipeline_state().get("stages", {})
+    report_stage = pipeline.get("report", {})
+    return {
+        "date": target_date,
+        "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "report_updated_at": report_stage.get("updated_at"),
+        "report_message": report_stage.get("message"),
+        "refresh_seconds": 60,
+        "rows": rows,
+        "open_rows": open_rows,
+        "closed_rows": closed_rows,
+        "bankroll": {"base": base, "deposits": deposits},
+        "summary": {
+            "cash": cash,
+            "equity": equity,
+            "deployed": total_cost,
+            "market_value": total_market_value,
+            "p_l": total_pl,
+            "return_on_bankroll": return_on_bankroll,
+            "return_on_deployed": return_on_deployed,
+            "heat": heat,
+            "winners": winners,
+            "losers": losers,
+            "flat": flat,
+            "open_count": len(open_rows),
+            "closed_count": len(closed_rows),
+            "total_count": len(rows),
+        },
+        "best": best,
+        "worst": worst,
+    }
+
+
+def html_table(rows: list[dict], empty: str, max_columns: int | None = None) -> str:
+    if not rows:
+        return f"<div class='empty'>{escape(empty)}</div>"
+    columns = list(rows[0].keys())
+    if max_columns is not None:
+        columns = columns[:max_columns]
+    head = "".join(f"<th>{escape(str(column))}</th>" for column in columns)
+    body = []
+    for row in rows:
+        cells = "".join(f"<td>{escape(str(row.get(column, '')))}</td>" for column in columns)
+        body.append(f"<tr>{cells}</tr>")
+    return f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(body)}</tbody></table>"
+
+
+def money(value: float) -> str:
+    return f"-${abs(value):,.2f}" if value < 0 else f"${value:,.2f}"
+
+
+def pct(value: float) -> str:
+    return f"{value:.2f}%"
+
+
+def live_infographic_html(target_date: str | None = None) -> bytes:
+    payload = live_infographic_payload(target_date)
+    summary = payload["summary"]
+    is_up = summary["p_l"] >= 0
+    accent_class = "positive" if is_up else "negative"
+    headline = "Up on the day" if is_up else "Down on the day"
+    best = payload["best"]
+    worst = payload["worst"]
+    report_updated = payload.get("report_updated_at") or "No report stage timestamp"
+    report_message = payload.get("report_message") or "Awaiting report stage"
+
+    def trade_card(title: str, row: dict | None, cls: str) -> str:
+        if row is None:
+            return (
+                f"<section class='side-card'><small>{escape(title)}</small>"
+                "<div class='empty-mini'>No positions yet</div></section>"
+            )
+        ticker = escape(str(row.get("ticker") or ""))
+        sector = escape(str(row.get("sector") or ""))
+        pl = float(row.get("p_l") or 0)
+        pl_pct = float(row.get("p_l_%") or 0)
+        return (
+            f"<section class='side-card'><small>{escape(title)}</small>"
+            f"<div class='ticker-row'><strong>{ticker}</strong><span>{sector}</span></div>"
+            f"<div class='trade-pnl {cls}'>{money(pl)} <span>{pl_pct:+.2f}%</span></div></section>"
+        )
+
+    rows = sorted(payload["rows"], key=lambda row: float(row.get("p_l_%") or 0))
+
+    # --- Diverging bar chart SVG (poster fill) ---
+    def bar_chart_svg(chart_rows: list) -> str:
+        if not chart_rows:
+            return ""
+        row_h, pad_l, pad_r, total_w = 27, 54, 64, 500
+        bar_area = total_w - pad_l - pad_r
+        svg_h = len(chart_rows) * row_h + 2
+        pct_vals = [float(r.get("p_l_%") or 0) for r in chart_rows]
+        max_pos = max((v for v in pct_vals if v > 0), default=0.5)
+        max_neg = abs(min((v for v in pct_vals if v < 0), default=-0.5))
+        total_range = max(max_pos + max_neg, 0.1)
+        zero_x = pad_l + bar_area * (max_neg / total_range)
+        parts = [
+            f'<svg viewBox="0 0 {total_w} {svg_h}" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block">',
+            f'<line x1="{zero_x:.1f}" y1="0" x2="{zero_x:.1f}" y2="{svg_h}" stroke="#dce5ef" stroke-width="1.5"/>',
+        ]
+        for i, r in enumerate(chart_rows):
+            pv = float(r.get("p_l_%") or 0)
+            status = str(r.get("status") or "").upper()
+            tick = escape(str(r.get("ticker") or ""))
+            y0 = i * row_h + 2
+            bh = row_h - 6
+            ym = y0 + bh / 2 + 4.5
+            col = "#16803c" if pv >= 0 else "#c43d3d"
+            op = "0.85" if status == "OPEN" else "0.42"
+            bw = (abs(pv) / total_range) * bar_area
+            bx = zero_x if pv >= 0 else zero_x - bw
+            if bw > 0.5:
+                parts.append(
+                    f'<rect x="{bx:.1f}" y="{y0}" width="{bw:.1f}" height="{bh}"'
+                    f' rx="3" fill="{col}" opacity="{op}"/>'
+                )
+            parts.append(
+                f'<text x="{pad_l - 6}" y="{ym:.1f}" text-anchor="end"'
+                f' font-size="11" font-weight="700"'
+                f' font-family="-apple-system,BlinkMacSystemFont,sans-serif"'
+                f' fill="#17202a">{tick}</text>'
+            )
+            parts.append(
+                f'<text x="{pad_l + bar_area + 6}" y="{ym:.1f}" text-anchor="start"'
+                f' font-size="10.5" font-weight="700"'
+                f' font-family="-apple-system,BlinkMacSystemFont,sans-serif"'
+                f' fill="{col}">{pv:+.1f}%</text>'
+            )
+        parts.append('</svg>')
+        return ''.join(parts)
+
+    chart_svg = bar_chart_svg(rows)
+
+    # --- Donut ---
+    total = max(int(summary["total_count"]), 1)
+    green_deg = summary["winners"] / total * 360
+    red_deg = (summary["winners"] + summary["losers"]) / total * 360
+    if summary["total_count"]:
+        donut = (
+            f"conic-gradient(var(--green) 0deg {green_deg:.1f}deg,"
+            f"var(--red) {green_deg:.1f}deg {red_deg:.1f}deg,"
+            f"var(--amber) {red_deg:.1f}deg 360deg)"
+        )
+    else:
+        donut = "#e5e7eb"
+
+    # P&L totals per win/loss bucket
+    green_pl = sum(float(r.get("p_l") or 0) for r in rows if float(r.get("p_l") or 0) > 0)
+    red_pl = sum(float(r.get("p_l") or 0) for r in rows if float(r.get("p_l") or 0) < 0)
+
+    # --- Colored positions table ---
+    def positions_table_html(table_rows: list) -> str:
+        if not table_rows:
+            return "<div class='empty'>No paper performance rows available yet.</div>"
+        max_abs_pct = max((abs(float(r.get("p_l_%") or 0)) for r in table_rows), default=1) or 1
+        cols = ["Ticker", "Sector", "Status", "P/L", "P/L %", "Band"]
+        thead = "".join(f"<th>{c}</th>" for c in cols)
+        tbody = []
+        for r in table_rows:
+            pl = float(r.get("p_l") or 0)
+            pv = float(r.get("p_l_%") or 0)
+            pos = pl >= 0
+            bw = int(abs(pv) / max_abs_pct * 52)
+            bc = "#16803c" if pos else "#c43d3d"
+            st = str(r.get("status") or "")
+            pct_td = (
+                f"<td><div class='pct-cell'>"
+                f"<span class='pbar' style='width:{bw}px;background:{bc}'></span>"
+                f"<span class='{'ok' if pos else 'bad'}'>{pv:+.2f}%</span>"
+                f"</div></td>"
+            )
+            pl_td = f"<td class='{'ok' if pos else 'bad'}'>{money(pl)}</td>"
+            badge = f"<span class='sb {st.lower()}'>{escape(st)}</span>"
+            tbody.append(
+                f"<tr class='{'rpos' if pos else 'rneg'}'>"
+                f"<td class='tkr'>{escape(str(r.get('ticker') or ''))}</td>"
+                f"<td class='sec'>{escape(str(r.get('sector') or ''))}</td>"
+                f"<td>{badge}</td>"
+                f"{pl_td}"
+                f"{pct_td}"
+                f"<td class='bnd'>{escape(str(r.get('confirmation_band') or ''))}</td>"
+                f"</tr>"
+            )
+        return f"<table><thead><tr>{thead}</tr></thead><tbody>{''.join(tbody)}</tbody></table>"
+
+    pos_table = positions_table_html(rows)
+
+    html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="{payload['refresh_seconds']}">
+<title>Live P/L Infographic</title><style>
+:root{{--bg:#f4f7fb;--panel:#fff;--text:#17202a;--muted:#64748b;--line:#dce5ef;--blue:#1d4ed8;--green:#16803c;--red:#c43d3d;--amber:#b7791f;--soft:#f8fafc}}
+*{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--text);font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}}
+header{{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:16px;position:sticky;top:0;z-index:3;height:52px}}
+.hdr-left{{display:flex;align-items:center;gap:10px;flex-shrink:0}}.hdr-left h1{{font-size:15px;font-weight:700;margin:0;letter-spacing:-.01em}}
+.hdr-nav{{display:flex;align-items:center;gap:2px;flex:1;padding:0 8px}}
+.hdr-nav a{{padding:6px 13px;border-radius:7px;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none;transition:background .15s,color .15s;white-space:nowrap}}
+.hdr-nav a:hover{{background:#f1f3f5;color:var(--text)}}.hdr-nav a.active{{background:#eff6ff;color:var(--blue)}}
+.hdr-right{{display:flex;gap:10px;align-items:center;flex-shrink:0;color:var(--muted);font-size:12px}}
+main{{max-width:1320px;margin:0 auto;padding:24px 20px 64px}}
+.watch-shell{{display:grid;grid-template-columns:minmax(360px,1.35fr) minmax(300px,.75fr);gap:20px;align-items:start}}
+.poster{{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:34px;box-shadow:0 8px 28px rgba(17,24,39,.05);display:flex;flex-direction:column;gap:0}}
+.eyebrow{{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 14px}}
+.headline{{font-size:54px;line-height:1;letter-spacing:-.045em;margin:0 0 20px;text-transform:uppercase}}
+.big-pnl{{font-size:98px;line-height:.9;letter-spacing:-.06em;font-weight:850;margin:0 0 14px}}
+.positive{{color:var(--green)}}.negative{{color:var(--red)}}.muted{{color:var(--muted)}}
+.subline{{font-size:18px;color:var(--muted);font-weight:650}}
+.metric-row{{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:24px}}
+.metric small{{display:block;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}}
+.metric strong{{font-size:22px;letter-spacing:-.02em}}
+.chart-area{{border-top:1px solid var(--line);margin-top:26px;padding-top:18px}}
+.chart-label{{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}}
+.note{{border-top:1px solid var(--line);margin-top:20px;padding-top:14px;color:var(--muted);font-size:12px;line-height:1.5}}
+.side{{display:grid;gap:16px}}
+.side-card{{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px;box-shadow:0 4px 18px rgba(17,24,39,.04)}}
+.side-card small{{display:block;color:var(--muted);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-bottom:20px}}
+.mix{{display:grid;grid-template-columns:148px 1fr;gap:22px;align-items:center}}
+.donut{{width:142px;height:142px;border-radius:50%;background:{donut};position:relative}}
+.donut::after{{content:"";position:absolute;inset:32px;background:var(--panel);border:1px solid var(--line);border-radius:50%}}
+.donut-center{{position:absolute;inset:0;display:grid;place-items:center;text-align:center;z-index:1;font-weight:800;font-size:30px}}
+.donut-center span{{display:block;font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase}}
+.legend div{{font-size:19px;font-weight:800;margin:7px 0 2px}}.legend .lsub{{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:2px}}
+.legend .g{{color:var(--green)}}.legend .r{{color:var(--red)}}.legend .f{{color:var(--amber)}}
+.ticker-row{{display:flex;align-items:baseline;gap:12px;min-width:0}}.ticker-row strong{{font-size:58px;letter-spacing:-.06em;line-height:.95}}.ticker-row span{{font-size:20px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+.trade-pnl{{font-size:36px;font-weight:850;letter-spacing:-.03em;margin-top:8px}}.trade-pnl span{{margin-left:10px}}
+.status-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}}
+.status-tile{{background:#fbfdff;border:1px solid var(--line);border-radius:12px;padding:14px}}.status-tile small{{display:block;margin:0 0 8px}}.status-tile strong{{font-size:17px}}
+.table-panel{{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px;overflow:auto}}
+.panel-head{{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}}.panel-head h2{{font-size:15px;margin:0}}.panel-head span{{color:var(--muted);font-size:12px}}
+table{{width:100%;border-collapse:collapse;white-space:nowrap}}
+th{{padding:9px 10px;border-bottom:2px solid var(--line);text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em}}
+td{{padding:7px 10px;border-bottom:1px solid var(--line)}}
+tbody tr:last-child td{{border-bottom:0}}
+tbody tr:hover td{{filter:brightness(.97)}}
+.rpos td{{background:#f5fcf7}}.rneg td{{background:#fdf6f6}}
+.tkr{{font-weight:700;font-size:13px}}.sec{{color:var(--muted);font-size:12px}}.bnd{{color:var(--muted);font-size:12px;text-align:center}}
+.ok{{color:var(--green);font-weight:700}}.bad{{color:var(--red);font-weight:700}}
+.sb{{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;letter-spacing:.02em}}
+.sb.open{{background:#f0fdf4;color:var(--green);border:1px solid #86efac}}
+.sb.closed{{background:#f1f5f9;color:var(--muted);border:1px solid var(--line)}}
+.pct-cell{{display:flex;align-items:center;gap:7px}}
+.pbar{{display:inline-block;height:8px;border-radius:3px;flex-shrink:0;opacity:.75}}
+.empty{{padding:18px;border-radius:10px;background:var(--soft);color:var(--muted)}}.empty-mini{{color:var(--muted);font-size:20px;font-weight:700}}
+@media(max-width:1000px){{.watch-shell{{grid-template-columns:1fr}}.headline{{font-size:42px}}.big-pnl{{font-size:72px}}}}
+@media(max-width:640px){{main{{padding:16px}}header{{overflow:auto}}.metric-row,.status-grid{{grid-template-columns:1fr 1fr}}.mix{{grid-template-columns:1fr}}}}
+</style></head><body>
+<header>
+  <div class="hdr-left"><h1>Live Infographic</h1></div>
+  <nav class="hdr-nav">
+    <a href="/">Dashboard</a>
+    <a href="/live-infographic" class="active">Live infographic</a>
+    <a href="/jobs">Jobs</a>
+    <a href="/day">Day status</a>
+    <a href="/strategy-review">Strategy review</a>
+  </nav>
+  <div class="hdr-right"><span>Auto-refresh {payload['refresh_seconds']}s</span><span>{escape(payload['generated_at'])}</span></div>
+</header>
+<main>
+  <div class="watch-shell">
+    <section class="poster">
+      <div>
+        <p class="eyebrow">Realtime P/L flash card · {escape(payload['date'])}</p>
+        <h2 class="headline">{escape(headline)}</h2>
+        <div class="big-pnl {accent_class}">{money(summary['p_l'])}</div>
+        <div class="subline">{pct(summary['return_on_bankroll'])} of bankroll&nbsp;&nbsp;|&nbsp;&nbsp;{pct(summary['return_on_deployed'])} on deployed capital</div>
+        <div class="metric-row">
+          <div class="metric"><small>Equity</small><strong>{money(summary['equity'])}</strong></div>
+          <div class="metric"><small>Deployed</small><strong class="muted">{money(summary['deployed'])}</strong></div>
+          <div class="metric"><small>Cash</small><strong>{money(summary['cash'])}</strong></div>
+          <div class="metric"><small>Heat</small><strong class="positive">{pct(summary['heat'])}</strong></div>
+        </div>
+      </div>
+      <div class="chart-area">
+        <div class="chart-label">Position P/L %</div>
+        {chart_svg}
+      </div>
+      <div class="note">Open positions marked to latest report prices &middot; faded bars = closed &middot; auto-refreshes every {payload['refresh_seconds']}s</div>
+    </section>
+    <aside class="side">
+      <section class="side-card">
+        <small>Position mix</small>
+        <div class="mix">
+          <div class="donut"><div class="donut-center"><div>{summary['total_count']}<span>Rows</span></div></div></div>
+          <div class="legend">
+            <div class="g">{summary['winners']} green<span class="lsub">{money(green_pl)}</span></div>
+            <div class="r">{summary['losers']} red<span class="lsub">{money(red_pl)}</span></div>
+            <div class="f">{summary['flat']} flat</div>
+          </div>
+        </div>
+      </section>
+      {trade_card("Best card", best, "positive")}
+      {trade_card("Worst card", worst, "negative")}
+      <section class="side-card">
+        <small>Live status</small>
+        <div class="status-grid">
+          <div class="status-tile"><small>Open</small><strong>{summary['open_count']}</strong></div>
+          <div class="status-tile"><small>Resolved</small><strong>{summary['closed_count']}</strong></div>
+          <div class="status-tile"><small>Report</small><strong>{escape(str(report_message))}</strong></div>
+        </div>
+        <p class="muted" style="margin:12px 0 0;font-size:12px">Last report: {escape(str(report_updated))}</p>
+      </section>
+    </aside>
+  </div>
+  <section class="table-panel">
+    <div class="panel-head"><h2>Positions, worst first</h2><span>{summary['total_count']} rows</span></div>
+    {pos_table}
+  </section>
+</main>
+<script>
+setTimeout(function(){{ window.location.reload(); }}, {payload['refresh_seconds'] * 1000});
+</script>
+</body></html>"""
+    return html.encode("utf-8")
+
+
+def day_html(target_date: str) -> bytes:
+    payload = day_payload(target_date)
+    summary = payload["summary"]
+    failed = summary["failed_jobs"]
+    status_cls = "bad" if failed else "ok"
+    status_label = f"{failed} failed job{'s' if failed != 1 else ''}" if failed else "Pipeline clear"
+    cards = {
+        "Bankroll": f"${payload['bankroll']['base']:,.2f}",
+        "Deposits": f"${payload['bankroll']['deposits']:,.2f}",
+        "Paper rows": summary["paper_rows"],
+        "Open positions": summary["open_positions"],
+        "Resolved trades": summary["resolved_trades"],
+        "Job runs": summary["job_runs"],
+        "Failed jobs": summary["failed_jobs"],
+        "Decision": summary["strategy_decision"],
+    }
+    card_html = "".join(
+        f"<div class='card'><small>{escape(str(label))}</small><strong class='{'bad' if label == 'Failed jobs' and value else ''}'>{escape(str(value))}</strong></div>"
+        for label, value in cards.items()
+    )
+    stage_rows = [{"stage": name, **value} for name, value in payload["pipeline_stages"].items()]
+    html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Day status · {escape(payload['date'])}</title><style>
+:root{{--bg:#f4f6f8;--panel:#fff;--text:#17202a;--muted:#687386;--line:#dce3ec;--blue:#1d4ed8;--green:#16803c;--red:#b42318}}
+*{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--text);font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}}
+header{{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:16px;position:sticky;top:0;z-index:3;height:52px}}
+.hdr-left{{display:flex;align-items:center;gap:10px;flex-shrink:0}}
+.hdr-left h1{{font-size:15px;font-weight:700;margin:0;letter-spacing:-.01em}}
+.hdr-nav{{display:flex;align-items:center;gap:2px;flex:1;padding:0 8px}}
+.hdr-nav a{{padding:6px 13px;border-radius:7px;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none;transition:background .15s,color .15s;white-space:nowrap}}
+.hdr-nav a:hover{{background:#f1f3f5;color:var(--text)}}
+.hdr-nav a.active{{background:#eff6ff;color:var(--blue)}}
+.hdr-right{{display:flex;gap:8px;align-items:center;flex-shrink:0}}
+.status-badge{{border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;white-space:nowrap}}
+.status-badge.ok{{background:#f0fdf4;border:1px solid #86efac;color:var(--green)}}
+.status-badge.bad{{background:#fef2f2;border:1px solid #fca5a5;color:var(--red)}}
+form{{display:flex;gap:6px;align-items:center}}
+input[type=date]{{border:1px solid var(--line);border-radius:7px;padding:5px 9px;font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:#fff}}
+button{{border:1px solid #bfcee3;background:#f8fbff;color:#183b75;border-radius:7px;padding:5px 12px;font-size:13px;font-weight:600;cursor:pointer}}
+button:hover{{border-color:#7da2da}}
+main{{max-width:1400px;margin:0 auto;padding:24px 20px 64px}}
+.page-title{{margin:0 0 20px}}
+.page-title h2{{font-size:22px;font-weight:700;letter-spacing:-.02em;margin:0 0 3px}}
+.page-title .sub{{font-size:12px;color:var(--muted)}}
+.cards{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}}
+.card{{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:0 1px 6px rgba(17,24,39,.03)}}
+.card small{{display:block;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}}
+.card strong{{display:block;font-size:20px;font-weight:700;letter-spacing:-.02em}}
+.card strong.bad{{color:var(--red)}}
+.grid{{display:grid;grid-template-columns:1fr 1fr;gap:14px}}
+.panel{{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;overflow:auto;box-shadow:0 1px 6px rgba(17,24,39,.03)}}
+.panel.full{{grid-column:1/-1}}
+.panel-head{{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}}
+.panel-head h3{{font-size:14px;font-weight:700;margin:0}}
+.panel-head .sub{{font-size:12px;color:var(--muted)}}
+table{{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap}}
+th,td{{padding:9px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}}
+th{{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-weight:600}}
+tbody tr:last-child td{{border-bottom:0}}
+.empty{{color:var(--muted);padding:18px;background:#f9fafb;border-radius:8px;font-size:13px}}
+a{{color:var(--blue)}}
+.ok{{color:var(--green);font-weight:700}}.bad{{color:var(--red);font-weight:700}}
+@media(max-width:1000px){{.cards{{grid-template-columns:repeat(2,1fr)}}.grid{{grid-template-columns:1fr}}}}
+@media(max-width:560px){{.cards{{grid-template-columns:1fr 1fr}}main{{padding:16px}}}}
+</style></head><body>
+<header>
+  <div class="hdr-left"><h1>Day Status</h1></div>
+  <nav class="hdr-nav">
+    <a href="/">Dashboard</a>
+    <a href="/live-infographic">Live infographic</a>
+    <a href="/jobs">Jobs</a>
+    <a href="/day" class="active">Day status</a>
+    <a href="/strategy-review">Strategy review</a>
+  </nav>
+  <div class="hdr-right">
+    <span class="status-badge {status_cls}">{escape(status_label)}</span>
+    <form action="/day" method="get">
+      <input type="date" name="date" value="{escape(payload['date'])}">
+      <button>Go</button>
+    </form>
+  </div>
+</header>
+<main>
+  <div class="page-title">
+    <h2>{escape(payload['date'])}</h2>
+    <div class="sub">Generated {escape(payload['generated_at'])}</div>
+  </div>
+  <section class="cards">{card_html}</section>
+  <div class="grid">
+    <section class="panel full">
+      <div class="panel-head"><h3>Pipeline stages</h3><span class="sub">Dependency gates</span></div>
+      {html_table(stage_rows, "No pipeline stages recorded for this date.")}
+    </section>
+    <section class="panel full">
+      <div class="panel-head"><h3>Job runs</h3><span class="sub">Scheduler activity</span></div>
+      {html_table(payload['jobs'], "No job runs recorded for this date.", 10)}
+    </section>
+    <section class="panel full">
+      <div class="panel-head"><h3>Strategy review</h3><span class="sub">Improvement and tuning gates</span></div>
+      {html_table(payload['strategy_reviews'], "No strategy review rows recorded for this date.")}
+    </section>
+    <section class="panel full">
+      <div class="panel-head"><h3>Paper performance snapshot</h3><span class="sub">Trade state captured for this date</span></div>
+      {html_table(payload['paper_performance'], "No paper performance snapshot recorded for this date.", 24)}
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h3>Score-band analytics</h3><span class="sub">Resolved outcomes by band</span></div>
+      {html_table(payload['score_band'], "No score-band analytics recorded for this date.")}
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h3>Signal component analytics</h3><span class="sub">Resolved outcomes by signal</span></div>
+      {html_table(payload['components'], "No component analytics recorded for this date.")}
+    </section>
+    <section class="panel full">
+      <div class="panel-head"><h3>Paper ledger through date</h3><span class="sub">PostgreSQL paper_trades rows</span></div>
+      {html_table(payload['paper_trades'], "No paper trades recorded through this date.", 24)}
+    </section>
+  </div>
+</main></body></html>"""
+    return html.encode("utf-8")
+
+
+def app_html() -> bytes:
+    html = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stock Strategy App</title><style>
+:root{--bg:#f4f6f8;--panel:#fff;--text:#17202a;--muted:#687386;--line:#dce3ec;--blue:#1d4ed8;--green:#16803c;--red:#b42318;--amber:#92400e;--amber-bg:#fffbeb;--amber-border:#fcd34d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:16px;position:sticky;top:0;z-index:3;height:52px}
+.hdr-left{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.hdr-left h1{font-size:15px;font-weight:700;margin:0;letter-spacing:-.01em}
+.hdr-nav{display:flex;align-items:center;gap:2px;flex:1;padding:0 8px}
+.hdr-nav a{padding:6px 13px;border-radius:7px;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none;transition:background .15s,color .15s;white-space:nowrap}
+.hdr-nav a:hover{background:#f1f3f5;color:var(--text)}
+.hdr-nav a.active{background:#eff6ff;color:var(--blue)}
+.hdr-right{display:flex;gap:8px;align-items:center;flex-shrink:0}
+.badge{border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:600;background:#fff;color:var(--muted);white-space:nowrap}
+.badge.open{background:#f0fdf4;border-color:#86efac;color:var(--green)}.badge.session{background:#eff6ff;border-color:#93c5fd;color:#1e40af}
+.clock-txt{font-size:12px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+main{display:grid;grid-template-columns:300px minmax(0,1fr);gap:14px;padding:14px;height:calc(100vh - 57px)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto}
+.sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.sec:first-child{margin-top:0}
+.controls{display:grid;gap:6px}
+button{border:1px solid #bfcee3;background:#f8fbff;color:#183b75;border-radius:7px;padding:9px 11px;font-weight:600;cursor:pointer;text-align:left;font-size:13px;transition:border-color .15s,background .15s}
+button:hover:not(:disabled){border-color:#7da2da;background:#f0f6ff}button:disabled{opacity:.5;cursor:not-allowed}
+.btn-inject{background:var(--amber-bg);border-color:var(--amber-border);color:var(--amber)}
+.btn-inject:hover:not(:disabled){background:#fef3c7;border-color:#f59e0b}
+.run-bar{display:flex;align-items:center;gap:8px;padding:9px 11px;background:#eff6ff;border:1px solid #93c5fd;border-radius:7px;font-size:13px;font-weight:600;color:#1e40af;margin-top:4px}
+.run-bar.hidden{display:none}
+@keyframes spin{to{transform:rotate(360deg)}}.spinner{width:13px;height:13px;border:2px solid #93c5fd;border-top-color:#1d4ed8;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+.kv{display:grid;grid-template-columns:1fr auto;gap:6px;padding:7px 0;border-bottom:1px solid #f1f3f6;align-items:baseline}
+.kv:last-child{border-bottom:0}.kv .k{color:var(--muted);font-size:13px}.kv .v{font-size:13px;text-align:right}
+.ok{color:var(--green);font-weight:700}.bad{color:var(--red);font-weight:700}.muted{color:var(--muted)}
+.job-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f1f3f6;gap:8px}
+.job-row:last-child{border-bottom:0}
+.job-name{font-size:13px;font-weight:600}
+.job-right{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.job-time{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.jb{font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;white-space:nowrap}
+.jb.ok{background:#f0fdf4;color:var(--green);border:1px solid #86efac}
+.jb.bad{background:#fef2f2;color:var(--red);border:1px solid #fca5a5}
+.jb.none{background:#f9fafb;color:var(--muted);border:1px solid var(--line)}
+.log-hdr{display:flex;justify-content:space-between;align-items:baseline}
+.log-hdr .sec{margin-bottom:6px}.log-src{font-size:11px;color:var(--muted);margin-top:16px}
+.log{white-space:pre-wrap;max-height:200px;overflow:auto;font:12px ui-monospace,SFMono-Regular,Menlo,monospace;background:#0f172a;color:#e2e8f0;border-radius:7px;padding:10px;line-height:1.5}
+iframe{width:100%;height:100%;border:1px solid var(--line);border-radius:10px;background:#fff}
+a{color:var(--blue)}
+@media(max-width:900px){main{grid-template-columns:1fr;height:auto}iframe{height:75vh}}
+</style></head><body>
+<header>
+  <div class="hdr-left"><h1>Stock Strategy App</h1></div>
+  <nav class="hdr-nav">
+    <a href="/" class="active" id="nav-home">Dashboard</a>
+    <a href="/live-infographic" id="nav-live">Live infographic</a>
+    <a href="/jobs" id="nav-jobs">Jobs</a>
+    <a href="/day" id="nav-day">Day status</a>
+    <a href="/strategy-review" id="nav-review">Strategy review</a>
+  </nav>
+  <div class="hdr-right"><div id="market-badge" class="badge">Market —</div><span id="clock" class="clock-txt">—</span></div>
+</header>
+<main>
+<aside class="panel">
+  <div class="sec">Actions</div>
+  <div class="controls">
+    <button class="btn-inject" id="inject-bankroll">Inject $25,000 bankroll</button>
+    <button data-job="morning">Run morning scan</button>
+    <button data-job="confirmation">Run 9:45 confirmation</button>
+    <button data-job="report">Run live report update</button>
+    <button data-job="strategy_review">Run strategy review</button>
+    <button data-job="health">Run health check</button>
+    <button data-job="dashboard">Rebuild dashboard</button>
+  </div>
+  <div id="run-bar" class="run-bar hidden"><span class="spinner"></span><span id="run-label">Running…</span></div>
+
+  <div class="sec">System</div>
+  <div id="sys-status"></div>
+
+  <div class="sec">Job runs</div>
+  <div id="job-status"></div>
+
+  <div class="log-hdr"><div class="sec">Last output</div><span id="log-src" class="log-src"></span></div>
+  <div class="log" id="log">No job output yet.</div>
+</aside>
+<section><iframe id="dash-frame" src="/dashboard"></iframe></section>
+</main>
+<script>
+function fmtTime(iso){if(!iso)return '—';const d=new Date(iso);const t=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});return d.toDateString()===new Date().toDateString()?t:d.toLocaleDateString([],{month:'short',day:'numeric'})+' '+t}
+async function getStatus(){const r=await fetch('/api/status');return r.json()}
+function kv(k,v,cls=''){return `<div class="kv"><span class="k">${k}</span><span class="v ${cls}">${v}</span></div>`}
+function render(s){
+  document.getElementById('clock').textContent=fmtTime(s.server_time);
+  const mb=document.getElementById('market-badge');
+  if(s.market_open_now){mb.textContent='Market open';mb.className='badge open'}
+  else if(s.market_session){mb.textContent='Market session';mb.className='badge session'}
+  else{mb.textContent='Market closed';mb.className='badge'}
+  const rb=document.getElementById('run-bar');
+  if(s.running){rb.className='run-bar';document.getElementById('run-label').textContent='Running: '+s.running}
+  else{rb.className='run-bar hidden'}
+  let sys='';
+  sys+=kv('Backend',s.running?'Running: '+s.running:'Idle',s.running?'bad':'ok');
+  sys+=kv('Live updates',s.live_updates?'On':'Off',s.live_updates?'ok':'muted');
+  sys+=kv('Bankroll','$'+Number(s.bankroll.base).toLocaleString(),'ok');
+  sys+=kv('Deposits','$'+Number(s.bankroll.deposits).toLocaleString(),'muted');
+  document.getElementById('sys-status').innerHTML=sys;
+  let jobs='';
+  for(const [name,job] of Object.entries(s.jobs)){
+    const last=job.last_run;
+    const badge=last?(last.ok?'<span class="jb ok">OK</span>':'<span class="jb bad">Failed</span>'):'<span class="jb none">not run</span>';
+    const ts=last?`<span class="job-time" title="${last.finished_at||''}">${fmtTime(last.finished_at)}</span>`:'';
+    jobs+=`<div class="job-row"><span class="job-name">${name.replace(/_/g,' ')}</span><span class="job-right">${ts}${badge}</span></div>`;
+  }
+  document.getElementById('job-status').innerHTML=jobs;
+  document.querySelectorAll('button').forEach(b=>b.disabled=!!s.running);
+  const allRuns=[];
+  for(const [name,job] of Object.entries(s.jobs)){if(job.last_run)allRuns.push({...job.last_run,_name:name})}
+  const latest=allRuns.sort((a,b)=>(b.finished_at||'').localeCompare(a.finished_at||''))[0];
+  if(latest){document.getElementById('log').textContent=latest.output_tail||'(no output)';document.getElementById('log-src').textContent=latest._name.replace(/_/g,' ')+' \xb7 '+fmtTime(latest.finished_at)}
+}
+async function refresh(){try{render(await getStatus())}catch(e){document.getElementById('sys-status').innerHTML=kv('Backend','unreachable','bad')}}
+document.querySelectorAll('button[data-job]').forEach(b=>b.onclick=async()=>{b.disabled=true;await fetch('/api/run/'+b.dataset.job,{method:'POST'});document.getElementById('dash-frame').src='/dashboard?ts='+Date.now();setTimeout(refresh,500)});
+document.getElementById('inject-bankroll').onclick=async()=>{if(!confirm('Inject $25,000 into the paper bankroll?'))return;await fetch('/api/bankroll/inject',{method:'POST'});document.getElementById('dash-frame').src='/dashboard?ts='+Date.now();setTimeout(refresh,500)};
+refresh();setInterval(refresh,30000);
+</script></body></html>"""
+    return html.encode("utf-8")
+
+
+def jobs_html() -> bytes:
+    html = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scheduled Jobs</title><style>
+:root{--bg:#f4f6f8;--panel:#fff;--text:#17202a;--muted:#687386;--line:#dce3ec;--blue:#1d4ed8;--green:#16803c;--red:#b42318}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:16px;position:sticky;top:0;z-index:2;height:52px}
+.hdr-left{display:flex;align-items:center;flex-shrink:0}.hdr-left h1{font-size:15px;font-weight:700;margin:0;letter-spacing:-.01em}
+.hdr-nav{display:flex;align-items:center;gap:2px;flex:1;padding:0 8px}
+.hdr-nav a{padding:6px 13px;border-radius:7px;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none;transition:background .15s,color .15s;white-space:nowrap}
+.hdr-nav a:hover{background:#f1f3f5;color:var(--text)}
+.hdr-nav a.active{background:#eff6ff;color:var(--blue)}
+.hdr-right{display:flex;gap:12px;align-items:center}
+.badge{border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:600;background:#fff;color:var(--muted)}
+.badge.open{background:#f0fdf4;border-color:#86efac;color:var(--green)}.badge.session{background:#eff6ff;border-color:#93c5fd;color:#1e40af}
+main{padding:16px;display:grid;gap:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;overflow:auto}
+.panel-hdr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
+.panel-hdr h2{font-size:15px;font-weight:700;margin:0}.panel-hdr .sub{font-size:12px;color:var(--muted)}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:.04em;font-weight:600}
+tbody tr:last-child td{border-bottom:0}
+button{border:1px solid #bfcee3;background:#f8fbff;color:#183b75;border-radius:7px;padding:7px 11px;font-weight:600;cursor:pointer;white-space:nowrap;font-size:13px;transition:border-color .15s}
+button:hover:not(:disabled){border-color:#7da2da}button:disabled{opacity:.5;cursor:not-allowed}
+.jb{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.jb.ok{background:#f0fdf4;color:var(--green);border:1px solid #86efac}
+.jb.bad{background:#fef2f2;color:var(--red);border:1px solid #fca5a5}
+.jb.none{background:#f9fafb;color:var(--muted);border:1px solid var(--line)}
+.ts{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.job-desc{font-size:12px;color:var(--muted);margin-top:2px}
+.run-indicator{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:#eff6ff;border:1px solid #93c5fd;border-radius:999px;font-size:12px;font-weight:600;color:#1e40af}
+.run-indicator.hidden{display:none}
+@keyframes spin{to{transform:rotate(360deg)}}.spinner{width:11px;height:11px;border:2px solid #93c5fd;border-top-color:#1d4ed8;border-radius:50%;animation:spin .7s linear infinite}
+.log{white-space:pre-wrap;max-height:240px;overflow:auto;font:12px ui-monospace,SFMono-Regular,Menlo,monospace;background:#0f172a;color:#e2e8f0;border-radius:7px;padding:10px;line-height:1.5}
+a{color:var(--blue)}
+</style></head><body>
+<header>
+  <div class="hdr-left"><h1>Stock Strategy App</h1></div>
+  <nav class="hdr-nav">
+    <a href="/">Dashboard</a>
+    <a href="/live-infographic">Live infographic</a>
+    <a href="/jobs" class="active">Jobs</a>
+    <a href="/day">Day status</a>
+    <a href="/strategy-review">Strategy review</a>
+  </nav>
+  <div class="hdr-right">
+    <div id="market-badge" class="badge">Market —</div>
+    <div id="run-indicator" class="run-indicator hidden"><span class="spinner"></span><span id="run-label">Running…</span></div>
+  </div>
+</header>
+<main>
+<section class="panel">
+  <div class="panel-hdr"><h2>Jobs</h2><span class="sub" id="server-time"></span></div>
+  <table><thead><tr><th>Job</th><th>Schedule</th><th>Next run</th><th>Last status</th><th>Last run</th><th></th></tr></thead><tbody id="jobs"></tbody></table>
+</section>
+<section class="panel">
+  <div class="panel-hdr"><h2>Run history</h2><span class="sub">Most recent 80 runs</span></div>
+  <table><thead><tr><th>Finished</th><th>Job</th><th>Reason</th><th>Status</th><th>Return code</th></tr></thead><tbody id="history"></tbody></table>
+</section>
+<section class="panel">
+  <div class="panel-hdr"><h2>Last output</h2><span class="sub" id="log-src"></span></div>
+  <div class="log" id="log">No output yet.</div>
+</section>
+</main>
+<script>
+function fmtTime(iso){if(!iso)return '—';const d=new Date(iso);const t=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});return d.toDateString()===new Date().toDateString()?t:d.toLocaleDateString([],{month:'short',day:'numeric'})+' '+t}
+function fmtNext(iso){if(!iso)return '—';const d=new Date(iso);const diff=d-Date.now();if(diff<0)return 'overdue';if(diff<60000)return 'in <1 min';if(diff<3600000)return 'in '+Math.round(diff/60000)+'m';return fmtTime(iso)}
+async function loadJobs(){const r=await fetch('/api/jobs');return r.json()}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function jb(run){if(!run)return '<span class="jb none">not run</span>';return run.ok?'<span class="jb ok">OK</span>':'<span class="jb bad">Failed</span>'}
+function render(data){
+  document.getElementById('server-time').textContent=fmtTime(data.server_time);
+  const mb=document.getElementById('market-badge');
+  if(data.market_open_now){mb.textContent='Market open';mb.className='badge open'}
+  else if(data.market_session){mb.textContent='Market session';mb.className='badge session'}
+  else{mb.textContent='Market closed';mb.className='badge'}
+  const ri=document.getElementById('run-indicator');
+  if(data.running){ri.className='run-indicator';document.getElementById('run-label').textContent='Running: '+data.running}
+  else{ri.className='run-indicator hidden'}
+  const dis=data.running?'disabled':'';
+  document.getElementById('jobs').innerHTML=Object.entries(data.jobs).map(([name,job])=>`<tr>
+    <td><b>${esc(name.replace(/_/g,' '))}</b><div class="job-desc">${esc(job.description)}</div></td>
+    <td class="ts">${esc(job.schedule_time||'manual')}</td>
+    <td class="ts" title="${esc(job.next_run||'')}">${fmtNext(job.next_run)}</td>
+    <td>${jb(job.last_run)}</td>
+    <td class="ts" title="${esc(job.last_run?.finished_at||'')}">${fmtTime(job.last_run?.finished_at)}</td>
+    <td><button data-job="${esc(name)}" ${dis}>Run now</button></td>
+  </tr>`).join('');
+  document.getElementById('history').innerHTML=data.history.map(run=>`<tr>
+    <td class="ts" title="${esc(run.finished_at)}">${fmtTime(run.finished_at)}</td>
+    <td>${esc(run.job_name.replace(/_/g,' '))}</td>
+    <td class="ts">${esc(run.reason)}</td>
+    <td>${jb(run)}</td>
+    <td class="ts">${esc(run.returncode??'')}</td>
+  </tr>`).join('');
+  const latest=data.history[0];
+  document.getElementById('log').textContent=latest?.output_tail||'No output yet.';
+  document.getElementById('log-src').textContent=latest?latest.job_name.replace(/_/g,' ')+' \xb7 '+fmtTime(latest.finished_at):'';
+  document.querySelectorAll('button[data-job]').forEach(btn=>btn.onclick=async()=>{btn.disabled=true;await fetch('/api/run/'+btn.dataset.job,{method:'POST'});setTimeout(refresh,500)});
+}
+async function refresh(){render(await loadJobs())}
+refresh();setInterval(refresh,30000);
+</script></body></html>"""
+    return html.encode("utf-8")
+
+
+class Handler(SimpleHTTPRequestHandler):
+    server_version = "StockStrategyApp/1.0"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(PROJECT_DIR), **kwargs)
+
+    def log_message(self, format: str, *args) -> None:
+        append_log(f"HTTP {self.address_string()} {format % args}")
+
+    def send_json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK) -> None:
+        body = json.dumps(payload, indent=2).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self) -> None:
+        parsed = urlparse(self.path)
+        path = unquote(parsed.path)
+        query = parse_qs(parsed.query)
+        if path == "/":
+            body = app_html()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if path == "/day":
+            body = day_html(query.get("date", [today_key()])[0])
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if path == "/live-infographic":
+            body = live_infographic_html(query.get("date", [None])[0])
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if path == "/jobs":
+            body = jobs_html()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if path == "/strategy-review":
+            latest = newest_path("strategy_review_*.html")
+            if latest:
+                self.path = "/" + str(latest.relative_to(PROJECT_DIR))
+            else:
+                body = b"<html><body style='font:14px sans-serif;padding:48px;color:#374151'><h2>No strategy review yet</h2><p>The 10:30 review will appear here after it runs.</p><p><a href='/'>Back to app</a></p></body></html>"
+                self.send_response(HTTPStatus.NOT_FOUND)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+        elif path == "/dashboard":
+            self.path = "/" + str(DASHBOARD_FILE.relative_to(PROJECT_DIR))
+        elif path == "/api/status":
+            self.send_json(status_payload())
+            return
+        elif path == "/api/jobs":
+            self.send_json(jobs_payload())
+            return
+        elif path == "/api/day":
+            self.send_json(day_payload(query.get("date", [today_key()])[0]))
+            return
+        super().do_GET()
+
+    def do_POST(self) -> None:
+        parsed = urlparse(self.path)
+        path = unquote(parsed.path)
+        if path.startswith("/api/run/"):
+            name = path.rsplit("/", 1)[-1]
+            result = run_job(name, "manual")
+            if name == "strategy_review" and result.get("ok"):
+                result["dashboard_refresh"] = run_job("dashboard", "strategy-review-refresh")
+            self.send_json(result, HTTPStatus.OK if result.get("ok") else HTTPStatus.CONFLICT)
+            return
+        if path == "/api/bankroll/inject":
+            event = add_bankroll_deposit(25000.0, "UI bankroll injection")
+            dashboard_result = run_job("dashboard", "bankroll-injection")
+            self.send_json({"ok": True, "event": event, "bankroll": {"base": bankroll_base(), "deposits": total_bankroll_deposits()}, "dashboard": dashboard_result})
+            return
+        self.send_json({"ok": False, "error": "Not found"}, HTTPStatus.NOT_FOUND)
+
+
+def main() -> int:
+    ensure_directories()
+    wait_for_database()
+    init_schema()
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "80"))
+    server = ThreadingHTTPServer((host, port), Handler)
+    run_job("dashboard", "startup")
+    thread = threading.Thread(target=scheduler_loop, daemon=True)
+    thread.start()
+    append_log(f"Serving on http://{host}:{port}")
+    print(f"Stock Strategy App running at http://{host}:{port}")
+    print(f"Dashboard: http://{host}:{port}/dashboard")
+    server.serve_forever()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -4,21 +4,25 @@ from __future__ import annotations
 
 from datetime import datetime
 from html import escape
+from math import floor
 from typing import Optional
 
 import pandas as pd
 import yfinance as yf
 
 from scanner_config import (
-    EARNINGS_BLACKOUT_SESSIONS, MAX_BID_ASK_SPREAD_PCT, MAX_DAILY_PAPER_TRADES,
-    MAX_HOLDING_DAYS, MAX_PORTFOLIO_HEAT_PCT, MAX_SECTOR_EXPOSURE_PCT,
-    MIN_CONFIRMATION_SCORE_TO_BUY, PAPER_TRADES_FILE, SHARES_PER_TRADE,
-    FINAL_LOT_FALLBACK_PCT, SCALE_OUT_10_PCT, SCALE_OUT_20_PCT, SLIPPAGE_BPS,
+    BREAKEVEN_AFTER_TARGET_10_PCT, EARNINGS_BLACKOUT_SESSIONS,
+    FINAL_LOT_FALLBACK_PCT, MAX_BID_ASK_SPREAD_PCT, MAX_DAILY_PAPER_TRADES,
+    MAX_HOLDING_DAYS, MAX_OPEN_POSITIONS, MAX_PORTFOLIO_HEAT_PCT,
+    MAX_POSITION_EXPOSURE_PCT, MAX_SECTOR_EXPOSURE_PCT, MAX_SECTOR_POSITIONS,
+    MINIMUM_CASH_RESERVE_PCT, MIN_CONFIRMATION_SCORE_TO_BUY, PAPER_TRADES_FILE,
+    RISK_PER_TRADE_PCT, SCALE_OUT_10_PCT, SCALE_OUT_20_PCT, SLIPPAGE_BPS,
     STARTING_CAPITAL, STOP_LOSS_PCT, TAKE_PROFIT_PCT,
     WATCHLIST_EXPORT_DIR, ensure_directories,
 )
 from market_calendar import sessions_until
 from pipeline_health import market_gate, record_stage, require_today_csv
+from stock_storage import append_snapshot, bankroll_base, load_paper_trades, save_paper_trades, total_bankroll_deposits
 
 TRADE_COLUMNS = [
     "trade_id", "trade_date", "entry_datetime", "ticker", "sector", "market_regime",
@@ -26,7 +30,7 @@ TRADE_COLUMNS = [
     "sessions_to_earnings", "earnings_status", "confirmation_components", "entry_volume", "bid", "ask",
     "bid_ask_spread_pct", "quote_source", "spread_proxy_pct", "quoted_entry_price",
     "entry_price", "initial_cost", "initial_risk", "shares", "remaining_shares", "status", "current_price", "target_10", "target_20",
-    "target_30", "stop_8", "exit_datetime", "exit_price", "exit_reason",
+    "target_30", "stop_8", "active_stop", "exit_datetime", "exit_price", "exit_reason",
     "realized_proceeds", "realized_p_l", "shares_sold_10", "shares_sold_20",
     "shares_sold_30", "shares_sold_protect", "shares_sold_stop", "shares_sold_time",
     "target_10_hit_at", "target_20_hit_at", "target_30_hit_at", "last_evaluated_at",
@@ -62,24 +66,64 @@ def intraday_history(ticker: str) -> pd.DataFrame:
 
 
 def load_trades() -> pd.DataFrame:
-    if not PAPER_TRADES_FILE.exists():
-        return pd.DataFrame(columns=TRADE_COLUMNS)
-    trades = pd.read_csv(PAPER_TRADES_FILE, dtype={"ticker": str, "trade_id": str})
+    trades = load_paper_trades(TRADE_COLUMNS, PAPER_TRADES_FILE)
     for column in TRADE_COLUMNS:
         if column not in trades.columns:
             trades[column] = pd.NA
     if not trades.empty:
         trades["status"] = trades["status"].fillna(OPEN_STATUS)
+        trades["active_stop"] = effective_stops(trades)
     return trades[TRADE_COLUMNS]
 
 
+def effective_stops(trades: pd.DataFrame) -> pd.Series:
+    """Return the protective stop currently active for each trade."""
+    entry = pd.to_numeric(trades["entry_price"], errors="coerce").fillna(0)
+    original = pd.to_numeric(trades["stop_8"], errors="coerce").fillna(entry)
+    stored = pd.to_numeric(trades.get("active_stop"), errors="coerce").fillna(original)
+    sold10 = pd.to_numeric(trades["shares_sold_10"], errors="coerce").fillna(0)
+    sold20 = pd.to_numeric(trades["shares_sold_20"], errors="coerce").fillna(0)
+    calculated = original.copy()
+    calculated = calculated.where(
+        sold10.le(0), entry * (1 + BREAKEVEN_AFTER_TARGET_10_PCT / 100)
+    )
+    calculated = calculated.where(
+        sold20.le(0), entry * (1 + FINAL_LOT_FALLBACK_PCT / 100)
+    )
+    return pd.concat([original, stored, calculated], axis=1).max(axis=1)
+
+
+def calculate_position_size(equity: float, available_cash: float, entry_price: float) -> int:
+    """Size a trade from stop risk while preserving exposure and cash limits."""
+    if equity <= 0 or available_cash <= 0 or entry_price <= 0:
+        return 0
+    stop_reference = entry_price * (1 - STOP_LOSS_PCT / 100)
+    stop_fill = stop_reference * (1 - SLIPPAGE_BPS / 10_000)
+    risk_per_share = entry_price - stop_fill
+    risk_budget = equity * RISK_PER_TRADE_PCT / 100
+    exposure_budget = equity * MAX_POSITION_EXPOSURE_PCT / 100
+    reserve = equity * MINIMUM_CASH_RESERVE_PCT / 100
+    deployable_cash = max(0.0, available_cash - reserve)
+    if risk_per_share <= 0 or deployable_cash <= 0:
+        return 0
+    return max(0, min(
+        floor(risk_budget / risk_per_share),
+        floor(exposure_budget / entry_price),
+        floor(deployable_cash / entry_price),
+    ))
+
+
 def account_summary(trades: pd.DataFrame) -> dict:
+    deposits = total_bankroll_deposits()
+    capital_base = bankroll_base()
     if trades.empty:
         return {
-            "cash": STARTING_CAPITAL, "open_value": 0.0, "equity": STARTING_CAPITAL,
+            "cash": capital_base, "open_value": 0.0, "equity": capital_base,
             "realized_p_l": 0.0, "unrealized_p_l": 0.0, "deployed": 0.0,
             "portfolio_heat": 0.0, "portfolio_heat_pct": 0.0,
             "open_positions": 0, "closed_trades": 0,
+            "starting_capital": STARTING_CAPITAL, "capital_deposits": deposits,
+            "capital_base": capital_base,
         }
     entry = pd.to_numeric(trades["entry_price"], errors="coerce").fillna(0)
     shares = pd.to_numeric(trades["shares"], errors="coerce").fillna(0)
@@ -90,19 +134,22 @@ def account_summary(trades: pd.DataFrame) -> dict:
     is_open = remaining > 0
     initial_cost = pd.to_numeric(trades.get("initial_cost"), errors="coerce").fillna(entry * shares)
     total_entry_cost = float(initial_cost.sum())
-    cash = STARTING_CAPITAL - total_entry_cost + float(proceeds.sum())
+    cash = capital_base - total_entry_cost + float(proceeds.sum())
     open_value = float((current[is_open] * remaining[is_open]).sum())
     realized = float(realized_by_row.sum())
     unrealized = float(((current[is_open] - entry[is_open]) * remaining[is_open]).sum())
-    stops = pd.to_numeric(trades["stop_8"], errors="coerce").fillna(entry)
+    stops = effective_stops(trades)
     portfolio_heat = float(((entry[is_open] - stops[is_open]).clip(lower=0) * remaining[is_open]).sum())
+    equity = cash + open_value
     return {
-        "cash": cash, "open_value": open_value, "equity": cash + open_value,
+        "cash": cash, "open_value": open_value, "equity": equity,
         "realized_p_l": realized, "unrealized_p_l": unrealized,
         "deployed": float((entry[is_open] * remaining[is_open]).sum()),
         "portfolio_heat": portfolio_heat,
-        "portfolio_heat_pct": portfolio_heat / STARTING_CAPITAL * 100 if STARTING_CAPITAL else 0.0,
+        "portfolio_heat_pct": portfolio_heat / equity * 100 if equity else 0.0,
         "open_positions": int(is_open.sum()), "closed_trades": int((~is_open).sum()),
+        "starting_capital": STARTING_CAPITAL, "capital_deposits": deposits,
+        "capital_base": capital_base,
     }
 
 
@@ -118,26 +165,40 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
     if confirmations.empty:
         return trades
     eligible = confirmations[confirmations["score"] >= MIN_CONFIRMATION_SCORE_TO_BUY]
-    eligible = eligible.sort_values("score", ascending=False, kind="mergesort").head(MAX_DAILY_PAPER_TRADES)
+    eligible = eligible.sort_values("score", ascending=False, kind="mergesort")
     existing = set(zip(trades["trade_date"].astype(str), trades["ticker"].astype(str).str.upper()))
     summary = account_summary(trades)
     available_cash = max(0.0, float(summary["cash"]))
     open_mask = pd.to_numeric(trades["remaining_shares"], errors="coerce").fillna(0).gt(0) if not trades.empty else pd.Series(dtype=bool)
+    open_tickers = (
+        set(trades.loc[open_mask, "ticker"].astype(str).str.upper())
+        if not trades.empty else set()
+    )
     active_cost = (
         pd.to_numeric(trades.loc[open_mask, "entry_price"], errors="coerce").fillna(0)
         * pd.to_numeric(trades.loc[open_mask, "remaining_shares"], errors="coerce").fillna(0)
     ) if not trades.empty else pd.Series(dtype=float)
     sector_cost = active_cost.groupby(trades.loc[open_mask, "sector"].fillna("Unknown")).sum().to_dict() if not trades.empty else {}
-    sector_limit = STARTING_CAPITAL * MAX_SECTOR_EXPOSURE_PCT / 100
+    sector_counts = trades.loc[open_mask, "sector"].fillna("Unknown").value_counts().to_dict() if not trades.empty else {}
+    equity = float(summary["equity"])
+    sector_limit = equity * MAX_SECTOR_EXPOSURE_PCT / 100
     current_heat = float(((
         pd.to_numeric(trades.loc[open_mask, "entry_price"], errors="coerce").fillna(0)
-        - pd.to_numeric(trades.loc[open_mask, "stop_8"], errors="coerce").fillna(0)
+        - effective_stops(trades.loc[open_mask])
     ) * pd.to_numeric(trades.loc[open_mask, "remaining_shares"], errors="coerce").fillna(0)).sum()) if not trades.empty else 0.0
-    heat_limit = STARTING_CAPITAL * MAX_PORTFOLIO_HEAT_PCT / 100
+    heat_limit = equity * MAX_PORTFOLIO_HEAT_PCT / 100
     additions = []
     for row in eligible.itertuples(index=False):
+        if len(additions) >= MAX_DAILY_PAPER_TRADES:
+            break
+        if int(summary["open_positions"]) + len(additions) >= MAX_OPEN_POSITIONS:
+            print(f"Skipped remaining candidates: {MAX_OPEN_POSITIONS} open-position limit reached")
+            break
         ticker = str(row.ticker).upper()
         if (today, ticker) in existing:
+            continue
+        if ticker in open_tickers:
+            print(f"Skipped {ticker}: existing open position")
             continue
         earnings_blocked = getattr(row, "earnings_blocked", False)
         if str(earnings_blocked).strip().lower() in {"true", "1", "yes"}:
@@ -151,8 +212,13 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
         ask = pd.to_numeric(getattr(row, "ask", pd.NA), errors="coerce")
         execution_reference = float(ask) if pd.notna(ask) and float(ask) > 0 else quoted
         execution = execution_reference * (1 + SLIPPAGE_BPS / 10_000)
-        trade_cost = execution * SHARES_PER_TRADE
-        initial_risk = execution * STOP_LOSS_PCT / 100 * SHARES_PER_TRADE
+        shares = calculate_position_size(equity, available_cash, execution)
+        if shares < 1:
+            print(f"Skipped {ticker}: risk sizing, exposure, or cash reserve permits no shares")
+            continue
+        stop_reference = execution * (1 - STOP_LOSS_PCT / 100)
+        trade_cost = execution * shares
+        initial_risk = (execution - stop_reference * (1 - SLIPPAGE_BPS / 10_000)) * shares
         sector_value = getattr(row, "sector", "Unknown")
         sector = "Unknown" if pd.isna(sector_value) or not str(sector_value).strip() else str(sector_value)
         if trade_cost > available_cash + 0.005:
@@ -160,6 +226,9 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
             continue
         if float(sector_cost.get(sector, 0)) + trade_cost > sector_limit + 0.005:
             print(f"Skipped {ticker}: {sector} exposure would exceed {MAX_SECTOR_EXPOSURE_PCT:.0f}%")
+            continue
+        if int(sector_counts.get(sector, 0)) >= MAX_SECTOR_POSITIONS:
+            print(f"Skipped {ticker}: already holding {MAX_SECTOR_POSITIONS} {sector} position")
             continue
         if current_heat + initial_risk > heat_limit + 0.005:
             print(f"Skipped {ticker}: portfolio heat would exceed {MAX_PORTFOLIO_HEAT_PCT:.1f}%")
@@ -184,11 +253,12 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
             "spread_proxy_pct": getattr(row, "spread_proxy_pct", pd.NA),
             "quoted_entry_price": quoted, "entry_price": execution,
             "initial_cost": trade_cost, "initial_risk": initial_risk,
-            "shares": SHARES_PER_TRADE, "remaining_shares": SHARES_PER_TRADE,
+            "shares": shares, "remaining_shares": shares,
             "status": OPEN_STATUS, "current_price": execution,
             "target_10": execution * (1 + TAKE_PROFIT_PCT / 100),
             "target_20": execution * 1.20, "target_30": execution * 1.30,
             "stop_8": execution * (1 - STOP_LOSS_PCT / 100),
+            "active_stop": execution * (1 - STOP_LOSS_PCT / 100),
             "exit_datetime": pd.NA, "exit_price": pd.NA, "exit_reason": pd.NA,
             "realized_proceeds": 0.0, "realized_p_l": 0.0,
             "shares_sold_10": 0, "shares_sold_20": 0, "shares_sold_30": 0,
@@ -201,7 +271,9 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
         })
         available_cash -= trade_cost
         sector_cost[sector] = float(sector_cost.get(sector, 0)) + trade_cost
+        sector_counts[sector] = int(sector_counts.get(sector, 0)) + 1
         current_heat += initial_risk
+        open_tickers.add(ticker)
     if additions:
         new_rows = pd.DataFrame(additions, columns=TRADE_COLUMNS)
         trades = new_rows if trades.empty else pd.concat([trades, new_rows], ignore_index=True)
@@ -220,7 +292,7 @@ def apply_corporate_actions(trades: pd.DataFrame) -> pd.DataFrame:
     active = pd.to_numeric(result["remaining_shares"], errors="coerce").fillna(0).gt(0)
     share_fields = ["shares", "remaining_shares", "shares_sold_10", "shares_sold_20", "shares_sold_30",
                     "shares_sold_protect", "shares_sold_stop", "shares_sold_time"]
-    price_fields = ["entry_price", "current_price", "target_10", "target_20", "target_30", "stop_8"]
+    price_fields = ["entry_price", "current_price", "target_10", "target_20", "target_30", "stop_8", "active_stop"]
     for idx, row in result[active].iterrows():
         ticker = str(row["ticker"])
         try:
@@ -276,7 +348,7 @@ def _sell_lot(
 
 
 def update_trade_lifecycle(trades: pd.DataFrame) -> pd.DataFrame:
-    """Scale out 50/25/25, protect the final lot, and resolve risk exits."""
+    """Scale out 50/25/25 and ratchet protection after each target."""
     if trades.empty:
         return trades
     result = trades.copy()
@@ -288,6 +360,7 @@ def update_trade_lifecycle(trades: pd.DataFrame) -> pd.DataFrame:
     }
     for column, default in numeric_defaults.items():
         result[column] = pd.to_numeric(result[column], errors="coerce").fillna(default)
+    result["active_stop"] = effective_stops(result)
     active = result["remaining_shares"].gt(0)
     for idx, row in result[active].iterrows():
         ticker = str(row["ticker"])
@@ -322,34 +395,40 @@ def update_trade_lifecycle(trades: pd.DataFrame) -> pd.DataFrame:
             days = _holding_days(entry_time, now)
             result.at[idx, "holding_days"] = days
             target = float(row["target_10"])
-            stop = float(row["stop_8"])
-            protect_floor = float(row["entry_price"]) * (1 + FINAL_LOT_FALLBACK_PCT / 100)
+            entry = float(row["entry_price"])
+            breakeven_floor = entry * (1 + BREAKEVEN_AFTER_TARGET_10_PCT / 100)
+            protect_floor = entry * (1 + FINAL_LOT_FALLBACK_PCT / 100)
             for timestamp, bar in after.iterrows():
                 remaining = float(result.at[idx, "remaining_shares"])
                 if remaining <= 0:
                     break
                 low, high = float(bar["Low"]), float(bar["High"])
                 result.at[idx, "last_evaluated_at"] = timestamp.isoformat()
-                # Conservative rule: an ambiguous same-bar stop wins over upside targets.
-                if float(bar["Low"]) <= stop:
-                    gap_aware_stop = min(stop, float(bar["Open"]))
-                    _sell_lot(result, idx, remaining, gap_aware_stop, "STOP -8%", timestamp, "shares_sold_stop")
-                    break
-                # After +20%, the last 25 shares may not round-trip below +10%.
+                target10_already_active = float(result.at[idx, "shares_sold_10"]) > 0
                 target20_already_active = float(result.at[idx, "shares_sold_20"]) > 0
-                if target20_already_active and low <= protect_floor:
-                    gap_aware_floor = min(protect_floor, float(bar["Open"]))
-                    _sell_lot(result, idx, remaining, gap_aware_floor, "PROTECT +10%", timestamp, "shares_sold_protect")
+                active_stop = float(result.at[idx, "active_stop"])
+                # The stop already active before this bar wins any same-bar ambiguity.
+                if low <= active_stop:
+                    gap_aware_stop = min(active_stop, float(bar["Open"]))
+                    if target20_already_active:
+                        reason, bucket = "PROTECT +10%", "shares_sold_protect"
+                    elif target10_already_active:
+                        reason, bucket = "PROTECT BREAKEVEN", "shares_sold_protect"
+                    else:
+                        reason, bucket = "STOP -8%", "shares_sold_stop"
+                    _sell_lot(result, idx, remaining, gap_aware_stop, reason, timestamp, bucket)
                     break
                 initial = float(result.at[idx, "shares"])
                 if float(result.at[idx, "shares_sold_10"]) <= 0 and high >= target:
-                    quantity = round(initial * SCALE_OUT_10_PCT / 100)
+                    quantity = max(1, round(initial * SCALE_OUT_10_PCT / 100))
                     _sell_lot(result, idx, quantity, target, "SCALE +10%", timestamp, "shares_sold_10")
                     result.at[idx, "target_10_hit_at"] = timestamp.isoformat()
+                    result.at[idx, "active_stop"] = max(float(result.at[idx, "active_stop"]), breakeven_floor)
                 if float(result.at[idx, "remaining_shares"]) > 0 and float(result.at[idx, "shares_sold_20"]) <= 0 and high >= float(row["target_20"]):
-                    quantity = round(initial * SCALE_OUT_20_PCT / 100)
+                    quantity = max(1, round(initial * SCALE_OUT_20_PCT / 100))
                     _sell_lot(result, idx, quantity, float(row["target_20"]), "SCALE +20%", timestamp, "shares_sold_20")
                     result.at[idx, "target_20_hit_at"] = timestamp.isoformat()
+                    result.at[idx, "active_stop"] = max(float(result.at[idx, "active_stop"]), protect_floor)
                 if float(result.at[idx, "remaining_shares"]) > 0 and float(result.at[idx, "shares_sold_20"]) > 0 and high >= float(row["target_30"]):
                     _sell_lot(result, idx, float(result.at[idx, "remaining_shares"]), float(row["target_30"]), "FINAL +30%", timestamp, "shares_sold_30")
                     result.at[idx, "target_30_hit_at"] = timestamp.isoformat()
@@ -367,7 +446,7 @@ def update_trade_lifecycle(trades: pd.DataFrame) -> pd.DataFrame:
 def calculate_performance(trades: pd.DataFrame) -> pd.DataFrame:
     result = trades.copy()
     numeric = ["entry_price", "quoted_entry_price", "shares", "remaining_shares", "confirmation_score", "current_price",
-               "target_10", "target_20", "target_30", "stop_8", "exit_price", "realized_p_l",
+               "target_10", "target_20", "target_30", "stop_8", "active_stop", "exit_price", "realized_p_l",
                "realized_proceeds", "shares_sold_10", "shares_sold_20", "shares_sold_30",
                "shares_sold_protect", "shares_sold_stop", "shares_sold_time"]
     for column in numeric:
@@ -463,10 +542,13 @@ def main() -> int:
         return 1
     trades = update_trade_lifecycle(apply_corporate_actions(load_trades()))
     trades = add_new_trades(trades, confirmations, today)
-    trades.to_csv(PAPER_TRADES_FILE, index=False)
+    save_paper_trades(trades, TRADE_COLUMNS, PAPER_TRADES_FILE)
     performance = calculate_performance(trades)
     band = grouped_analytics(performance, "confirmation_band")
     components = component_analytics(performance)
+    append_snapshot("paper_performance", performance, "report_date", today)
+    append_snapshot("score_band_performance", band, "report_date", today)
+    append_snapshot("component_performance", components, "report_date", today)
     csv_path = WATCHLIST_EXPORT_DIR / f"paper_performance_{today}.csv"
     performance.to_csv(csv_path, index=False)
     band.to_csv(WATCHLIST_EXPORT_DIR / f"score_band_performance_{today}.csv", index=False)
@@ -477,7 +559,7 @@ def main() -> int:
     csv_path.with_suffix(".html").write_text(report_html, encoding="utf-8")
     PAPER_TRADES_FILE.with_suffix(".html").write_text(report_html, encoding="utf-8")
     from dashboard import build_dashboard
-    build_dashboard(performance, today)
+    build_dashboard(performance, datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z"))
     print(f"Saved {len(performance)} trades to {csv_path} and {html_path}")
     record_stage("report", "SUCCESS", len(performance), f"Equity ${account_summary(performance)['equity']:,.2f}")
     return 0
