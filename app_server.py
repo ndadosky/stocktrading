@@ -1121,7 +1121,7 @@ a{color:var(--blue)}
 </style></head><body>
 <header>
   <div class="hdr-left"><h1>Stock Strategy App</h1></div>
-  <nav class="hdr-nav">{header_nav("/")}</nav>
+  <nav class="hdr-nav">__HEADER_NAV__</nav>
   <div class="hdr-right"><div id="market-badge" class="badge">Market —</div><span id="clock" class="clock-txt">—</span></div>
 </header>
 <main>
@@ -1187,7 +1187,7 @@ document.querySelectorAll('button[data-job]').forEach(b=>b.onclick=async()=>{b.d
 document.getElementById('inject-bankroll').onclick=async()=>{if(!confirm('Inject $25,000 into the paper bankroll?'))return;await fetch('/api/bankroll/inject',{method:'POST'});document.getElementById('dash-frame').src='/dashboard?ts='+Date.now();setTimeout(refresh,500)};
 refresh();setInterval(refresh,30000);
 </script></body></html>"""
-    return html.encode("utf-8")
+    return html.replace("__HEADER_NAV__", header_nav("/")).encode("utf-8")
 
 
 def jobs_html() -> bytes:
@@ -1228,7 +1228,7 @@ a{color:var(--blue)}
 </style></head><body>
 <header>
   <div class="hdr-left"><h1>Stock Strategy App</h1></div>
-  <nav class="hdr-nav">{header_nav("/jobs")}</nav>
+  <nav class="hdr-nav">__HEADER_NAV__</nav>
   <div class="hdr-right">
     <div id="market-badge" class="badge">Market —</div>
     <div id="run-indicator" class="run-indicator hidden"><span class="spinner"></span><span id="run-label">Running…</span></div>
@@ -1287,9 +1287,7 @@ function render(data){
 async function refresh(){render(await loadJobs())}
 refresh();setInterval(refresh,30000);
 </script></body></html>"""
-    return html.encode("utf-8")
-
-
+    return html.replace("__HEADER_NAV__", header_nav("/jobs")).encode("utf-8")
 class Handler(SimpleHTTPRequestHandler):
     server_version = "StockStrategyApp/1.0"
 

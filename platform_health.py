@@ -21,6 +21,7 @@ from stock_storage import bankroll_base, table_count, total_bankroll_deposits
 from version import version_label
 
 CODEX_BIN = os.getenv("CODEX_BIN", "codex")
+CODEX_HOME = os.getenv("CODEX_HOME", "").strip()
 CODEX_TIMEOUT_SECONDS = int(os.getenv("CODEX_PROBE_TIMEOUT_SECONDS", "120"))
 CODEX_HOST_URL = os.getenv("CODEX_HEALTH_URL", "").strip()
 IMAGE_PYTHON = os.getenv("STOCK_IMAGE_PYTHON", os.getenv("PYTHON", "python3"))
@@ -174,6 +175,14 @@ def check_scheduler(state: dict) -> dict:
     )
 
 
+def _codex_env() -> dict[str, str]:
+    env = os.environ.copy()
+    if CODEX_HOME:
+        env["HOME"] = str(Path(CODEX_HOME).parent)
+        env["CODEX_HOME"] = CODEX_HOME
+    return env
+
+
 def check_codex_cli() -> dict:
     binary = shutil.which(CODEX_BIN)
     if not binary and Path(CODEX_BIN).is_file():
@@ -181,8 +190,8 @@ def check_codex_cli() -> dict:
     if not binary:
         return _status(
             False,
-            f"{CODEX_BIN} not found in container PATH — mount host Codex or set CODEX_BIN",
-            hint="On Pi: add a volume for the host codex binary in docker-compose.pi.yml",
+            f"{CODEX_BIN} not found — set CODEX_HOST_BIN in .env and mount in docker-compose.pi.yml",
+            hint="Pi default: /home/admin/.codex/packages/standalone/current/bin/codex",
         )
     try:
         completed = subprocess.run(
@@ -192,6 +201,7 @@ def check_codex_cli() -> dict:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             timeout=15,
+            env=_codex_env(),
         )
         output = (completed.stdout or "").strip()
         return _status(
@@ -315,6 +325,7 @@ def codex_chat(message: str) -> dict:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=CODEX_TIMEOUT_SECONDS,
+            env=_codex_env(),
         )
         duration_ms = int((time.time() - started) * 1000)
         response = (completed.stdout or "").strip()

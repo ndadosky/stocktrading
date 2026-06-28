@@ -22,13 +22,15 @@ services:
       APP_BUILT_AT: ${APP_BUILT_AT:-}
       STOCK_STARTING_CAPITAL: ${STOCK_STARTING_CAPITAL:-25000}
       STOCK_IMAGE_PYTHON: ${STOCK_IMAGE_PYTHON:-python3}
-      CODEX_BIN: ${CODEX_BIN:-codex}
+      CODEX_BIN: ${CODEX_BIN:-/usr/local/bin/codex}
+      CODEX_HOME: ${CODEX_HOME:-/root/.codex}
       STOCK_SCHEDULER: ${STOCK_SCHEDULER:-systemd}
       STOCK_REQUIRE_POSTGRES: ${STOCK_REQUIRE_POSTGRES:-true}
       TZ: America/New_York
     volumes:
       - ./exports:/app/exports
       - ./logs:/app/logs
-      # Optional: expose host Codex CLI to the container (uncomment and set path on the Pi)
-      # - /path/on/pi/codex:/usr/local/bin/codex:ro
+      # Host Codex CLI + auth (standalone binary on the Pi)
+      - ${CODEX_HOST_BIN:-/home/admin/.codex/packages/standalone/current/bin/codex}:/usr/local/bin/codex:ro
+      - ${CODEX_HOST_CONFIG:-/home/admin/.codex}:/root/.codex:ro
     restart: unless-stopped
