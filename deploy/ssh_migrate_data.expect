@@ -1,0 +1,57 @@
+#!/usr/bin/expect -f
+set timeout 300
+set user "admin"
+set password "password"
+set host "raspberrypi.local"
+set src "/Users/dadon003/code/stock"
+
+proc scp_file {local remote} {
+    global user password host
+    spawn scp -o StrictHostKeyChecking=no $local ${user}@${host}:$remote
+    expect {
+        -re "password:" { send "$password\r"; exp_continue }
+        eof
+    }
+    catch wait result
+    return [lindex $result 3]
+}
+
+proc run_ssh {cmd} {
+    global user password host
+    spawn ssh -o StrictHostKeyChecking=no ${user}@${host} $cmd
+    expect {
+        -re "password:" { send "$password\r"; exp_continue }
+        -re "sudo.*password" { send "$password\r"; exp_continue }
+        eof
+    }
+    catch wait result
+    return [lindex $result 3]
+}
+
+puts "Copying SQLite databases and exports..."
+foreach file {
+    exports/stock_app.sqlite
+    exports/app_server.sqlite
+    paper_trades.csv
+    migrate_sqlite_to_postgres.py
+} {
+    set rc [scp_file "$src/$file" "/home/admin/stock/$file"]
+    if {$rc != 0} { exit $rc }
+}
+
+# Copy dated export snapshots for dashboard history charts
+foreach file [glob -nocomplain "$src/exports/paper_performance_*.csv" "$src/exports/score_band_performance_*.csv" "$src/exports/component_performance_*.csv" "$src/exports/dashboard.html"] {
+    set rc [scp_file $file "/home/admin/stock/exports/[file tail $file]"]
+    if {$rc != 0} { puts "warn: failed to copy $file" }
+}
+
+puts "Running migration inside app container..."
+set rc [run_ssh {cd /home/admin/stock && sudo docker cp migrate_sqlite_to_postgres.py stock_app_1:/app/migrate_sqlite_to_postgres.py && sudo docker exec stock_app_1 python3 /app/migrate_sqlite_to_postgres.py --stock-db /app/exports/stock_app.sqlite --app-db /app/exports/app_server.sqlite}]
+if {$rc != 0} { exit $rc }
+
+puts "Rebuilding dashboard..."
+run_ssh {sudo docker exec stock_app_1 python3 /app/dashboard.py}
+
+run_ssh {sudo docker exec stock_app_1 python3 -c "from stock_storage import table_count; print('paper_trades', table_count('paper_trades')); print('job_runs', table_count('job_runs'))"}
+
+exit 0

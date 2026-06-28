@@ -132,7 +132,10 @@ def account_summary(trades: pd.DataFrame) -> dict:
     proceeds = pd.to_numeric(trades["realized_proceeds"], errors="coerce").fillna(0)
     realized_by_row = pd.to_numeric(trades["realized_p_l"], errors="coerce").fillna(0)
     is_open = remaining > 0
-    initial_cost = pd.to_numeric(trades.get("initial_cost"), errors="coerce").fillna(entry * shares)
+    if "initial_cost" in trades.columns:
+        initial_cost = pd.to_numeric(trades["initial_cost"], errors="coerce").fillna(entry * shares)
+    else:
+        initial_cost = entry * shares
     total_entry_cost = float(initial_cost.sum())
     cash = capital_base - total_entry_cost + float(proceeds.sum())
     open_value = float((current[is_open] * remaining[is_open]).sum())
