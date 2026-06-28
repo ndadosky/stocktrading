@@ -32,6 +32,7 @@ from platform_health import codex_chat, platform_health_payload
 from nav_html import header_nav
 from strategy_review import load_latest_review_rows, render_strategy_review_html
 from best_case_analysis import compute_best_case
+from morning_candidates import build_morning_candidates, preview_rows
 
 
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -71,6 +72,9 @@ class AppState:
         self.running: Optional[str] = None
         self.scheduler_started_at = datetime.now().astimezone().isoformat(timespec="seconds")
         self.live_updates = os.getenv("STOCK_DISABLE_LIVE_UPDATES", "").lower() not in {"1", "true", "yes"}
+        self.scanner_preview_running = False
+        self.scanner_preview_result: Optional[dict] = None
+        self.scanner_preview_error: Optional[str] = None
 
 
 STATE = AppState()
@@ -1290,41 +1294,110 @@ refresh();setInterval(refresh,30000);
     return html.replace("__HEADER_NAV__", header_nav("/jobs")).encode("utf-8")
 
 
-def scanner_payload() -> dict:
+def _saved_scanner_preview() -> tuple[list[str], list[dict], str]:
     import pandas as pd
 
     today = today_key()
     today_csv = WATCHLIST_EXPORT_DIR / f"morning_candidates_{today}.csv"
     source = today_csv if today_csv.exists() else CANDIDATES_FILE
-    preview: list[dict] = []
-    columns: list[str] = []
-    if source.exists():
-        try:
-            frame = pd.read_csv(source)
-            preferred = [c for c in ("ticker", "Ticker", "score", "Score", "name", "Name", "sector", "Sector", "signal", "Signal") if c in frame.columns]
-            columns = preferred[:6] if preferred else list(frame.columns[:6])
-            subset = frame[columns].head(20) if columns else frame.head(0)
-            preview = subset.fillna("").astype(str).to_dict(orient="records")
-        except Exception as exc:
-            preview = [{"error": f"Could not read {source.name}: {exc}"}]
+    if not source.exists():
+        return [], [], "none"
+    try:
+        frame = pd.read_csv(source)
+        columns, rows = preview_rows(frame, limit=50)
+        return columns, rows, f"saved:{source.name}"
+    except Exception as exc:
+        return [], [{"error": f"Could not read {source.name}: {exc}"}], "saved"
+
+
+def _run_scanner_preview_worker() -> None:
+    try:
+        _, candidates, stats = build_morning_candidates(include_earnings=True)
+        columns, rows = preview_rows(candidates, limit=50)
+        result = {
+            "ok": True,
+            "read_only": True,
+            "preview_source": "live",
+            "preview_columns": columns,
+            "preview": rows,
+            "stats": stats,
+        }
+        with STATE.lock:
+            STATE.scanner_preview_result = result
+            STATE.scanner_preview_error = None
+        append_log(f"Scanner preview complete — {stats['scored_count']} candidates ({stats['coverage_pct']}% coverage)")
+    except Exception as exc:
+        with STATE.lock:
+            STATE.scanner_preview_result = None
+            STATE.scanner_preview_error = str(exc)
+        append_log(f"Scanner preview failed: {exc}")
+    finally:
+        with STATE.lock:
+            STATE.scanner_preview_running = False
+
+
+def start_scanner_preview() -> dict:
     with STATE.lock:
-        running = STATE.running
+        if STATE.scanner_preview_running:
+            return {"ok": False, "error": "Preview scan already running"}
+        if STATE.running:
+            return {"ok": False, "error": f"Scheduled job already running: {STATE.running}"}
+        STATE.scanner_preview_running = True
+        STATE.scanner_preview_error = None
+    thread = threading.Thread(target=_run_scanner_preview_worker, daemon=True)
+    thread.start()
+    append_log("Scanner preview started (read-only)")
+    return {"ok": True, "started": True, "read_only": True}
+
+
+def scanner_payload() -> dict:
+    with STATE.lock:
+        preview_running = STATE.scanner_preview_running
+        preview_result = STATE.scanner_preview_result
+        preview_error = STATE.scanner_preview_error
+
+    today = today_key()
+    today_csv = WATCHLIST_EXPORT_DIR / f"morning_candidates_{today}.csv"
+    if preview_result:
+        preview_columns = preview_result.get("preview_columns") or []
+        preview = preview_result.get("preview") or []
+        preview_source = preview_result.get("preview_source", "live")
+        stats = preview_result.get("stats")
+    else:
+        preview_columns, preview, preview_source = _saved_scanner_preview()
+        stats = None
+
     last = last_run("morning")
     return {
         "server_time": datetime.now().astimezone().isoformat(timespec="seconds"),
-        "running": running,
-        "running_scanner": running == "morning",
+        "read_only": True,
+        "preview_running": preview_running,
+        "preview_error": preview_error if not preview_running else None,
+        "preview_source": preview_source,
+        "preview_columns": preview_columns,
+        "preview": preview,
+        "stats": stats,
         "files": {
             "candidates_latest": file_info(CANDIDATES_FILE),
             "candidates_html": file_info(CANDIDATES_FILE.with_suffix(".html")),
             "today_scored": file_info(today_csv),
             "today_html": file_info(today_csv.with_suffix(".html")),
         },
-        "preview_source": str(source),
-        "preview_columns": columns,
-        "preview": preview,
-        "last_run": last,
+        "last_scheduled_run": last,
     }
+
+
+def _render_preview_table(columns: list[str], rows: list[dict]) -> str:
+    if columns and rows and "error" not in rows[0]:
+        head = "".join(f"<th>{escape(str(c))}</th>" for c in columns)
+        body = "".join(
+            "<tr>" + "".join(f"<td>{escape(str(row.get(c, '')))}</td>" for c in columns) + "</tr>"
+            for row in rows
+        )
+        return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+    if rows:
+        return f"<p class='empty'>{escape(str(rows[0].get('error', 'No candidates yet.')))}</p>"
+    return "<p class='empty'>Click <strong>Run preview scan</strong> for a live read-only view. Nothing is saved to the database or export files.</p>"
 
 
 def scanner_html() -> bytes:
@@ -1333,7 +1406,7 @@ def scanner_html() -> bytes:
     files = payload["files"]
     latest = files["candidates_latest"]
     html_link = files["candidates_html"]
-    last = payload.get("last_run") or {}
+    last = payload.get("last_scheduled_run") or {}
     last_label = "OK" if last.get("ok") else ("Failed" if last else "Never")
     last_cls = "ok" if last.get("ok") else ("bad" if last else "muted")
     html_name = CANDIDATES_FILE.with_suffix(".html").name
@@ -1343,18 +1416,19 @@ def scanner_html() -> bytes:
         if html_link.get("exists"):
             exports_html += f' · <a href="/exports/{escape(html_name)}">HTML</a>'
     preview_cols = payload.get("preview_columns") or []
-    preview_rows = payload.get("preview") or []
-    if preview_cols and preview_rows and "error" not in preview_rows[0]:
-        head = "".join(f"<th>{escape(str(c))}</th>" for c in preview_cols)
-        body = "".join(
-            "<tr>" + "".join(f"<td>{escape(str(row.get(c, '')))}</td>" for c in preview_cols) + "</tr>"
-            for row in preview_rows
+    preview_rows_data = payload.get("preview") or []
+    preview_table = _render_preview_table(preview_cols, preview_rows_data)
+    stats = payload.get("stats") or {}
+    stats_text = ""
+    if stats:
+        stats_text = (
+            f"Live preview · {stats.get('scored_count', 0)} scored from {stats.get('raw_count', 0)} Finviz rows "
+            f"({stats.get('coverage_pct', 0)}% coverage)"
         )
-        preview_table = f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
-    elif preview_rows:
-        preview_table = f"<p class='empty'>{escape(str(preview_rows[0].get('error', 'No candidates yet.')))}</p>"
-    else:
-        preview_table = "<p class='empty'>No scan results yet. Run the scanner to fetch and score Finviz candidates.</p>"
+    source_label = "Live preview" if payload.get("preview_source") == "live" else (
+        "Saved export" if str(payload.get("preview_source", "")).startswith("saved:") else "No data"
+    )
+    running_style = "" if payload.get("preview_running") else "display:none"
 
     html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Scanner</title><style>
@@ -1380,9 +1454,9 @@ main{{max-width:1200px;margin:0 auto;padding:24px 20px 64px;display:grid;gap:16p
 table{{width:100%;border-collapse:collapse;font-size:13px}}
 th,td{{padding:9px 8px;border-bottom:1px solid var(--line);text-align:left}}
 th{{color:var(--muted);font-size:11px;text-transform:uppercase}}
-.log{{white-space:pre-wrap;max-height:220px;overflow:auto;font:12px ui-monospace,Menlo,monospace;background:#0f172a;color:#e2e8f0;border-radius:10px;padding:12px;line-height:1.5}}
 .empty{{color:var(--muted);padding:8px 0}}
 .run-pill{{display:inline-block;background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;margin-left:8px}}
+.note{{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--muted)}}
 a{{color:var(--blue)}}
 </style></head><body>
 <header>
@@ -1395,47 +1469,72 @@ a{{color:var(--blue)}}
     <div class="page-title">
       <div>
         <h2>Morning Finviz scanner</h2>
-        <p class="sub">Fetch the universe, score candidates, and write exports/candidates_latest.csv — same job as the 8:45 ET schedule.</p>
+        <p class="sub">Read-only preview — fetches and scores Finviz live. Does not write to the database, job history, or export files. The 8:45 ET schedule still runs the full save job.</p>
       </div>
-      <button class="btn-run" id="run-scanner">Run scanner now</button>
+      <button class="btn-run" id="run-scanner">Run preview scan</button>
     </div>
     <div class="meta">
-      <div><small>Last run</small><span class="{last_cls}" id="last-status">{escape(last_label)}</span></div>
-      <div><small>Latest CSV</small>{'Updated ' + escape(latest.get('modified_at', '—')) if latest.get('exists') else 'Not generated yet'}</div>
-      <div><small>Rows preview</small>{len(preview_rows)} shown</div>
-      <div><small>Exports</small>{exports_html}</div>
+      <div><small>Preview source</small><span id="preview-source">{escape(source_label)}</span></div>
+      <div><small>Rows shown</small><span id="row-count">{len(preview_rows_data)}</span></div>
+      <div><small>Last scheduled save</small><span class="{last_cls}">{escape(last_label)}</span></div>
+      <div><small>Saved exports</small>{exports_html}</div>
     </div>
-    <div id="run-indicator" class="sub" style="display:none"><span class="run-pill">RUNNING</span> Scanner in progress…</div>
+    <div id="run-indicator" class="sub" style="{running_style}"><span class="run-pill">RUNNING</span> Fetching Finviz and scoring candidates… (may take a few minutes)</div>
+    <div id="preview-stats" class="note" style="{'display:block' if stats_text else 'display:none'}">{escape(stats_text)}</div>
     <div id="preview">{preview_table}</div>
-  </section>
-  <section class="panel">
-    <div class="page-title"><div><h2>Last output</h2><p class="sub">Tail from the most recent morning scan job.</p></div></div>
-    <div class="log" id="log">{escape((last.get('output_tail') or 'No scanner output yet.'))}</div>
   </section>
 </main>
 <script>
+function esc(v){{return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}}
+function renderPreview(data){{
+  const cols=data.preview_columns||[];
+  const rows=data.preview||[];
+  const target=document.getElementById('preview');
+  document.getElementById('row-count').textContent=rows.length;
+  document.getElementById('preview-source').textContent=
+    data.preview_source==='live'?'Live preview':(String(data.preview_source||'').startsWith('saved:')?'Saved export':'No data');
+  const statsEl=document.getElementById('preview-stats');
+  if(data.stats){{
+    const s=data.stats;
+    statsEl.style.display='block';
+    statsEl.textContent=`Live preview · ${{s.scored_count||0}} scored from ${{s.raw_count||0}} Finviz rows (${{s.coverage_pct||0}}% coverage)`;
+  }}else if(!data.preview_running){{statsEl.style.display='none';}}
+  if(!cols.length||!rows.length){{target.innerHTML='<p class="empty">Click <strong>Run preview scan</strong> for a live read-only view.</p>';return;}}
+  if(rows[0].error){{target.innerHTML='<p class="empty">'+rows[0].error+'</p>';return;}}
+  const head=cols.map(c=>'<th>'+esc(c)+'</th>').join('');
+  const body=rows.map(r=>'<tr>'+cols.map(c=>'<td>'+esc(r[c])+'</td>').join('')+'</tr>').join('');
+  target.innerHTML='<table><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table>';
+}}
 async function loadScanner(){{
   const res=await fetch('/api/scanner');
   return res.json();
 }}
-document.getElementById('run-scanner').onclick=async()=>{{
-  const btn=document.getElementById('run-scanner');
-  const indicator=document.getElementById('run-indicator');
-  btn.disabled=true; indicator.style.display='block';
-  try{{
-    const res=await fetch('/api/run/morning',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{"reason":"manual"}}'}});
-    const data=await res.json();
-    if(!data.ok && !data.skipped){{alert(data.error||'Scanner failed');}}
-  }}catch(err){{alert('Request failed: '+err);}}
-  setTimeout(async()=>{{location.reload();}}, 800);
-}};
-setInterval(async()=>{{
+let previewErrorShown=false;
+async function refreshScanner(){{
   try{{
     const data=await loadScanner();
     document.getElementById('server-time').textContent=data.server_time;
-    if(data.running_scanner) document.getElementById('run-indicator').style.display='block';
+    const indicator=document.getElementById('run-indicator');
+    const btn=document.getElementById('run-scanner');
+    if(data.preview_running){{indicator.style.display='block';btn.disabled=true;btn.textContent='Scanning…';}}
+    else{{indicator.style.display='none';btn.disabled=false;btn.textContent='Run preview scan';}}
+    if(data.preview_error&&!data.preview_running&&!previewErrorShown){{previewErrorShown=true;alert(data.preview_error);}}
+    if(data.preview_source==='live'&&!data.preview_error){{previewErrorShown=false;}}
+    renderPreview(data);
   }}catch(e){{}}
-}}, 5000);
+}}
+document.getElementById('run-scanner').onclick=async()=>{{
+  const btn=document.getElementById('run-scanner');
+  btn.disabled=true;btn.textContent='Starting…';
+  document.getElementById('run-indicator').style.display='block';
+  try{{
+    const res=await fetch('/api/scanner/preview',{{method:'POST'}});
+    const data=await res.json();
+    if(!data.ok){{alert(data.error||'Could not start preview scan');btn.disabled=false;btn.textContent='Run preview scan';document.getElementById('run-indicator').style.display='none';return;}}
+    refreshScanner();
+  }}catch(err){{alert('Request failed: '+err);btn.disabled=false;btn.textContent='Run preview scan';document.getElementById('run-indicator').style.display='none';}}
+}};
+setInterval(refreshScanner,3000);
 </script></body></html>"""
     return html.encode("utf-8")
 
@@ -1576,6 +1675,9 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             message = payload.get("message", "")
             self.send_json(codex_chat(message))
+            return
+        if path == "/api/scanner/preview":
+            self.send_json(start_scanner_preview())
             return
         self.send_json({"ok": False, "error": "Not found"}, HTTPStatus.NOT_FOUND)
 

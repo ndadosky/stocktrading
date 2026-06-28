@@ -196,26 +196,11 @@ def earnings_context(ticker: str, as_of: date) -> dict:
         return {"earnings_date": pd.NA, "sessions_to_earnings": pd.NA, "earnings_blocked": False, "earnings_status": "UNKNOWN"}
 
 
-def main() -> int:
-    ensure_directories()
-    if not market_gate("morning"):
-        return 0
-    today = datetime.now().astimezone().strftime("%Y-%m-%d")
-    try:
-        raw = exclude_etfs(get_finviz_candidates())
-    except Exception as exc:
-        record_stage("morning", "FAILED", 0, str(exc))
-        print(f"Finviz fetch failed; no files were overwritten: {exc}")
-        return 1
+def build_morning_candidates(*, include_earnings: bool = True) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+    """Fetch Finviz universe and score candidates without writing files or DB state."""
+    raw = exclude_etfs(get_finviz_candidates())
     if raw.empty or "Ticker" not in raw.columns:
-        record_stage("morning", "FAILED", 0, "Finviz returned no usable candidates")
-        print("Finviz returned no usable candidates; no files were overwritten.")
-        return 1
-
-    raw_csv = WATCHLIST_EXPORT_DIR / f"finviz_raw_{today}.csv"
-    raw_html = raw_csv.with_suffix(".html")
-    raw.to_csv(raw_csv, index=False)
-    raw_html.write_text(html_document(raw, f"Finviz raw candidates — {today}"), encoding="utf-8")
+        raise RuntimeError("Finviz returned no usable candidates")
 
     rows = []
     for _, candidate in raw.iterrows():
@@ -224,7 +209,9 @@ def main() -> int:
             history = yf.download(ticker, period="6mo", interval="1d", auto_adjust=False, progress=False)
             metrics = score_history(history)
             if metrics:
-                row = candidate.to_dict(); row.update(metrics); rows.append(row)
+                row = candidate.to_dict()
+                row.update(metrics)
+                rows.append(row)
             else:
                 print(f"Skipped {ticker}: insufficient daily history")
         except Exception as exc:
@@ -232,17 +219,64 @@ def main() -> int:
 
     candidates = pd.DataFrame(rows)
     if candidates.empty:
-        record_stage("morning", "FAILED", 0, "No candidates had sufficient daily history")
-        print("No candidates had enough market data; latest candidates were not overwritten.")
-        return 1
+        raise RuntimeError("No candidates had sufficient daily history")
+
     candidates = candidates.sort_values("strategy_score", ascending=False, kind="mergesort")
-    for column, default in (("earnings_date", pd.NA), ("sessions_to_earnings", pd.NA), ("earnings_blocked", False), ("earnings_status", "NOT CHECKED")):
+    for column, default in (
+        ("earnings_date", pd.NA),
+        ("sessions_to_earnings", pd.NA),
+        ("earnings_blocked", False),
+        ("earnings_status", "NOT CHECKED"),
+    ):
         candidates[column] = default
-    review_mask = candidates["strategy_score"] >= MIN_SCORE_FOR_CANDIDATE
-    for index, row in candidates[review_mask].iterrows():
-        context = earnings_context(str(row["Ticker"]), datetime.now().astimezone().date())
-        for key, value in context.items():
-            candidates.at[index, key] = value
+    if include_earnings:
+        review_mask = candidates["strategy_score"] >= MIN_SCORE_FOR_CANDIDATE
+        as_of = datetime.now().astimezone().date()
+        for index, row in candidates[review_mask].iterrows():
+            context = earnings_context(str(row["Ticker"]), as_of)
+            for key, value in context.items():
+                candidates.at[index, key] = value
+
+    blocked = int(candidates["earnings_blocked"].fillna(False).astype(bool).sum())
+    coverage = len(candidates) / len(raw) if len(raw) else 0.0
+    stats = {
+        "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "raw_count": len(raw),
+        "scored_count": len(candidates),
+        "coverage_pct": round(coverage * 100, 1),
+        "earnings_blocks": blocked,
+        "status": "SUCCESS" if coverage >= 0.80 else "DEGRADED",
+    }
+    return raw, candidates, stats
+
+
+PREVIEW_COLUMNS = (
+    "Ticker",
+    "Company",
+    "Sector",
+    "strategy_score",
+    "strategy_signal",
+    "rsi_14",
+    "week_move_%",
+    "earnings_status",
+)
+
+
+def preview_rows(candidates: pd.DataFrame, limit: int = 50) -> tuple[list[str], list[dict]]:
+    columns = [column for column in PREVIEW_COLUMNS if column in candidates.columns]
+    if not columns:
+        columns = list(candidates.columns[:8])
+    subset = candidates[columns].head(limit)
+    return columns, subset.fillna("").astype(str).to_dict(orient="records")
+
+
+def persist_morning_candidates(raw: pd.DataFrame, candidates: pd.DataFrame, stats: dict) -> None:
+    today = datetime.now().astimezone().strftime("%Y-%m-%d")
+    raw_csv = WATCHLIST_EXPORT_DIR / f"finviz_raw_{today}.csv"
+    raw_html = raw_csv.with_suffix(".html")
+    raw.to_csv(raw_csv, index=False)
+    raw_html.write_text(html_document(raw, f"Finviz raw candidates — {today}"), encoding="utf-8")
+
     candidates.to_csv(CANDIDATES_FILE, index=False)
     CANDIDATES_FILE.with_suffix(".html").write_text(
         html_document(candidates, f"Latest scored candidates — {today}"), encoding="utf-8"
@@ -253,10 +287,25 @@ def main() -> int:
         html_document(candidates, f"Scored morning candidates — {today}"), encoding="utf-8"
     )
     print(f"Saved {len(candidates)} candidates to {CANDIDATES_FILE}")
-    blocked = int(candidates["earnings_blocked"].fillna(False).astype(bool).sum())
-    coverage = len(candidates) / len(raw) if len(raw) else 0
-    status = "SUCCESS" if coverage >= 0.80 else "DEGRADED"
-    record_stage("morning", status, len(candidates), f"{coverage:.0%} history coverage; {blocked} earnings blocks")
+    record_stage(
+        "morning",
+        stats["status"],
+        stats["scored_count"],
+        f"{stats['coverage_pct']:.0f}% history coverage; {stats['earnings_blocks']} earnings blocks",
+    )
+
+
+def main() -> int:
+    ensure_directories()
+    if not market_gate("morning"):
+        return 0
+    try:
+        raw, candidates, stats = build_morning_candidates()
+    except Exception as exc:
+        record_stage("morning", "FAILED", 0, str(exc))
+        print(f"Morning scan failed; no files were overwritten: {exc}")
+        return 1
+    persist_morning_candidates(raw, candidates, stats)
     return 0
 
 
