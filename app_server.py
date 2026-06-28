@@ -33,6 +33,7 @@ from nav_html import header_nav
 from strategy_review import load_latest_review_rows, render_strategy_review_html
 from best_case_analysis import compute_best_case
 from morning_candidates import build_morning_candidates, preview_rows
+from version import version_label
 
 
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -1076,119 +1077,183 @@ a{{color:var(--blue)}}
     return html.encode("utf-8")
 
 
-def app_html() -> bytes:
+def settings_payload() -> dict:
+    status = status_payload()
+    status["version"] = version_label()
+    return status
+
+
+def settings_html() -> bytes:
     html = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Stock Strategy App</title><style>
+<title>Settings</title><style>
 :root{--bg:#f4f6f8;--panel:#fff;--text:#17202a;--muted:#687386;--line:#dce3ec;--blue:#1d4ed8;--green:#16803c;--red:#b42318;--amber:#92400e;--amber-bg:#fffbeb;--amber-border:#fcd34d}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-header{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:16px;position:sticky;top:0;z-index:3;height:52px}
-.hdr-left{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.hdr-left h1{font-size:15px;font-weight:700;margin:0;letter-spacing:-.01em}
+header{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:16px;position:sticky;top:0;z-index:2;height:52px}
+.hdr-left h1{font-size:15px;font-weight:700;margin:0}
 .hdr-nav{display:flex;align-items:center;gap:2px;flex:1;padding:0 8px}
-.hdr-nav a{padding:6px 13px;border-radius:7px;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none;transition:background .15s,color .15s;white-space:nowrap}
-.hdr-nav a:hover{background:#f1f3f5;color:var(--text)}
-.hdr-nav a.active{background:#eff6ff;color:var(--blue)}
-.hdr-right{display:flex;gap:8px;align-items:center;flex-shrink:0}
-.badge{border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:600;background:#fff;color:var(--muted);white-space:nowrap}
-.badge.open{background:#f0fdf4;border-color:#86efac;color:var(--green)}.badge.session{background:#eff6ff;border-color:#93c5fd;color:#1e40af}
-.clock-txt{font-size:12px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
-main{display:grid;grid-template-columns:300px minmax(0,1fr);gap:14px;padding:14px;height:calc(100vh - 57px)}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto}
-.sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
-.sec:first-child{margin-top:0}
-.controls{display:grid;gap:6px}
-button{border:1px solid #bfcee3;background:#f8fbff;color:#183b75;border-radius:7px;padding:9px 11px;font-weight:600;cursor:pointer;text-align:left;font-size:13px;transition:border-color .15s,background .15s}
-button:hover:not(:disabled){border-color:#7da2da;background:#f0f6ff}button:disabled{opacity:.5;cursor:not-allowed}
-.btn-inject{background:var(--amber-bg);border-color:var(--amber-border);color:var(--amber)}
-.btn-inject:hover:not(:disabled){background:#fef3c7;border-color:#f59e0b}
-.run-bar{display:flex;align-items:center;gap:8px;padding:9px 11px;background:#eff6ff;border:1px solid #93c5fd;border-radius:7px;font-size:13px;font-weight:600;color:#1e40af;margin-top:4px}
-.run-bar.hidden{display:none}
-@keyframes spin{to{transform:rotate(360deg)}}.spinner{width:13px;height:13px;border:2px solid #93c5fd;border-top-color:#1d4ed8;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
-.kv{display:grid;grid-template-columns:1fr auto;gap:6px;padding:7px 0;border-bottom:1px solid #f1f3f6;align-items:baseline}
+.hdr-nav a{padding:6px 13px;border-radius:7px;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none}
+.hdr-nav a:hover{background:#f1f3f5;color:var(--text)}.hdr-nav a.active{background:#eff6ff;color:var(--blue)}
+.hdr-right{font-size:12px;color:var(--muted)}
+main{max-width:960px;margin:0 auto;padding:24px 20px 64px;display:grid;gap:16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:0 1px 6px rgba(15,23,42,.04)}
+.page-title h2{margin:0 0 4px;font-size:22px}.sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+.sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px}
+.kv{display:grid;grid-template-columns:1fr auto;gap:6px;padding:8px 0;border-bottom:1px solid #f1f3f6;align-items:baseline}
 .kv:last-child{border-bottom:0}.kv .k{color:var(--muted);font-size:13px}.kv .v{font-size:13px;text-align:right}
 .ok{color:var(--green);font-weight:700}.bad{color:var(--red);font-weight:700}.muted{color:var(--muted)}
-.job-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f1f3f6;gap:8px}
+button{border:1px solid #bfcee3;background:#f8fbff;color:#183b75;border-radius:8px;padding:10px 16px;font-weight:700;cursor:pointer;font-size:13px}
+button:disabled{opacity:.55;cursor:not-allowed}
+.btn-inject{background:var(--amber-bg);border-color:var(--amber-border);color:var(--amber)}
+.job-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f3f6;gap:8px}
 .job-row:last-child{border-bottom:0}
-.job-name{font-size:13px;font-weight:600}
-.job-right{display:flex;gap:6px;align-items:center;flex-shrink:0}
-.job-time{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
-.jb{font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;white-space:nowrap}
+.jb{font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px}
 .jb.ok{background:#f0fdf4;color:var(--green);border:1px solid #86efac}
 .jb.bad{background:#fef2f2;color:var(--red);border:1px solid #fca5a5}
 .jb.none{background:#f9fafb;color:var(--muted);border:1px solid var(--line)}
-.log-hdr{display:flex;justify-content:space-between;align-items:baseline}
-.log-hdr .sec{margin-bottom:6px}.log-src{font-size:11px;color:var(--muted);margin-top:16px}
-.log{white-space:pre-wrap;max-height:200px;overflow:auto;font:12px ui-monospace,SFMono-Regular,Menlo,monospace;background:#0f172a;color:#e2e8f0;border-radius:7px;padding:10px;line-height:1.5}
-iframe{width:100%;height:100%;border:1px solid var(--line);border-radius:10px;background:#fff}
+.log{white-space:pre-wrap;max-height:240px;overflow:auto;font:12px ui-monospace,Menlo,monospace;background:#0f172a;color:#e2e8f0;border-radius:10px;padding:12px;line-height:1.5}
+.run-bar{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;font-size:13px;font-weight:600;color:#1e40af;margin-bottom:12px}
+.run-bar.hidden{display:none}
+@keyframes spin{to{transform:rotate(360deg)}}.spinner{width:13px;height:13px;border:2px solid #93c5fd;border-top-color:#1d4ed8;border-radius:50%;animation:spin .7s linear infinite}
 a{color:var(--blue)}
-@media(max-width:900px){main{grid-template-columns:1fr;height:auto}iframe{height:75vh}}
+</style></head><body>
+<header>
+  <div class="hdr-left"><h1>Settings</h1></div>
+  <nav class="hdr-nav">__HEADER_NAV__</nav>
+  <div class="hdr-right" id="server-time">—</div>
+</header>
+<main>
+  <section class="panel">
+    <div class="page-title">
+      <h2>Bankroll</h2>
+      <p class="sub">Paper account capital. Scheduled jobs and the dashboard use these totals.</p>
+    </div>
+    <div id="bankroll"></div>
+    <div style="margin-top:14px">
+      <button class="btn-inject" id="inject-bankroll">Inject $25,000 bankroll</button>
+    </div>
+  </section>
+  <section class="panel">
+    <div class="page-title">
+      <h2>System</h2>
+      <p class="sub">Runtime configuration and backend status. Manual job runs live on the <a href="/jobs">Jobs</a> page.</p>
+    </div>
+    <div id="run-bar" class="run-bar hidden"><span class="spinner"></span><span id="run-label">Running…</span></div>
+    <div id="system"></div>
+  </section>
+  <section class="panel">
+    <div class="page-title">
+      <h2>Today's pipeline files</h2>
+      <p class="sub">Export artifacts on disk for the current session.</p>
+    </div>
+    <div id="files"></div>
+  </section>
+  <section class="panel">
+    <div class="page-title">
+      <h2>Job status</h2>
+      <p class="sub">Last result per scheduled job. Use <a href="/jobs">Jobs</a> to run manually or view history.</p>
+    </div>
+    <div id="jobs"></div>
+  </section>
+  <section class="panel">
+    <div class="page-title">
+      <h2>Last job output</h2>
+      <p class="sub" id="log-src"></p>
+    </div>
+    <div class="log" id="log">No job output yet.</div>
+  </section>
+</main>
+<script>
+function fmtTime(iso){if(!iso)return '—';const d=new Date(iso);const t=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});return d.toDateString()===new Date().toDateString()?t:d.toLocaleDateString([],{month:'short',day:'numeric'})+' '+t}
+function kv(k,v,cls=''){return `<div class="kv"><span class="k">${k}</span><span class="v ${cls}">${v}</span></div>`}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+async function loadSettings(){const r=await fetch('/api/settings');return r.json()}
+function render(s){
+  document.getElementById('server-time').textContent=fmtTime(s.server_time);
+  const rb=document.getElementById('run-bar');
+  if(s.running){rb.className='run-bar';document.getElementById('run-label').textContent='Running: '+s.running}
+  else{rb.className='run-bar hidden'}
+  document.getElementById('bankroll').innerHTML=
+    kv('Base capital','$'+Number(s.bankroll.base).toLocaleString(),'ok')+
+    kv('Deposits','$'+Number(s.bankroll.deposits).toLocaleString(),'muted')+
+    kv('Injection amount','$'+Number(s.bankroll.injection_amount).toLocaleString(),'muted');
+  let sys='';
+  sys+=kv('Version',esc(s.version||'—'));
+  sys+=kv('Scheduler',esc(s.scheduler_mode||'—'));
+  sys+=kv('Backend',s.running?'Running: '+esc(s.running):'Idle',s.running?'bad':'ok');
+  sys+=kv('Live updates',s.live_updates?'On':'Off',s.live_updates?'ok':'muted');
+  sys+=kv('Database',esc(s.files?.database_url||'—'));
+  document.getElementById('system').innerHTML=sys;
+  const fileLabels={morning:'Morning candidates',confirmation:'9:45 confirmation',paper_performance:'Paper performance',dashboard:'Dashboard HTML',paper_trades:'Paper trades CSV'};
+  let files='';
+  for(const [key,label] of Object.entries(fileLabels)){
+    const f=s.files?.[key]||{};
+    const val=f.exists?('Updated '+fmtTime(f.modified_at)):'Missing';
+    files+=kv(label,val,f.exists?'ok':'muted');
+  }
+  document.getElementById('files').innerHTML=files;
+  let jobs='';
+  for(const [name,job] of Object.entries(s.jobs||{})){
+    const last=job.last_run;
+    const badge=last?(last.ok?'<span class="jb ok">OK</span>':'<span class="jb bad">Failed</span>'):'<span class="jb none">not run</span>';
+    jobs+=`<div class="job-row"><span><b>${esc(name.replace(/_/g,' '))}</b><br><span class="sub">${esc(job.description||'')}</span></span><span>${badge}</span></div>`;
+  }
+  document.getElementById('jobs').innerHTML=jobs;
+  document.getElementById('inject-bankroll').disabled=!!s.running;
+  const allRuns=[];
+  for(const [name,job] of Object.entries(s.jobs||{})){if(job.last_run)allRuns.push({...job.last_run,_name:name})}
+  const latest=allRuns.sort((a,b)=>(b.finished_at||'').localeCompare(a.finished_at||''))[0];
+  if(latest){
+    document.getElementById('log').textContent=latest.output_tail||'(no output)';
+    document.getElementById('log-src').textContent=latest._name.replace(/_/g,' ')+' · '+fmtTime(latest.finished_at);
+  }
+}
+document.getElementById('inject-bankroll').onclick=async()=>{
+  if(!confirm('Inject $25,000 into the paper bankroll?'))return;
+  const btn=document.getElementById('inject-bankroll');btn.disabled=true;
+  try{await fetch('/api/bankroll/inject',{method:'POST'});render(await loadSettings())}catch(e){alert('Request failed: '+e)}
+  btn.disabled=false;
+};
+async function refresh(){try{render(await loadSettings())}catch(e){document.getElementById('system').innerHTML=kv('Backend','unreachable','bad')}}
+refresh();setInterval(refresh,30000);
+</script></body></html>"""
+    return html.replace("__HEADER_NAV__", header_nav("/settings")).encode("utf-8")
+
+
+def app_html() -> bytes:
+    html = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stock Strategy App</title><style>
+:root{--bg:#f4f6f8;--panel:#fff;--text:#17202a;--muted:#687386;--line:#dce3ec;--green:#16803c;--blue:#1d4ed8}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:16px;position:sticky;top:0;z-index:3;height:52px}
+.hdr-left h1{font-size:15px;font-weight:700;margin:0}
+.hdr-nav{display:flex;align-items:center;gap:2px;flex:1;padding:0 8px}
+.hdr-nav a{padding:6px 13px;border-radius:7px;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none}
+.hdr-nav a:hover{background:#f1f3f5;color:var(--text)}.hdr-nav a.active{background:#eff6ff;color:var(--blue)}
+.hdr-right{display:flex;gap:8px;align-items:center}
+.badge{border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:600;background:#fff;color:var(--muted)}
+.badge.open{background:#f0fdf4;border-color:#86efac;color:var(--green)}.badge.session{background:#eff6ff;border-color:#93c5fd;color:#1e40af}
+.clock-txt{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+main{padding:14px;height:calc(100vh - 57px)}
+iframe{width:100%;height:100%;border:1px solid var(--line);border-radius:10px;background:#fff}
 </style></head><body>
 <header>
   <div class="hdr-left"><h1>Stock Strategy App</h1></div>
   <nav class="hdr-nav">__HEADER_NAV__</nav>
   <div class="hdr-right"><div id="market-badge" class="badge">Market —</div><span id="clock" class="clock-txt">—</span></div>
 </header>
-<main>
-<aside class="panel">
-  <div class="sec">Actions</div>
-  <div class="controls">
-    <button class="btn-inject" id="inject-bankroll">Inject $25,000 bankroll</button>
-    <button data-job="morning">Run morning scan</button>
-    <button data-job="confirmation">Run 9:45 confirmation</button>
-    <button data-job="report">Run live report update</button>
-    <button data-job="strategy_review">Run strategy review</button>
-    <button data-job="health">Run health check</button>
-    <button data-job="dashboard">Rebuild dashboard</button>
-  </div>
-  <div id="run-bar" class="run-bar hidden"><span class="spinner"></span><span id="run-label">Running…</span></div>
-
-  <div class="sec">System</div>
-  <div id="sys-status"></div>
-
-  <div class="sec">Job runs</div>
-  <div id="job-status"></div>
-
-  <div class="log-hdr"><div class="sec">Last output</div><span id="log-src" class="log-src"></span></div>
-  <div class="log" id="log">No job output yet.</div>
-</aside>
-<section><iframe id="dash-frame" src="/dashboard"></iframe></section>
-</main>
+<main><iframe id="dash-frame" src="/dashboard" title="Strategy dashboard"></iframe></main>
 <script>
-function fmtTime(iso){if(!iso)return '—';const d=new Date(iso);const t=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});return d.toDateString()===new Date().toDateString()?t:d.toLocaleDateString([],{month:'short',day:'numeric'})+' '+t}
-async function getStatus(){const r=await fetch('/api/status');return r.json()}
-function kv(k,v,cls=''){return `<div class="kv"><span class="k">${k}</span><span class="v ${cls}">${v}</span></div>`}
-function render(s){
-  document.getElementById('clock').textContent=fmtTime(s.server_time);
-  const mb=document.getElementById('market-badge');
-  if(s.market_open_now){mb.textContent='Market open';mb.className='badge open'}
-  else if(s.market_session){mb.textContent='Market session';mb.className='badge session'}
-  else{mb.textContent='Market closed';mb.className='badge'}
-  const rb=document.getElementById('run-bar');
-  if(s.running){rb.className='run-bar';document.getElementById('run-label').textContent='Running: '+s.running}
-  else{rb.className='run-bar hidden'}
-  let sys='';
-  sys+=kv('Backend',s.running?'Running: '+s.running:'Idle',s.running?'bad':'ok');
-  sys+=kv('Live updates',s.live_updates?'On':'Off',s.live_updates?'ok':'muted');
-  sys+=kv('Bankroll','$'+Number(s.bankroll.base).toLocaleString(),'ok');
-  sys+=kv('Deposits','$'+Number(s.bankroll.deposits).toLocaleString(),'muted');
-  document.getElementById('sys-status').innerHTML=sys;
-  let jobs='';
-  for(const [name,job] of Object.entries(s.jobs)){
-    const last=job.last_run;
-    const badge=last?(last.ok?'<span class="jb ok">OK</span>':'<span class="jb bad">Failed</span>'):'<span class="jb none">not run</span>';
-    const ts=last?`<span class="job-time" title="${last.finished_at||''}">${fmtTime(last.finished_at)}</span>`:'';
-    jobs+=`<div class="job-row"><span class="job-name">${name.replace(/_/g,' ')}</span><span class="job-right">${ts}${badge}</span></div>`;
-  }
-  document.getElementById('job-status').innerHTML=jobs;
-  document.querySelectorAll('button').forEach(b=>b.disabled=!!s.running);
-  const allRuns=[];
-  for(const [name,job] of Object.entries(s.jobs)){if(job.last_run)allRuns.push({...job.last_run,_name:name})}
-  const latest=allRuns.sort((a,b)=>(b.finished_at||'').localeCompare(a.finished_at||''))[0];
-  if(latest){document.getElementById('log').textContent=latest.output_tail||'(no output)';document.getElementById('log-src').textContent=latest._name.replace(/_/g,' ')+' \xb7 '+fmtTime(latest.finished_at)}
+function fmtTime(iso){if(!iso)return '—';return new Date(iso).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+async function refresh(){
+  try{
+    const s=await fetch('/api/status').then(r=>r.json());
+    document.getElementById('clock').textContent=fmtTime(s.server_time);
+    const mb=document.getElementById('market-badge');
+    if(s.market_open_now){mb.textContent='Market open';mb.className='badge open'}
+    else if(s.market_session){mb.textContent='Market session';mb.className='badge session'}
+    else{mb.textContent='Market closed';mb.className='badge'}
+  }catch(e){}
 }
-async function refresh(){try{render(await getStatus())}catch(e){document.getElementById('sys-status').innerHTML=kv('Backend','unreachable','bad')}}
-document.querySelectorAll('button[data-job]').forEach(b=>b.onclick=async()=>{b.disabled=true;await fetch('/api/run/'+b.dataset.job,{method:'POST'});document.getElementById('dash-frame').src='/dashboard?ts='+Date.now();setTimeout(refresh,500)});
-document.getElementById('inject-bankroll').onclick=async()=>{if(!confirm('Inject $25,000 into the paper bankroll?'))return;await fetch('/api/bankroll/inject',{method:'POST'});document.getElementById('dash-frame').src='/dashboard?ts='+Date.now();setTimeout(refresh,500)};
 refresh();setInterval(refresh,30000);
 </script></body></html>"""
     return html.replace("__HEADER_NAV__", header_nav("/")).encode("utf-8")
@@ -1600,6 +1665,14 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if path == "/settings":
+            body = settings_html()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if path in {"/healthcheck", "/health"}:
             body = healthcheck_html()
             self.send_response(HTTPStatus.OK)
@@ -1632,6 +1705,9 @@ class Handler(SimpleHTTPRequestHandler):
             return
         elif path == "/api/scanner":
             self.send_json(scanner_payload())
+            return
+        elif path == "/api/settings":
+            self.send_json(settings_payload())
             return
         elif path == "/api/strategy/best-case":
             self.send_json(compute_best_case())

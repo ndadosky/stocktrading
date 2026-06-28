@@ -10,6 +10,7 @@ def header_nav(active: str) -> str:
         ("/day", "Day status", "nav-day"),
         ("/strategy-review", "Strategy review", "nav-review"),
         ("/healthcheck", "Health check", "nav-health"),
+        ("/settings", "Settings", "nav-settings"),
     )
     parts = []
     for href, label, nav_id in links:
