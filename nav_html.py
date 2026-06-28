@@ -93,7 +93,8 @@ body{-webkit-tap-highlight-color:transparent}
 
 def header_nav(active: str) -> str:
     links = (
-        ("/", "Dashboard", "Home", "nav-home"),
+        ("/", "Dashboard", "Dash", "nav-home"),
+        ("/home", "Home Controls", "Home", "nav-home-controls"),
         ("/live-infographic", "Live infographic", "Live", "nav-live"),
         ("/scanner", "Scanner", "Scan", "nav-scanner"),
         ("/jobs", "Jobs", "Jobs", "nav-jobs"),

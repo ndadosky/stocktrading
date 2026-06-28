@@ -33,6 +33,7 @@ from nav_html import finalize_page_html
 from strategy_review import load_latest_review_rows, render_strategy_review_html
 from best_case_analysis import compute_best_case
 from morning_candidates import build_morning_candidates, preview_rows
+from home_controls import home_assistant_switch, home_controls_payload, poolsync_control
 from version import version_label
 
 
@@ -1235,6 +1236,109 @@ refresh();setInterval(refresh,30000);
     return finalize_page_html(html, "/settings")
 
 
+def home_controls_html() -> bytes:
+    html = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Home Controls</title><style>
+:root{--bg:#f4f6f8;--panel:#fff;--text:#17202a;--muted:#687386;--line:#dce3ec;--blue:#1d4ed8;--green:#16803c;--amber:#b7791f;--red:#b42318;--soft:#f8fafc}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+header{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:16px;position:sticky;top:0;z-index:3;height:52px}
+.hdr-left{display:flex;align-items:center;flex-shrink:0}.hdr-left h1{font-size:15px;font-weight:700;margin:0;letter-spacing:-.01em}
+.hdr-nav{display:flex;align-items:center;gap:2px;flex:1;padding:0 8px}.hdr-nav a{padding:6px 13px;border-radius:7px;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none;white-space:nowrap}.hdr-nav a:hover{background:#f1f3f5;color:var(--text)}.hdr-nav a.active{background:#eff6ff;color:var(--blue)}
+.hdr-right{font-size:12px;color:var(--muted);white-space:nowrap}
+.page-title{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:20px}.page-title h2{margin:0 0 5px;font-size:25px;letter-spacing:-.03em}.sub{font-size:12px;color:var(--muted)}
+.home-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.home-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:0 2px 12px rgba(15,23,42,.035);min-width:0}.cars-card{grid-column:1/-1}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:22px}.card-title{display:flex;align-items:center;gap:11px}.card-title h3{font-size:16px;margin:0 0 3px}.icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-size:19px;background:#eff6ff}.pool .icon{background:#ecfeff}.door .icon{background:#f3f4f6}.solar .icon{background:#fffbeb}.cars-card .icon{background:#eef2ff}
+.pill{font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;background:#f1f5f9;color:var(--muted);white-space:nowrap}.pill.ok{background:#f0fdf4;color:var(--green)}.pill.warn{background:#fffbeb;color:var(--amber)}.pill.bad{background:#fef2f2;color:var(--red)}
+.hero-value{font-size:46px;line-height:1;font-weight:800;letter-spacing:-.055em;margin:5px 0 8px}.hero-value small{font-size:19px;color:var(--muted);letter-spacing:0}.detail-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:20px}.detail{background:var(--soft);border:1px solid #edf1f5;border-radius:10px;padding:12px}.detail small{display:block;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}.detail strong{font-size:14px}
+.door-state{display:flex;align-items:center;gap:16px;padding:10px 0}.door-state .lock{font-size:42px}.door-state strong{display:block;font-size:25px;letter-spacing:-.03em;text-transform:capitalize}.door-state span{color:var(--muted);font-size:12px}
+.cars-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.car{border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--soft)}.car-top{display:flex;justify-content:space-between;gap:10px;align-items:center}.car h4{font-size:14px;margin:0}.charge{font-size:32px;font-weight:800;letter-spacing:-.04em;margin:18px 0 9px}.battery{height:7px;background:#e5e7eb;border-radius:999px;overflow:hidden}.battery span{display:block;height:100%;background:var(--green);border-radius:999px;transition:width .3s ease}
+.control-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px}.control-btn{min-height:38px;border:1px solid #cbd5e1;background:#fff;color:var(--text);border-radius:9px;padding:8px 13px;font-weight:700;cursor:pointer}.control-btn:hover{border-color:#7da2da;background:#f8fbff}.control-btn:disabled{opacity:.5;cursor:wait}.control-btn.primary{background:#eff6ff;border-color:#93c5fd;color:#1e40af}.control-btn.danger{color:var(--red)}.stepper{display:flex;align-items:center;gap:7px;margin-right:auto}.stepper .control-btn{width:40px;padding:8px}.stepper-value{min-width:72px;text-align:center;font-weight:750}
+.ewelink-card{grid-column:1/-1}.ewelink-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.ewelink-channel{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--soft);border:1px solid var(--line);border-radius:11px;padding:13px}.ewelink-channel strong{display:block;font-size:13px}.ewelink-channel small{color:var(--muted);text-transform:uppercase;font-size:10px;font-weight:700}.action-message{font-size:12px;color:var(--muted);min-height:18px;margin-top:10px}.action-message.bad{color:var(--red)}
+.empty{color:var(--muted);font-size:13px;line-height:1.5;padding:8px 0}.loading{position:relative;color:transparent!important;border-radius:7px;background:linear-gradient(90deg,#e7ebf0 25%,#f6f7f9 50%,#e7ebf0 75%);background-size:200% 100%;animation:shimmer 1.3s infinite}.loading *{visibility:hidden}@keyframes shimmer{to{background-position:-200% 0}}
+@media(max-width:900px){.ewelink-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.home-grid{grid-template-columns:1fr}.cars-card,.ewelink-card{grid-column:auto}.cars-grid,.ewelink-grid{grid-template-columns:1fr}.page-title{align-items:flex-start;flex-direction:column}.home-card{padding:18px}.hero-value{font-size:40px}.stepper{width:100%;margin-right:0}.control-row>.control-btn{flex:1}}
+@media(prefers-reduced-motion:reduce){.loading{animation:none}}
+</style></head><body>
+<header><div class="hdr-left"><h1>Stock Strategy App</h1></div><nav class="hdr-nav">__HEADER_NAV__</nav><div class="hdr-right" id="home-updated">Loading…</div></header>
+<main>
+  <div class="page-title"><div><h2>Home Controls</h2><div class="sub">A calm glance at the systems keeping home moving.</div></div><span class="pill" id="ha-status">Connecting</span></div>
+  <div class="home-grid">
+    <section class="home-card pool" id="pool-card">
+      <div class="card-head"><div class="card-title"><span class="icon">≈</span><div><h3>Pool</h3><div class="sub">PoolSync heat pump</div></div></div><span class="pill" id="pool-status">Loading</span></div>
+      <div class="hero-value" id="pool-temperature">—<small> °F</small></div><div class="sub" id="pool-message">Reading water temperature…</div>
+      <div class="detail-row"><div class="detail"><small>Mode</small><strong id="pool-mode">—</strong></div><div class="detail"><small>Setpoint</small><strong id="pool-setpoint">—</strong></div></div>
+      <div class="control-row"><div class="stepper"><button class="control-btn" id="pool-down" type="button" aria-label="Lower pool setpoint">−</button><span class="stepper-value" id="pool-target">— °F</span><button class="control-btn" id="pool-up" type="button" aria-label="Raise pool setpoint">+</button></div><button class="control-btn primary" id="pool-heat" type="button">Heat pool</button><button class="control-btn danger" id="pool-off" type="button">Turn off</button></div>
+      <div class="action-message" id="pool-action-message"></div>
+    </section>
+    <section class="home-card door">
+      <div class="card-head"><div class="card-title"><span class="icon">⌂</span><div><h3>Front door</h3><div class="sub">Yale lock</div></div></div><span class="pill" id="door-status">Loading</span></div>
+      <div class="door-state"><div class="lock" id="door-icon">◌</div><div><strong id="door-state">—</strong><span id="door-message">Waiting for Home Assistant</span></div></div>
+    </section>
+    <section class="home-card solar">
+      <div class="card-head"><div class="card-title"><span class="icon">☀</span><div><h3>Solar</h3><div class="sub">Enphase energy</div></div></div><span class="pill" id="solar-status">Loading</span></div>
+      <div class="hero-value" id="solar-power">—<small> kW</small></div><div class="sub">Current production</div>
+      <div class="detail-row"><div class="detail"><small>Produced today</small><strong id="solar-today">—</strong></div><div class="detail"><small>Source</small><strong>Home Assistant</strong></div></div>
+    </section>
+    <section class="home-card ewelink-card">
+      <div class="card-head"><div class="card-title"><span class="icon">⌁</span><div><h3>eWeLink</h3><div class="sub" id="ewelink-model">PSF-B04-GL relay</div></div></div><span class="pill" id="ewelink-status">Loading</span></div>
+      <div class="ewelink-grid" id="ewelink-grid"><div class="empty">Waiting for Home Assistant channel mappings…</div></div>
+      <div class="action-message" id="ewelink-action-message"></div>
+    </section>
+    <section class="home-card cars-card">
+      <div class="card-head"><div class="card-title"><span class="icon">◇</span><div><h3>Cars</h3><div class="sub">Charge and connection status</div></div></div></div>
+      <div class="cars-grid" id="cars-grid"><div class="car loading">Loading vehicle status</div><div class="car loading">Loading vehicle status</div></div>
+    </section>
+  </div>
+</main>
+<script>
+const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const setPill=(id,text,kind='')=>{const el=document.getElementById(id);el.textContent=text;el.className='pill '+kind};
+const value=(v,fallback='—')=>v===null||v===undefined||v===''?fallback:v;
+let latestHome=null;
+function renderHome(data){
+  latestHome=data;
+  document.getElementById('home-updated').textContent='Updated '+new Date(data.generated_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const ha=data.home_assistant||{};setPill('ha-status',ha.connected?'Home Assistant online':'Home Assistant setup needed',ha.connected?'ok':'warn');
+  const pool=data.pool||{};
+  if(pool.connected){
+    setPill('pool-status',pool.online?'Online':'Offline',pool.online?'ok':'bad');
+    document.getElementById('pool-temperature').innerHTML=esc(value(pool.temperature))+'<small> '+esc(pool.unit||'°F')+'</small>';
+    document.getElementById('pool-message').textContent=pool.name||'PoolSync heater';
+    document.getElementById('pool-mode').textContent=pool.mode||'—';
+    document.getElementById('pool-setpoint').textContent=pool.setpoint==null?'—':pool.setpoint+' '+(pool.unit||'°F');
+    document.getElementById('pool-target').textContent=pool.setpoint==null?'— °F':pool.setpoint+' '+(pool.unit||'°F');
+  }else{
+    setPill('pool-status',pool.configured?'Unavailable':'Setup needed',pool.configured?'bad':'warn');
+    document.getElementById('pool-message').textContent=pool.message||'PoolSync is not configured';
+  }
+  const door=data.front_door||{};
+  if(door.configured){const locked=door.locked;setPill('door-status',door.state,locked?'ok':'warn');document.getElementById('door-icon').textContent=locked?'●':'○';document.getElementById('door-state').textContent=door.state;document.getElementById('door-message').textContent=locked?'Secure':'Check the front door'}
+  else{setPill('door-status','Setup needed','warn');document.getElementById('door-state').textContent='Not connected';document.getElementById('door-message').textContent='Choose the Yale lock entity in .env'}
+  const solar=data.solar||{};
+  if(solar.configured){setPill('solar-status','Online','ok');document.getElementById('solar-power').innerHTML=esc(value(solar.power))+'<small> '+esc(solar.power_unit||'kW')+'</small>';document.getElementById('solar-today').textContent=value(solar.today)+' '+(solar.today_unit||'kWh')}
+  else{setPill('solar-status','Setup needed','warn');document.getElementById('solar-power').innerHTML='—<small> kW</small>';document.getElementById('solar-today').textContent='Choose Enphase entities in .env'}
+  document.getElementById('cars-grid').innerHTML=(data.cars||[]).map(car=>{const charge=car.charge==null?0:Math.max(0,Math.min(100,car.charge));const charging=['on','charging','true'].includes(String(car.charging||'').toLowerCase());const status=car.configured?(charging?'Charging':'Connected'):'Setup needed';return '<article class="car"><div class="car-top"><h4>'+esc(car.name)+'</h4><span class="pill '+(car.configured?'ok':'warn')+'">'+esc(status)+'</span></div><div class="charge">'+(car.charge==null?'—':esc(car.charge)+'%')+'</div><div class="battery"><span style="width:'+charge+'%"></span></div></article>'}).join('');
+  const ew=data.ewelink||{};document.getElementById('ewelink-model').textContent=(ew.model||'PSF-B04-GL')+(ew.device_id?' · '+ew.device_id:'');
+  if(ew.configured){setPill('ewelink-status','Connected','ok');document.getElementById('ewelink-grid').innerHTML=(ew.channels||[]).map(channel=>{const on=channel.state==='on';return '<div class="ewelink-channel"><div><strong>'+esc(channel.name)+'</strong><small>'+esc(channel.state)+'</small></div><button type="button" class="control-btn '+(on?'danger':'primary')+'" data-ew-channel="'+channel.channel+'" data-ew-state="'+(on?'off':'on')+'">Turn '+(on?'off':'on')+'</button></div>'}).join('')}
+  else{setPill('ewelink-status','Setup needed','warn');document.getElementById('ewelink-grid').innerHTML='<div class="empty">Map this device’s Home Assistant switch entities in <code>.env</code>.</div>'}
+}
+async function refreshHome(){try{const response=await fetch('/api/home/status',{cache:'no-store'});renderHome(await response.json())}catch(error){setPill('ha-status','Home status unavailable','bad')}}
+async function sendControl(url,payload,messageId){
+  const message=document.getElementById(messageId);message.className='action-message';message.textContent='Applying…';document.querySelectorAll('.control-btn').forEach(button=>button.disabled=true);
+  try{const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const result=await response.json();if(!result.ok)throw new Error(result.error||'Control request failed');message.textContent='Updated';await refreshHome()}
+  catch(error){message.className='action-message bad';message.textContent=error.message}
+  finally{document.querySelectorAll('.control-btn').forEach(button=>button.disabled=false)}
+}
+document.getElementById('pool-down').onclick=()=>sendControl('/api/home/pool',{action:'adjust_temperature',value:-1},'pool-action-message');
+document.getElementById('pool-up').onclick=()=>sendControl('/api/home/pool',{action:'adjust_temperature',value:1},'pool-action-message');
+document.getElementById('pool-heat').onclick=()=>sendControl('/api/home/pool',{action:'set_mode',value:'heat'},'pool-action-message');
+document.getElementById('pool-off').onclick=()=>sendControl('/api/home/pool',{action:'set_mode',value:'off'},'pool-action-message');
+document.getElementById('ewelink-grid').onclick=event=>{const button=event.target.closest('[data-ew-channel]');if(!button)return;sendControl('/api/home/ewelink',{channel:Number(button.dataset.ewChannel),state:button.dataset.ewState},'ewelink-action-message')};
+refreshHome();setInterval(refreshHome,30000);
+</script></body></html>"""
+    return finalize_page_html(html, "/home")
+
+
 def app_html() -> bytes:
     html = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Stock Strategy App</title><style>
@@ -1688,6 +1792,15 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if path == "/home":
+            body = home_controls_html()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store, max-age=0")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if path == "/day":
             body = day_html(query.get("date", [today_key()])[0])
             self.send_response(HTTPStatus.OK)
@@ -1758,6 +1871,9 @@ class Handler(SimpleHTTPRequestHandler):
         elif path == "/api/status":
             self.send_json(status_payload())
             return
+        elif path == "/api/home/status":
+            self.send_json(home_controls_payload())
+            return
         elif path == "/api/jobs":
             self.send_json(jobs_payload())
             return
@@ -1781,6 +1897,30 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
         path = unquote(parsed.path)
+        if path in {"/api/home/pool", "/api/home/ewelink"}:
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            raw = self.rfile.read(length) if length else b"{}"
+            try:
+                payload = json.loads(raw.decode("utf-8")) if raw else {}
+            except json.JSONDecodeError:
+                self.send_json({"ok": False, "error": "Invalid JSON body"}, HTTPStatus.BAD_REQUEST)
+                return
+            if path == "/api/home/pool":
+                result = poolsync_control(str(payload.get("action") or ""), payload.get("value"))
+            else:
+                try:
+                    channel = int(payload.get("channel"))
+                except (TypeError, ValueError):
+                    self.send_json({"ok": False, "error": "Invalid eWeLink channel"}, HTTPStatus.BAD_REQUEST)
+                    return
+                state = str(payload.get("state") or "").lower()
+                if state not in {"on", "off"}:
+                    self.send_json({"ok": False, "error": "eWeLink state must be on or off"}, HTTPStatus.BAD_REQUEST)
+                    return
+                result = home_assistant_switch(channel, state == "on")
+            status = HTTPStatus.OK if result.get("ok") else HTTPStatus.CONFLICT
+            self.send_json(result, status)
+            return
         if path.startswith("/api/run/"):
             name = path.rsplit("/", 1)[-1]
             length = int(self.headers.get("Content-Length", "0") or "0")
