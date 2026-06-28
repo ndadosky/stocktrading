@@ -23,14 +23,15 @@ services:
       STOCK_STARTING_CAPITAL: ${STOCK_STARTING_CAPITAL:-25000}
       STOCK_IMAGE_PYTHON: ${STOCK_IMAGE_PYTHON:-python3}
       CODEX_BIN: ${CODEX_BIN:-/usr/local/bin/codex}
-      CODEX_HOME: ${CODEX_HOME:-/root/.codex}
+      CODEX_HOME: ${CODEX_HOME:-/app/logs/codex}
+      HOME: ${CODEX_HOME:-/app/logs/codex}
       STOCK_SCHEDULER: ${STOCK_SCHEDULER:-systemd}
       STOCK_REQUIRE_POSTGRES: ${STOCK_REQUIRE_POSTGRES:-true}
       TZ: America/New_York
     volumes:
       - ./exports:/app/exports
       - ./logs:/app/logs
-      # Host Codex CLI + auth (standalone binary on the Pi)
+      # Host Codex CLI + read-only auth seed (writable workspace in ./logs/codex)
       - ${CODEX_HOST_BIN:-/home/admin/.codex/packages/standalone/current/bin/codex}:/usr/local/bin/codex:ro
-      - ${CODEX_HOST_CONFIG:-/home/admin/.codex}:/root/.codex:ro
+      - ${CODEX_HOST_CONFIG:-/home/admin/.codex}:/run/codex-host:ro
     restart: unless-stopped

@@ -21,7 +21,8 @@ from stock_storage import bankroll_base, table_count, total_bankroll_deposits
 from version import version_label
 
 CODEX_BIN = os.getenv("CODEX_BIN", "codex")
-CODEX_HOME = os.getenv("CODEX_HOME", "").strip()
+CODEX_HOME = os.getenv("CODEX_HOME", str(LOGS_DIR / "codex")).strip()
+CODEX_HOST_SEED = Path("/run/codex-host")
 CODEX_TIMEOUT_SECONDS = int(os.getenv("CODEX_PROBE_TIMEOUT_SECONDS", "120"))
 CODEX_HOST_URL = os.getenv("CODEX_HEALTH_URL", "").strip()
 IMAGE_PYTHON = os.getenv("STOCK_IMAGE_PYTHON", os.getenv("PYTHON", "python3"))
@@ -175,11 +176,36 @@ def check_scheduler(state: dict) -> dict:
     )
 
 
+def _resolve_binary(path_str: str) -> Optional[str]:
+    path = Path(path_str)
+    if path.is_file():
+        return str(path)
+    return shutil.which(path_str)
+
+
+def _codex_workspace() -> Path:
+    workspace = Path(CODEX_HOME)
+    workspace.mkdir(parents=True, exist_ok=True)
+    (workspace / "cache").mkdir(parents=True, exist_ok=True)
+    (workspace / "data").mkdir(parents=True, exist_ok=True)
+    if CODEX_HOST_SEED.is_dir():
+        for name in ("auth.json", "config.toml", "installation_id"):
+            src = CODEX_HOST_SEED / name
+            dest = workspace / name
+            if src.is_file() and not dest.exists():
+                shutil.copy2(src, dest)
+    return workspace
+
+
 def _codex_env() -> dict[str, str]:
+    workspace = _codex_workspace()
     env = os.environ.copy()
-    if CODEX_HOME:
-        env["HOME"] = str(Path(CODEX_HOME).parent)
-        env["CODEX_HOME"] = CODEX_HOME
+    env["HOME"] = str(workspace)
+    env["CODEX_HOME"] = str(workspace)
+    env["XDG_DATA_HOME"] = str(workspace / "data")
+    env["XDG_CACHE_HOME"] = str(workspace / "cache")
+    env["TMPDIR"] = str(LOGS_DIR / "codex-tmp")
+    Path(env["TMPDIR"]).mkdir(parents=True, exist_ok=True)
     return env
 
 
@@ -227,21 +253,21 @@ def check_codex_host_url() -> dict:
 
 
 def check_image_python() -> dict:
-    path = Path(IMAGE_PYTHON)
-    if not path.is_file():
-        return _status(False, f"Missing interpreter: {IMAGE_PYTHON}", path=str(path))
+    binary = _resolve_binary(IMAGE_PYTHON) or _resolve_binary("python3")
+    if not binary:
+        return _status(False, f"Missing interpreter: {IMAGE_PYTHON}", path=IMAGE_PYTHON)
     try:
         completed = subprocess.run(
-            [str(path), "-c", "import PIL; print(PIL.__version__)"],
+            [binary, "-c", "import PIL; print(PIL.__version__)"],
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             timeout=20,
         )
         output = (completed.stdout or "").strip()
-        return _status(completed.returncode == 0, output or "Pillow unavailable", path=str(path))
+        return _status(completed.returncode == 0, output or "Pillow unavailable", path=binary)
     except Exception as exc:
-        return _status(False, str(exc), path=str(path))
+        return _status(False, str(exc), path=binary)
 
 
 def check_market_data() -> dict:
@@ -330,16 +356,21 @@ def codex_chat(message: str) -> dict:
         duration_ms = int((time.time() - started) * 1000)
         response = (completed.stdout or "").strip()
         stderr = (completed.stderr or "").strip()
+        warnings = [line for line in stderr.splitlines() if line.strip().startswith("WARNING:")]
+        errors = [line for line in stderr.splitlines() if line.strip() and not line.strip().startswith("WARNING:")]
         if completed.returncode != 0 and not response:
+            detail = "\n".join(errors) if errors else stderr
             return {
                 "ok": False,
-                "error": stderr or f"Codex exited with code {completed.returncode}",
+                "error": detail or f"Codex exited with code {completed.returncode}",
+                "warnings": warnings,
                 "duration_ms": duration_ms,
             }
         return {
             "ok": True,
             "response": response,
-            "stderr_tail": stderr[-2000:] if stderr else "",
+            "warnings": warnings,
+            "stderr_tail": "\n".join(errors)[-2000:] if errors else "",
             "duration_ms": duration_ms,
             "binary": binary,
         }

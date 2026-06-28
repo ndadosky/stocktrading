@@ -26,7 +26,7 @@ from job_storage import (
     record_job_run,
     scheduled_already_ran,
 )
-from scanner_config import DASHBOARD_FILE, PAPER_TRADES_FILE, PIPELINE_STATE_FILE, WATCHLIST_EXPORT_DIR, ensure_directories
+from scanner_config import CANDIDATES_FILE, DASHBOARD_FILE, PAPER_TRADES_FILE, PIPELINE_STATE_FILE, WATCHLIST_EXPORT_DIR, ensure_directories
 from stock_storage import add_bankroll_deposit, bankroll_base, query_rows, table_count, total_bankroll_deposits
 from platform_health import codex_chat, platform_health_payload
 from nav_html import header_nav
@@ -542,8 +542,8 @@ document.getElementById('codex-send').onclick=async()=>{{
   try{{
     const res=await fetch('/api/codex/chat',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{message}})}});
     const data=await res.json();
-    if(data.ok){{out.textContent=(data.response||'(empty response)')+'\\n\\n['+data.duration_ms+' ms]';}}
-    else{{out.textContent='Error: '+(data.error||'unknown');}}
+    if data.ok){{out.textContent=(data.response||'(empty response)')+(data.warnings&&data.warnings.length?'\\n\\nWarnings:\\n'+data.warnings.join('\\n'):'')+'\\n\\n['+data.duration_ms+' ms]';}}
+    else{{out.textContent='Error: '+(data.error||'unknown')+(data.warnings&&data.warnings.length?'\\n\\nWarnings:\\n'+data.warnings.join('\\n'):'');}}
   }}catch(err){{out.textContent='Request failed: '+err;}}
   btn.disabled=false;
 }};
@@ -1288,6 +1288,158 @@ async function refresh(){render(await loadJobs())}
 refresh();setInterval(refresh,30000);
 </script></body></html>"""
     return html.replace("__HEADER_NAV__", header_nav("/jobs")).encode("utf-8")
+
+
+def scanner_payload() -> dict:
+    import pandas as pd
+
+    today = today_key()
+    today_csv = WATCHLIST_EXPORT_DIR / f"morning_candidates_{today}.csv"
+    source = today_csv if today_csv.exists() else CANDIDATES_FILE
+    preview: list[dict] = []
+    columns: list[str] = []
+    if source.exists():
+        try:
+            frame = pd.read_csv(source)
+            preferred = [c for c in ("ticker", "Ticker", "score", "Score", "name", "Name", "sector", "Sector", "signal", "Signal") if c in frame.columns]
+            columns = preferred[:6] if preferred else list(frame.columns[:6])
+            subset = frame[columns].head(20) if columns else frame.head(0)
+            preview = subset.fillna("").astype(str).to_dict(orient="records")
+        except Exception as exc:
+            preview = [{"error": f"Could not read {source.name}: {exc}"}]
+    with STATE.lock:
+        running = STATE.running
+    last = last_run("morning")
+    return {
+        "server_time": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "running": running,
+        "running_scanner": running == "morning",
+        "files": {
+            "candidates_latest": file_info(CANDIDATES_FILE),
+            "candidates_html": file_info(CANDIDATES_FILE.with_suffix(".html")),
+            "today_scored": file_info(today_csv),
+            "today_html": file_info(today_csv.with_suffix(".html")),
+        },
+        "preview_source": str(source),
+        "preview_columns": columns,
+        "preview": preview,
+        "last_run": last,
+    }
+
+
+def scanner_html() -> bytes:
+    payload = scanner_payload()
+    nav = header_nav("/scanner")
+    files = payload["files"]
+    latest = files["candidates_latest"]
+    html_link = files["candidates_html"]
+    last = payload.get("last_run") or {}
+    last_label = "OK" if last.get("ok") else ("Failed" if last else "Never")
+    last_cls = "ok" if last.get("ok") else ("bad" if last else "muted")
+    html_name = CANDIDATES_FILE.with_suffix(".html").name
+    exports_html = "—"
+    if latest.get("exists"):
+        exports_html = f'<a href="/exports/{escape(CANDIDATES_FILE.name)}">CSV</a>'
+        if html_link.get("exists"):
+            exports_html += f' · <a href="/exports/{escape(html_name)}">HTML</a>'
+    preview_cols = payload.get("preview_columns") or []
+    preview_rows = payload.get("preview") or []
+    if preview_cols and preview_rows and "error" not in preview_rows[0]:
+        head = "".join(f"<th>{escape(str(c))}</th>" for c in preview_cols)
+        body = "".join(
+            "<tr>" + "".join(f"<td>{escape(str(row.get(c, '')))}</td>" for c in preview_cols) + "</tr>"
+            for row in preview_rows
+        )
+        preview_table = f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+    elif preview_rows:
+        preview_table = f"<p class='empty'>{escape(str(preview_rows[0].get('error', 'No candidates yet.')))}</p>"
+    else:
+        preview_table = "<p class='empty'>No scan results yet. Run the scanner to fetch and score Finviz candidates.</p>"
+
+    html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scanner</title><style>
+:root{{--bg:#f4f6f8;--panel:#fff;--text:#17202a;--muted:#687386;--line:#dce3ec;--blue:#1d4ed8;--green:#16803c;--red:#b42318}}
+*{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--text);font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}}
+header{{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:16px;position:sticky;top:0;z-index:2;height:52px}}
+.hdr-left h1{{font-size:15px;font-weight:700;margin:0}}
+.hdr-nav{{display:flex;align-items:center;gap:2px;flex:1;padding:0 8px}}
+.hdr-nav a{{padding:6px 13px;border-radius:7px;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none}}
+.hdr-nav a:hover{{background:#f1f3f5;color:var(--text)}}.hdr-nav a.active{{background:#eff6ff;color:var(--blue)}}
+.hdr-right{{font-size:12px;color:var(--muted)}}
+main{{max-width:1200px;margin:0 auto;padding:24px 20px 64px;display:grid;gap:16px}}
+.panel{{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:0 1px 6px rgba(15,23,42,.04)}}
+.page-title{{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:4px}}
+.page-title h2{{margin:0 0 4px;font-size:22px}}
+.sub{{color:var(--muted);font-size:13px;margin:0 0 14px}}
+.btn-run{{border:1px solid #bfcee3;background:#f8fbff;color:#183b75;border-radius:8px;padding:10px 16px;font-weight:700;cursor:pointer;font-size:13px}}
+.btn-run:disabled{{opacity:.55;cursor:not-allowed}}
+.meta{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:14px}}
+.meta div{{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fbfcfe;font-size:13px}}
+.meta small{{display:block;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:6px}}
+.ok{{color:var(--green);font-weight:700}}.bad{{color:var(--red);font-weight:700}}.muted{{color:var(--muted)}}
+table{{width:100%;border-collapse:collapse;font-size:13px}}
+th,td{{padding:9px 8px;border-bottom:1px solid var(--line);text-align:left}}
+th{{color:var(--muted);font-size:11px;text-transform:uppercase}}
+.log{{white-space:pre-wrap;max-height:220px;overflow:auto;font:12px ui-monospace,Menlo,monospace;background:#0f172a;color:#e2e8f0;border-radius:10px;padding:12px;line-height:1.5}}
+.empty{{color:var(--muted);padding:8px 0}}
+.run-pill{{display:inline-block;background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;margin-left:8px}}
+a{{color:var(--blue)}}
+</style></head><body>
+<header>
+  <div class="hdr-left"><h1>Scanner</h1></div>
+  <nav class="hdr-nav">{nav}</nav>
+  <div class="hdr-right" id="server-time">{escape(payload['server_time'])}</div>
+</header>
+<main>
+  <section class="panel">
+    <div class="page-title">
+      <div>
+        <h2>Morning Finviz scanner</h2>
+        <p class="sub">Fetch the universe, score candidates, and write exports/candidates_latest.csv — same job as the 8:45 ET schedule.</p>
+      </div>
+      <button class="btn-run" id="run-scanner">Run scanner now</button>
+    </div>
+    <div class="meta">
+      <div><small>Last run</small><span class="{last_cls}" id="last-status">{escape(last_label)}</span></div>
+      <div><small>Latest CSV</small>{'Updated ' + escape(latest.get('modified_at', '—')) if latest.get('exists') else 'Not generated yet'}</div>
+      <div><small>Rows preview</small>{len(preview_rows)} shown</div>
+      <div><small>Exports</small>{exports_html}</div>
+    </div>
+    <div id="run-indicator" class="sub" style="display:none"><span class="run-pill">RUNNING</span> Scanner in progress…</div>
+    <div id="preview">{preview_table}</div>
+  </section>
+  <section class="panel">
+    <div class="page-title"><div><h2>Last output</h2><p class="sub">Tail from the most recent morning scan job.</p></div></div>
+    <div class="log" id="log">{escape((last.get('output_tail') or 'No scanner output yet.'))}</div>
+  </section>
+</main>
+<script>
+async function loadScanner(){{
+  const res=await fetch('/api/scanner');
+  return res.json();
+}}
+document.getElementById('run-scanner').onclick=async()=>{{
+  const btn=document.getElementById('run-scanner');
+  const indicator=document.getElementById('run-indicator');
+  btn.disabled=true; indicator.style.display='block';
+  try{{
+    const res=await fetch('/api/run/morning',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:'{{"reason":"manual"}}'}});
+    const data=await res.json();
+    if(!data.ok && !data.skipped){{alert(data.error||'Scanner failed');}}
+  }}catch(err){{alert('Request failed: '+err);}}
+  setTimeout(async()=>{{location.reload();}}, 800);
+}};
+setInterval(async()=>{{
+  try{{
+    const data=await loadScanner();
+    document.getElementById('server-time').textContent=data.server_time;
+    if(data.running_scanner) document.getElementById('run-indicator').style.display='block';
+  }}catch(e){{}}
+}}, 5000);
+</script></body></html>"""
+    return html.encode("utf-8")
+
+
 class Handler(SimpleHTTPRequestHandler):
     server_version = "StockStrategyApp/1.0"
 
@@ -1341,6 +1493,14 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if path == "/scanner":
+            body = scanner_html()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if path in {"/healthcheck", "/health"}:
             body = healthcheck_html()
             self.send_response(HTTPStatus.OK)
@@ -1370,6 +1530,9 @@ class Handler(SimpleHTTPRequestHandler):
             return
         elif path == "/api/healthcheck":
             self.send_json(health_payload())
+            return
+        elif path == "/api/scanner":
+            self.send_json(scanner_payload())
             return
         elif path == "/api/strategy/best-case":
             self.send_json(compute_best_case())

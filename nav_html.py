@@ -5,6 +5,7 @@ def header_nav(active: str) -> str:
     links = (
         ("/", "Dashboard", "nav-home"),
         ("/live-infographic", "Live infographic", "nav-live"),
+        ("/scanner", "Scanner", "nav-scanner"),
         ("/jobs", "Jobs", "nav-jobs"),
         ("/day", "Day status", "nav-day"),
         ("/strategy-review", "Strategy review", "nav-review"),
