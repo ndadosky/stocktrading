@@ -30,6 +30,7 @@ COMPOSE="${REPO_DIR}/deploy/compose.sh"
 
 echo "Building and starting the app container (host network, port 80)..."
 "$COMPOSE" -f docker-compose.pi.yml up -d --build
+git rev-parse HEAD > logs/deployed_commit
 
 echo "Installing 5-minute git pull + redeploy timer..."
 sudo cp deploy/stocktrading-pull.service /etc/systemd/system/

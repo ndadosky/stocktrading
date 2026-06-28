@@ -1,0 +1,20 @@
+.git
+.gitignore
+.dockerignore
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Runtime data is mounted into the container and can contain private Codex auth.
+logs/
+exports/
+backups/
+archive/
+
+.DS_Store
