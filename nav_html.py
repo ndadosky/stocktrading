@@ -14,6 +14,13 @@ def html_head_meta() -> str:
     )
 
 
+PAGE_LAYOUT_CSS = """
+main{width:100%;max-width:1280px;margin-left:auto;margin-right:auto;padding:24px 24px 64px}
+main.dash-frame-main{width:100%;max-width:1280px;margin-left:auto;margin-right:auto;padding:0;height:calc(100vh - 52px)}
+main.dash-frame-main iframe{width:100%;height:100%;border:0;border-radius:0;background:transparent}
+"""
+
+
 MOBILE_UI_CSS = """
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{-webkit-tap-highlight-color:transparent;touch-action:manipulation;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
@@ -54,8 +61,8 @@ table{max-width:100%}
   .metric-row,.status-grid{grid-template-columns:1fr 1fr!important}
   .mix{grid-template-columns:1fr!important}
   .watch-shell{grid-template-columns:1fr!important}
-  .dash-frame-main{padding:8px;height:calc(100dvh - 88px);min-height:320px}
-  .dash-frame-main iframe{border-radius:8px;min-height:calc(100dvh - 104px)}
+  main.dash-frame-main{padding:0;height:calc(100dvh - 88px);min-height:320px}
+  .dash-frame-main iframe{border-radius:0;min-height:calc(100dvh - 88px)}
 }
 @media(max-width:480px){
   .meta{grid-template-columns:1fr}
@@ -115,7 +122,7 @@ def finalize_page_html(html: str, nav_active: str | None = None) -> bytes:
     )
     for legacy in legacy_viewports:
         html = html.replace(legacy, html_head_meta())
-    html = html.replace("</style>", MOBILE_UI_CSS + "</style>", 1)
+    html = html.replace("</style>", PAGE_LAYOUT_CSS + MOBILE_UI_CSS + "</style>", 1)
     return html.encode("utf-8")
 
 
@@ -126,5 +133,5 @@ def finalize_dashboard_html(html: str) -> str:
     )
     for legacy in legacy_viewports:
         html = html.replace(legacy, html_head_meta())
-    html = html.replace("</style>", DASHBOARD_MOBILE_CSS + "</style>", 1)
+    html = html.replace("</style>", PAGE_LAYOUT_CSS + DASHBOARD_MOBILE_CSS + "</style>", 1)
     return html
