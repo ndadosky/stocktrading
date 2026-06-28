@@ -28,6 +28,7 @@ from job_storage import (
 )
 from scanner_config import DASHBOARD_FILE, PAPER_TRADES_FILE, PIPELINE_STATE_FILE, WATCHLIST_EXPORT_DIR, ensure_directories
 from stock_storage import add_bankroll_deposit, bankroll_base, query_rows, total_bankroll_deposits
+from platform_health import codex_chat, platform_health_payload
 
 
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -259,6 +260,237 @@ def jobs_payload() -> dict:
         "jobs": status["jobs"],
         "history": job_history(80),
     }
+
+
+def health_payload() -> dict:
+    status = status_payload()
+    app_state = {
+        "scheduler_started_at": STATE.scheduler_started_at,
+        "live_updates": STATE.live_updates,
+        "running": status["running"],
+    }
+    return platform_health_payload(app_state, status["jobs"])
+
+
+def header_nav(active: str) -> str:
+    links = (
+        ("/", "Dashboard", "nav-home"),
+        ("/live-infographic", "Live infographic", "nav-live"),
+        ("/jobs", "Jobs", "nav-jobs"),
+        ("/day", "Day status", "nav-day"),
+        ("/strategy-review", "Strategy review", "nav-review"),
+        ("/healthcheck", "Health", "nav-health"),
+    )
+    parts = []
+    for href, label, nav_id in links:
+        cls = "active" if active == href else ""
+        id_attr = f' id="{nav_id}"' if nav_id else ""
+        parts.append(f'<a href="{href}" class="{cls}"{id_attr}>{label}</a>')
+    return "".join(parts)
+
+
+def architecture_svg(payload: dict) -> str:
+    """Simple topology diagram for the health page."""
+    healthy = payload.get("ok", False)
+    accent = "#16803c" if healthy else "#b42318"
+    return f"""
+<svg viewBox="0 0 920 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:920px;display:block">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+  <rect x="20" y="120" width="130" height="56" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
+  <text x="85" y="145" text-anchor="middle" font-size="12" font-weight="700" fill="#1e3a8a">Your PC</text>
+  <text x="85" y="162" text-anchor="middle" font-size="10" fill="#64748b">Browser</text>
+
+  <rect x="190" y="120" width="150" height="56" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="265" y="145" text-anchor="middle" font-size="12" font-weight="700" fill="#0f172a">Raspberry Pi</text>
+  <text x="265" y="162" text-anchor="middle" font-size="10" fill="#64748b">:80 host network</text>
+
+  <rect x="380" y="70" width="160" height="56" rx="10" fill="#ecfdf5" stroke="#86efac"/>
+  <text x="460" y="95" text-anchor="middle" font-size="12" font-weight="700" fill="#14532d">Docker app</text>
+  <text x="460" y="112" text-anchor="middle" font-size="10" fill="#64748b">app_server.py</text>
+
+  <rect x="380" y="170" width="160" height="56" rx="10" fill="#fff7ed" stroke="#fdba74"/>
+  <text x="460" y="195" text-anchor="middle" font-size="12" font-weight="700" fill="#9a3412">PostgreSQL</text>
+  <text x="460" y="212" text-anchor="middle" font-size="10" fill="#64748b">127.0.0.1</text>
+
+  <rect x="590" y="20" width="140" height="52" rx="10" fill="#fdf4ff" stroke="#e9d5ff"/>
+  <text x="660" y="42" text-anchor="middle" font-size="12" font-weight="700" fill="#6b21a8">Codex CLI</text>
+  <text x="660" y="58" text-anchor="middle" font-size="10" fill="#64748b">analysis · chat</text>
+
+  <rect x="590" y="90" width="140" height="52" rx="10" fill="#f0fdf4" stroke="#bbf7d0"/>
+  <text x="660" y="112" text-anchor="middle" font-size="12" font-weight="700" fill="#166534">GitHub</text>
+  <text x="660" y="128" text-anchor="middle" font-size="10" fill="#64748b">main branch</text>
+
+  <rect x="590" y="160" width="140" height="52" rx="10" fill="#fef2f2" stroke="#fecaca"/>
+  <text x="660" y="182" text-anchor="middle" font-size="12" font-weight="700" fill="#991b1b">Finviz/Yahoo</text>
+  <text x="660" y="198" text-anchor="middle" font-size="10" fill="#64748b">market data</text>
+
+  <rect x="590" y="230" width="140" height="52" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text x="660" y="252" text-anchor="middle" font-size="12" font-weight="700" fill="#0f172a">exports/</text>
+  <text x="660" y="268" text-anchor="middle" font-size="10" fill="#64748b">CSV · HTML</text>
+
+  <rect x="770" y="120" width="130" height="56" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
+  <text x="835" y="145" text-anchor="middle" font-size="12" font-weight="700" fill="#1e3a8a">systemd</text>
+  <text x="835" y="162" text-anchor="middle" font-size="10" fill="#64748b">5m git pull</text>
+
+  <line x1="150" y1="148" x2="190" y2="148" stroke="#94a3b8" marker-end="url(#arrow)"/>
+  <line x1="340" y1="148" x2="380" y2="98" stroke="#94a3b8" marker-end="url(#arrow)"/>
+  <line x1="460" y1="126" x2="460" y2="170" stroke="#94a3b8" marker-end="url(#arrow)"/>
+  <line x1="540" y1="98" x2="590" y2="46" stroke="#94a3b8" marker-end="url(#arrow)"/>
+  <line x1="540" y1="110" x2="590" y2="116" stroke="#94a3b8" marker-end="url(#arrow)"/>
+  <line x1="540" y1="120" x2="590" y2="186" stroke="#94a3b8" marker-end="url(#arrow)"/>
+  <line x1="460" y1="226" x2="590" y2="256" stroke="#94a3b8" marker-end="url(#arrow)"/>
+  <line x1="730" y1="116" x2="770" y2="148" stroke="#94a3b8" marker-end="url(#arrow)"/>
+  <line x1="835" y1="176" x2="835" y2="220" stroke="#94a3b8" marker-end="url(#arrow)"/>
+  <line x1="835" y1="220" x2="730" y2="130" stroke="#94a3b8" marker-end="url(#arrow)" stroke-dasharray="4,4"/>
+
+  <circle cx="460" cy="98" r="6" fill="{accent}"/>
+  <text x="20" y="24" font-size="11" fill="#64748b">Overall: {'healthy' if healthy else 'degraded'} · {escape(payload.get('version', ''))}</text>
+</svg>"""
+
+
+def component_cards(components: dict) -> str:
+    rows = []
+    for name, info in components.items():
+        ok = info.get("ok", False)
+        cls = "ok" if ok else "bad"
+        badge = "HEALTHY" if ok else "UNHEALTHY"
+        detail = escape(str(info.get("detail", "")))
+        rows.append(
+            f"<div class='card {cls}'><div class='card-top'><strong>{escape(name.replace('_', ' '))}</strong>"
+            f"<span class='badge {cls}'>{badge}</span></div><p>{detail}</p></div>"
+        )
+    return "".join(rows)
+
+
+def scheduled_jobs_table(jobs: dict, running: Optional[str]) -> str:
+    rows = []
+    for name, job in jobs.items():
+        schedule = job.get("schedule_time") or "manual"
+        last = job.get("last_run") or {}
+        last_status = "OK" if last.get("ok") else ("Failed" if last else "Not run")
+        status_cls = "ok" if last.get("ok") else ("bad" if last else "muted")
+        next_run = job.get("next_run") or "—"
+        is_running = running == name
+        rows.append(
+            f"<tr><td><b>{escape(name.replace('_', ' '))}</b>"
+            f"{' <span class=run-pill>RUNNING</span>' if is_running else ''}"
+            f"<div class='sub'>{escape(job.get('description', ''))}</div></td>"
+            f"<td>{escape(str(schedule))}</td>"
+            f"<td>{escape(str(next_run))}</td>"
+            f"<td class='{status_cls}'>{escape(last_status)}</td></tr>"
+        )
+    return (
+        "<table><thead><tr><th>Job</th><th>Schedule (ET)</th><th>Next run</th><th>Last status</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table>"
+    )
+
+
+def healthcheck_html() -> bytes:
+    payload = health_payload()
+    overall = "healthy" if payload["ok"] else "degraded"
+    overall_cls = "ok" if payload["ok"] else "bad"
+    nav = header_nav("/healthcheck")
+    html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="60">
+<title>Platform health</title><style>
+:root{{--bg:#f4f6f8;--panel:#fff;--text:#17202a;--muted:#687386;--line:#dce3ec;--blue:#1d4ed8;--green:#16803c;--red:#b42318}}
+*{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--text);font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}}
+header{{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:16px;position:sticky;top:0;z-index:3;height:52px}}
+.hdr-left h1{{font-size:15px;font-weight:700;margin:0}}
+.hdr-nav{{display:flex;align-items:center;gap:2px;flex:1;padding:0 8px}}
+.hdr-nav a{{padding:6px 13px;border-radius:7px;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none}}
+.hdr-nav a:hover{{background:#f1f3f5;color:var(--text)}}.hdr-nav a.active{{background:#eff6ff;color:var(--blue)}}
+.hdr-right{{display:flex;gap:10px;align-items:center;color:var(--muted);font-size:12px}}
+.badge-top{{border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700}}
+.badge-top.ok{{background:#f0fdf4;color:var(--green);border:1px solid #86efac}}
+.badge-top.bad{{background:#fef2f2;color:var(--red);border:1px solid #fca5a5}}
+main{{max-width:1200px;margin:0 auto;padding:20px 20px 64px;display:grid;gap:16px}}
+.panel{{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;box-shadow:0 1px 6px rgba(15,23,42,.04)}}
+.panel h2{{margin:0 0 6px;font-size:16px}}.sub{{color:var(--muted);font-size:12px;margin:0 0 14px}}
+.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}}
+.card{{border:1px solid var(--line);border-radius:10px;padding:14px;background:#fbfcfe}}
+.card.ok{{border-color:#bbf7d0;background:#f8fff9}}.card.bad{{border-color:#fecaca;background:#fffafa}}
+.card-top{{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}}
+.card p{{margin:0;color:var(--muted);font-size:12px;line-height:1.45;word-break:break-word}}
+.badge{{font-size:10px;font-weight:800;letter-spacing:.04em;padding:3px 8px;border-radius:999px}}
+.badge.ok{{background:#dcfce7;color:var(--green)}}.badge.bad{{background:#fee2e2;color:var(--red)}}
+table{{width:100%;border-collapse:collapse;font-size:13px}}
+th,td{{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}}
+th{{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em}}
+.ok{{color:var(--green);font-weight:700}}.bad{{color:var(--red);font-weight:700}}.muted{{color:var(--muted)}}
+.sub{{font-size:12px;color:var(--muted);margin-top:4px}}
+.run-pill{{display:inline-block;background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;margin-left:6px}}
+.codex-box{{display:grid;gap:10px}}
+textarea{{width:100%;min-height:96px;border:1px solid var(--line);border-radius:10px;padding:12px;font:13px inherit;resize:vertical}}
+button{{border:1px solid #bfcee3;background:#f8fbff;color:#183b75;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer;width:fit-content}}
+button:disabled{{opacity:.55;cursor:not-allowed}}
+#codex-output{{white-space:pre-wrap;background:#0f172a;color:#e2e8f0;border-radius:10px;padding:14px;font:12px ui-monospace,Menlo,monospace;min-height:80px}}
+.legend{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:12px;font-size:12px;color:var(--muted)}}
+.legend div{{border:1px dashed var(--line);border-radius:8px;padding:8px 10px;background:#fff}}
+a{{color:var(--blue)}}
+</style></head><body>
+<header>
+  <div class="hdr-left"><h1>Platform health</h1></div>
+  <nav class="hdr-nav">{nav}</nav>
+  <div class="hdr-right">
+    <span class="badge-top {overall_cls}">{overall.upper()}</span>
+    <span id="clock">{escape(payload['generated_at'])}</span>
+  </div>
+</header>
+<main>
+  <section class="panel">
+    <h2>Network architecture</h2>
+    <p class="sub">Pi deployment: Docker app on port 80, PostgreSQL on host, GitHub auto-pull every 5 minutes, Codex for analysis.</p>
+    {architecture_svg(payload)}
+    <div class="legend">
+      <div><b>Deploy loop</b> — systemd timer → git pull → docker rebuild</div>
+      <div><b>Trading loop</b> — scheduler inside app_server runs morning → confirm → report jobs</div>
+      <div><b>Codex</b> — P/L flashcards and optional chat probe below</div>
+      <div><b>JSON API</b> — <a href="/api/healthcheck">/api/healthcheck</a></div>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>Component health</h2>
+    <p class="sub">Live probes from this app instance.</p>
+    <div class="grid">{component_cards(payload['components'])}</div>
+  </section>
+  <section class="panel">
+    <h2>Scheduled tasks</h2>
+    <p class="sub">Market-day ET schedule managed by the in-app scheduler. Manual runs available from the Jobs page.</p>
+    {scheduled_jobs_table(payload['scheduled_jobs'], payload['components']['scheduler'].get('running_job'))}
+  </section>
+  <section class="panel">
+    <h2>Codex probe</h2>
+    <p class="sub">Send a read-only Codex exec prompt to verify the CLI is wired up. Uses <code>codex exec --sandbox read-only</code>.</p>
+    <div class="codex-box">
+      <textarea id="codex-input" placeholder="Example: Summarize today's paper trading pipeline in two sentences."></textarea>
+      <button id="codex-send">Send to Codex</button>
+      <div id="codex-output">Waiting for a probe…</div>
+    </div>
+  </section>
+</main>
+<script>
+document.getElementById('codex-send').onclick=async()=>{{
+  const btn=document.getElementById('codex-send');
+  const out=document.getElementById('codex-output');
+  const message=document.getElementById('codex-input').value.trim();
+  if(!message){{out.textContent='Enter a message first.';return;}}
+  btn.disabled=true;out.textContent='Running Codex…';
+  try{{
+    const res=await fetch('/api/codex/chat',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{message}})}});
+    const data=await res.json();
+    if(data.ok){{out.textContent=(data.response||'(empty response)')+'\\n\\n['+data.duration_ms+' ms]';}}
+    else{{out.textContent='Error: '+(data.error||'unknown');}}
+  }}catch(err){{out.textContent='Request failed: '+err;}}
+  btn.disabled=false;
+}};
+</script>
+</body></html>"""
+    return html.encode("utf-8")
 
 
 def normalized_date(value: str | None) -> str:
@@ -610,6 +842,7 @@ tbody tr:hover td{{filter:brightness(.97)}}
     <a href="/jobs">Jobs</a>
     <a href="/day">Day status</a>
     <a href="/strategy-review">Strategy review</a>
+    <a href="/healthcheck">Health</a>
   </nav>
   <div class="hdr-right"><span>Auto-refresh {payload['refresh_seconds']}s</span><span>{escape(payload['generated_at'])}</span></div>
 </header>
@@ -744,6 +977,7 @@ a{{color:var(--blue)}}
     <a href="/jobs">Jobs</a>
     <a href="/day" class="active">Day status</a>
     <a href="/strategy-review">Strategy review</a>
+    <a href="/healthcheck">Health</a>
   </nav>
   <div class="hdr-right">
     <span class="status-badge {status_cls}">{escape(status_label)}</span>
@@ -848,6 +1082,7 @@ a{color:var(--blue)}
     <a href="/jobs" id="nav-jobs">Jobs</a>
     <a href="/day" id="nav-day">Day status</a>
     <a href="/strategy-review" id="nav-review">Strategy review</a>
+    <a href="/healthcheck" id="nav-health">Health</a>
   </nav>
   <div class="hdr-right"><div id="market-badge" class="badge">Market —</div><span id="clock" class="clock-txt">—</span></div>
 </header>
@@ -961,6 +1196,7 @@ a{color:var(--blue)}
     <a href="/jobs" class="active">Jobs</a>
     <a href="/day">Day status</a>
     <a href="/strategy-review">Strategy review</a>
+    <a href="/healthcheck">Health</a>
   </nav>
   <div class="hdr-right">
     <div id="market-badge" class="badge">Market —</div>
@@ -1076,6 +1312,14 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if path in {"/healthcheck", "/health"}:
+            body = healthcheck_html()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if path == "/strategy-review":
             latest = newest_path("strategy_review_*.html")
             if latest:
@@ -1099,6 +1343,9 @@ class Handler(SimpleHTTPRequestHandler):
         elif path == "/api/day":
             self.send_json(day_payload(query.get("date", [today_key()])[0]))
             return
+        elif path == "/api/healthcheck":
+            self.send_json(health_payload())
+            return
         super().do_GET()
 
     def do_POST(self) -> None:
@@ -1115,6 +1362,17 @@ class Handler(SimpleHTTPRequestHandler):
             event = add_bankroll_deposit(25000.0, "UI bankroll injection")
             dashboard_result = run_job("dashboard", "bankroll-injection")
             self.send_json({"ok": True, "event": event, "bankroll": {"base": bankroll_base(), "deposits": total_bankroll_deposits()}, "dashboard": dashboard_result})
+            return
+        if path == "/api/codex/chat":
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            raw = self.rfile.read(length) if length else b"{}"
+            try:
+                payload = json.loads(raw.decode("utf-8"))
+            except json.JSONDecodeError:
+                self.send_json({"ok": False, "error": "Invalid JSON body"}, HTTPStatus.BAD_REQUEST)
+                return
+            message = payload.get("message", "")
+            self.send_json(codex_chat(message))
             return
         self.send_json({"ok": False, "error": "Not found"}, HTTPStatus.NOT_FOUND)
 
