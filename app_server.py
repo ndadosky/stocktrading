@@ -452,7 +452,6 @@ def healthcheck_html() -> bytes:
     overall_cls = "ok" if payload["ok"] else "bad"
     nav = header_nav("/healthcheck")
     html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="refresh" content="60">
 <title>Health check</title><style>
 :root{{--bg:#f4f6f8;--panel:#fff;--text:#17202a;--muted:#687386;--line:#dce3ec;--blue:#1d4ed8;--green:#16803c;--red:#b42318}}
 *{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--text);font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}}
@@ -533,7 +532,7 @@ a{{color:var(--blue)}}
     <div class="codex-box">
       <textarea id="codex-input" placeholder="Example: Summarize today's paper trading pipeline in two sentences."></textarea>
       <button id="codex-send">Send to Codex</button>
-      <div id="codex-output">Waiting for a probe…</div>
+      <div id="codex-output">Enter a prompt above and click Send to Codex.</div>
     </div>
   </section>
 </main>
@@ -541,16 +540,20 @@ a{{color:var(--blue)}}
 document.getElementById('codex-send').onclick=async()=>{{
   const btn=document.getElementById('codex-send');
   const out=document.getElementById('codex-output');
-  const message=document.getElementById('codex-input').value.trim();
+  const input=document.getElementById('codex-input');
+  const message=input.value.trim();
   if(!message){{out.textContent='Enter a message first.';return;}}
-  btn.disabled=true;out.textContent='Running Codex…';
+  btn.disabled=true;input.disabled=true;out.textContent='Running Codex… (may take up to 2 minutes)';
   try{{
     const res=await fetch('/api/codex/chat',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{message}})}});
     const data=await res.json();
-    if data.ok){{out.textContent=(data.response||'(empty response)')+(data.warnings&&data.warnings.length?'\\n\\nWarnings:\\n'+data.warnings.join('\\n'):'')+'\\n\\n['+data.duration_ms+' ms]';}}
-    else{{out.textContent='Error: '+(data.error||'unknown')+(data.warnings&&data.warnings.length?'\\n\\nWarnings:\\n'+data.warnings.join('\\n'):'');}}
+    if(data.ok){{
+      out.textContent=(data.response||'(empty response)')+(data.warnings&&data.warnings.length?'\\n\\nWarnings:\\n'+data.warnings.join('\\n'):'')+'\\n\\n['+data.duration_ms+' ms]';
+    }}else{{
+      out.textContent='Error: '+(data.error||'unknown')+(data.warnings&&data.warnings.length?'\\n\\nWarnings:\\n'+data.warnings.join('\\n'):'');
+    }}
   }}catch(err){{out.textContent='Request failed: '+err;}}
-  btn.disabled=false;
+  btn.disabled=false;input.disabled=false;
 }};
 </script>
 </body></html>"""
