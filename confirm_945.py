@@ -12,7 +12,8 @@ import yfinance as yf
 from scanner_config import (
     CANDIDATES_FILE, CONFIRMATION_WEIGHTS, WATCHLIST_EXPORT_DIR, ensure_directories,
 )
-from pipeline_health import market_gate, record_stage, require_today_csv
+from pipeline_health import market_gate, record_stage, require_today_snapshot
+from stock_storage import append_snapshot
 
 
 def flatten_columns(frame: pd.DataFrame) -> pd.DataFrame:
@@ -130,10 +131,9 @@ def main() -> int:
     if not market_gate("confirmation"):
         return 0
     today = datetime.now().astimezone().strftime("%Y-%m-%d")
-    today_candidates = WATCHLIST_EXPORT_DIR / f"morning_candidates_{today}.csv"
-    candidates = require_today_csv(today_candidates, "confirmation")
+    candidates = require_today_snapshot("morning_candidates", "scan_date", "confirmation")
     if candidates is None:
-        print(f"Missing or stale candidates: {today_candidates}. Run morning_candidates.py first.")
+        print("Missing morning candidates in PostgreSQL. Run morning_candidates.py first.")
         return 1
     ticker_col = "Ticker" if "Ticker" in candidates.columns else "ticker"
     if ticker_col not in candidates.columns:
@@ -179,10 +179,10 @@ def main() -> int:
                "confirmation_band", "confirmation_volume", "bid", "ask", "bid_ask_spread_pct", "quote_source", "spread_proxy_pct",
                "target_10", "target_20", "target_30", "stop_8"]
     output = pd.DataFrame(results, columns=columns).sort_values("score", ascending=False)
-    csv_path = WATCHLIST_EXPORT_DIR / f"confirm_945_{today}.csv"
-    output.to_csv(csv_path, index=False)
-    write_html(output, csv_path.with_suffix(".html"), f"9:45 confirmation — {today}")
-    print(f"Saved {len(output)} confirmations to {csv_path}")
+    append_snapshot("confirmations", output, "confirm_date", today)
+    html_path = WATCHLIST_EXPORT_DIR / f"confirm_945_{today}.html"
+    write_html(output, html_path, f"9:45 confirmation — {today}")
+    print(f"Saved {len(output)} confirmations to PostgreSQL (confirmations.confirm_date={today})")
     coverage = len(output) / len(candidates) if len(candidates) else 0
     status = "SUCCESS" if coverage >= 0.70 else "DEGRADED" if results else "FAILED"
     record_stage("confirmation", status, len(output), f"{coverage:.0%} intraday coverage; live quotes requested for buys")

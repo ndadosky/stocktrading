@@ -21,7 +21,7 @@ from scanner_config import (
     WATCHLIST_EXPORT_DIR, ensure_directories,
 )
 from market_calendar import sessions_until
-from pipeline_health import market_gate, record_stage, require_today_csv
+from pipeline_health import market_gate, record_stage, require_today_snapshot
 from stock_storage import append_snapshot, bankroll_base, load_paper_trades, save_paper_trades, total_bankroll_deposits
 
 TRADE_COLUMNS = [
@@ -531,10 +531,9 @@ def main() -> int:
     if not market_gate("report"):
         return 0
     today = datetime.now().astimezone().strftime("%Y-%m-%d")
-    confirmation_file = WATCHLIST_EXPORT_DIR / f"confirm_945_{today}.csv"
-    confirmations = require_today_csv(confirmation_file, "report")
+    confirmations = require_today_snapshot("confirmations", "confirm_date", "report")
     if confirmations is None:
-        print(f"Missing or stale confirmation file: {confirmation_file}. Run confirm_945.py first.")
+        print("Missing confirmations in PostgreSQL. Run confirm_945.py first.")
         return 1
     required = {"ticker", "current", "score"}
     if not required.issubset(confirmations.columns):
@@ -548,25 +547,19 @@ def main() -> int:
         return 1
     trades = update_trade_lifecycle(apply_corporate_actions(load_trades()))
     trades = add_new_trades(trades, confirmations, today)
-    save_paper_trades(trades, TRADE_COLUMNS, PAPER_TRADES_FILE)
+    save_paper_trades(trades, TRADE_COLUMNS)
     performance = calculate_performance(trades)
     band = grouped_analytics(performance, "confirmation_band")
     components = component_analytics(performance)
     append_snapshot("paper_performance", performance, "report_date", today)
     append_snapshot("score_band_performance", band, "report_date", today)
     append_snapshot("component_performance", components, "report_date", today)
-    csv_path = WATCHLIST_EXPORT_DIR / f"paper_performance_{today}.csv"
-    performance.to_csv(csv_path, index=False)
-    band.to_csv(WATCHLIST_EXPORT_DIR / f"score_band_performance_{today}.csv", index=False)
-    components.to_csv(WATCHLIST_EXPORT_DIR / f"component_performance_{today}.csv", index=False)
     report_html = render_report(performance, today, band, components)
     html_path = WATCHLIST_EXPORT_DIR / f"daily_report_{today}.html"
     html_path.write_text(report_html, encoding="utf-8")
-    csv_path.with_suffix(".html").write_text(report_html, encoding="utf-8")
-    PAPER_TRADES_FILE.with_suffix(".html").write_text(report_html, encoding="utf-8")
     from dashboard import build_dashboard
     build_dashboard(performance, datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z"))
-    print(f"Saved {len(performance)} trades to {csv_path} and {html_path}")
+    print(f"Saved {len(performance)} trades to PostgreSQL and {html_path}")
     record_stage("report", "SUCCESS", len(performance), f"Equity ${account_summary(performance)['equity']:,.2f}")
     return 0
 

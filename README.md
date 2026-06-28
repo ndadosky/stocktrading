@@ -100,9 +100,10 @@ delisting, or data-source review rather than inventing an exit.
 
 ## 4. Reporting and dashboard
 
-`daily_report.py` maintains the complete lot-aware ledger in PostgreSQL, with
-`paper_trades.csv` kept as a compatibility export. It writes dated CSV/HTML reports and refreshes the permanent
-light-theme dashboard at:
+`daily_report.py` maintains the complete lot-aware ledger in PostgreSQL. Pipeline
+handoffs (morning candidates, 9:45 confirmations, daily performance) are stored
+as dated PostgreSQL snapshots. HTML reports under `exports/` are read-only views.
+The permanent dashboard lives at:
 
 ```text
 exports/dashboard.html
@@ -112,7 +113,7 @@ The dashboard shows account equity, cash, deployed capital, realized and
 unrealized P/L, open and resolved trades, staged exits, daily equity history,
 score-band performance, signal contribution, and active risk controls.
 The dashboard also exposes pipeline health. Each stage checks the exchange
-calendar and refuses stale upstream files; low history or intraday coverage is
+calendar and refuses stale upstream snapshots; low history or intraday coverage is
 marked `DEGRADED` instead of being hidden.
 
 ## 5. Continuous improvement
@@ -159,7 +160,7 @@ stock/
 ├── strategy_changelog.csv     # Optimization audit trail
 ├── optimizer_policy.json      # Sample, holdout, and adoption safeguards
 ├── market_calendar.py         # NYSE-session automation gate
-├── pipeline_health.py         # Stage state, coverage, and stale-file checks
+├── pipeline_health.py         # Stage state, coverage, and PostgreSQL snapshot checks
 ├── system_health.py           # Standalone health-audit command
 ├── db.py                      # PostgreSQL connection and schema bootstrap
 ├── stock_storage.py           # Paper ledger and analytics persistence
@@ -167,11 +168,12 @@ stock/
 ├── app_server.py              # Web UI, API, and job runner
 ├── docker-compose.yml         # App + PostgreSQL (local/dev)
 ├── docker-compose.pi.yml      # Pi: host network on port 80 + host PostgreSQL
-├── paper_trades.csv           # Compatibility export of the live paper ledger
+├── deploy/db_backup_git.sh    # Nightly pg_dump → backups/ → git push
+├── backups/                   # PostgreSQL dumps (committed nightly on Pi)
 ├── assets/
 │   ├── overview.png
 │   └── daily_message.png
-├── exports/                   # Dated CSV, HTML, dashboard, and infographic output
+├── exports/                   # HTML dashboard, reports, and infographics
 └── logs/
 ```
 
@@ -253,14 +255,13 @@ deposit separate from trading P/L.
 The date-specific status page at `/day?date=YYYY-MM-DD` reads from PostgreSQL,
 showing job runs, pipeline status, strategy review rows, paper performance,
 score bands, components, and the paper ledger for that date.
-Job history, paper trades, performance snapshots, score-band analytics,
-component analytics, and strategy-review rows live in PostgreSQL; CSV/HTML files
-are generated as exports for inspection and compatibility. The 10:30 strategy
-review writes `exports/strategy_review_YYYY-MM-DD.csv` and `.html`, and the
-dashboard shows the latest decision, sample gates, holdout status, latest-50
-success, and job health. While the market is open, it refreshes the
-paper-trading report and dashboard every five minutes after the same-day
-confirmation file exists.
+Job history, paper trades, pipeline snapshots, performance analytics, score-band
+analytics, component analytics, and strategy-review rows all live in PostgreSQL.
+HTML under `exports/` is generated for browser viewing only. The 10:30 strategy
+review writes `exports/strategy_review_YYYY-MM-DD.html`, and the dashboard shows
+the latest decision, sample gates, holdout status, latest-50 success, and job
+health. While the market is open, it refreshes the paper-trading report and
+dashboard every five minutes after the same-day confirmation snapshot exists.
 Override `PORT`, `HOST`, `DATABASE_URL`, `STOCK_SCHEDULER`, or
 `STOCK_LIVE_UPDATE_SECONDS` in `.env` if needed.
 
@@ -278,10 +279,11 @@ the app API:
 | `stocktrading-job-strategy_review.timer` | 10:30 | strategy review |
 | `stocktrading-job-pnl_flashcard.timer` | 16:15 | P/L flashcard |
 | `stocktrading-live-update.timer` | every 5 min | live report/dashboard |
+| `stocktrading-db-backup.timer` | 2:30 daily | PostgreSQL dump → git |
 
-Each timer runs `deploy/trigger_job.sh` (or `trigger_live_update.sh`), which
-skips non-market days and `POST`s to `http://127.0.0.1/api/run/<job>`. Logs:
-`logs/systemd_jobs.log`.
+Each timer runs `deploy/trigger_job.sh` (or `trigger_live_update.sh` / `db_backup_git.sh`), which
+skips non-market days and `POST`s to `http://127.0.0.1/api/run/<job>` (backup runs `pg_dump` and `git push`). Logs:
+`logs/systemd_jobs.log`, `logs/db_backup.log`.
 
 Install or refresh timers after a pull:
 

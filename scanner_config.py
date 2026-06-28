@@ -24,7 +24,7 @@ CANDIDATES_FILE = Path(
 PAPER_TRADES_FILE = Path(
     os.getenv("STOCK_PAPER_TRADES_FILE", PROJECT_DIR / "paper_trades.csv")
 ).expanduser().resolve()
-# Legacy SQLite path kept only for one-time migration scripts.
+# Legacy SQLite path — migration scripts only.
 STOCK_DB_FILE = Path(
     os.getenv("STOCK_DB_FILE", WATCHLIST_EXPORT_DIR / "stock_app.sqlite")
 ).expanduser().resolve()

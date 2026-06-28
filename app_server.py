@@ -26,8 +26,8 @@ from job_storage import (
     record_job_run,
     scheduled_already_ran,
 )
-from scanner_config import CANDIDATES_FILE, DASHBOARD_FILE, PAPER_TRADES_FILE, PIPELINE_STATE_FILE, WATCHLIST_EXPORT_DIR, ensure_directories
-from stock_storage import add_bankroll_deposit, bankroll_base, query_rows, table_count, total_bankroll_deposits
+from scanner_config import CANDIDATES_FILE, DASHBOARD_FILE, PIPELINE_STATE_FILE, WATCHLIST_EXPORT_DIR, ensure_directories
+from stock_storage import add_bankroll_deposit, bankroll_base, query_rows, snapshot_count, table_count, total_bankroll_deposits
 from platform_health import codex_chat, platform_health_payload
 from nav_html import header_nav
 from strategy_review import load_latest_review_rows, render_strategy_review_html
@@ -98,7 +98,9 @@ def market_open_now() -> bool:
 
 
 def confirmation_ready() -> bool:
-    return (WATCHLIST_EXPORT_DIR / f"confirm_945_{today_key()}.csv").exists()
+    from stock_storage import snapshot_count
+
+    return snapshot_count("confirmations", "confirm_date", today_key()) > 0
 
 
 def run_job(name: str, reason: str = "manual") -> dict:
@@ -244,11 +246,22 @@ def status_payload() -> dict:
     today = today_key()
     files = {
         "dashboard": file_info(DASHBOARD_FILE),
-        "paper_trades": file_info(PAPER_TRADES_FILE),
         "database_url": database_url().split("@")[-1],
-        "morning": file_info(WATCHLIST_EXPORT_DIR / f"morning_candidates_{today}.csv"),
-        "confirmation": file_info(WATCHLIST_EXPORT_DIR / f"confirm_945_{today}.csv"),
-        "paper_performance": file_info(WATCHLIST_EXPORT_DIR / f"paper_performance_{today}.csv"),
+        "morning_candidates": {
+            "exists": snapshot_count("morning_candidates", "scan_date", today) > 0,
+            "rows": snapshot_count("morning_candidates", "scan_date", today),
+            "source": "postgresql",
+        },
+        "confirmation": {
+            "exists": snapshot_count("confirmations", "confirm_date", today) > 0,
+            "rows": snapshot_count("confirmations", "confirm_date", today),
+            "source": "postgresql",
+        },
+        "paper_performance": {
+            "exists": snapshot_count("paper_performance", "report_date", today) > 0,
+            "rows": snapshot_count("paper_performance", "report_date", today),
+            "source": "postgresql",
+        },
         "latest_optimizer_review": file_info(newest_path("strategy_optimizer_review_*.html") or WATCHLIST_EXPORT_DIR / "strategy_optimizer_review_missing.html"),
         "latest_strategy_review": file_info(newest_path("strategy_review_*.html") or WATCHLIST_EXPORT_DIR / "strategy_review_missing.html"),
     }
@@ -426,10 +439,10 @@ def postgres_data_panel(payload: dict) -> str:
         ("Job runs (PostgreSQL)", str(data.get("postgres_job_runs", ledger.get("job_runs", 0)))),
         ("Account events", str(data.get("postgres_account_events", 0))),
         ("Strategy reviews", str(data.get("postgres_strategy_reviews", 0))),
+        ("Morning candidates (PG)", str(data.get("postgres_morning_candidates", 0))),
+        ("Confirmations (PG)", str(data.get("postgres_confirmations", 0))),
         ("Bankroll base", f"${data.get('bankroll_base', 0):,.0f}"),
         ("Deposits", f"${data.get('bankroll_deposits', 0):,.0f}"),
-        ("CSV export rows", str(data.get("csv_export_rows", 0)) + " (export only)"),
-        ("Pi requires PostgreSQL", "yes" if db.get("require_postgres") else "no"),
     ]
     table_rows = "".join(f"<tr><th>{escape(str(label))}</th><td>{value}</td></tr>" for label, value in rows)
     warn_html = ""
@@ -439,7 +452,7 @@ def postgres_data_panel(payload: dict) -> str:
     return f"""
 <section class="panel">
   <h2>PostgreSQL data source</h2>
-  <p class="sub">The Raspberry Pi uses host PostgreSQL as the live ledger. CSV and legacy SQLite files are exports or migration artifacts only.</p>
+  <p class="sub">All live trading data lives in PostgreSQL. HTML files under exports/ are read-only views.</p>
   <div class="source-banner {cls}"><strong>{'Using PostgreSQL' if source_ok else 'PostgreSQL check failed'}</strong> — {escape(str(data.get('detail', '')))}</div>
   <table class="ledger-table">{table_rows}</table>
   {warn_html}
@@ -506,12 +519,13 @@ a{{color:var(--blue)}}
 <main>
   <section class="panel">
     <h2>Network architecture</h2>
-    <p class="sub">Pi deployment: Docker app on port 80, PostgreSQL on host, GitHub auto-pull every 5 minutes, Codex for analysis.</p>
+    <p class="sub">Pi deployment: Docker app on port 80, host PostgreSQL, systemd jobs, nightly DB backup to git.</p>
     {architecture_svg(payload)}
     <div class="legend">
       <div><b>Deploy loop</b> — systemd timer → git pull → docker rebuild</div>
       <div><b>Trading loop</b> — systemd timers on the Pi host trigger jobs via the app API</div>
       <div><b>Codex</b> — P/L flashcards and optional chat probe below</div>
+      <div><b>Backups</b> — nightly pg_dump committed to backups/ in git</div>
       <div><b>JSON API</b> — <a href="/api/healthcheck">/api/healthcheck</a></div>
     </div>
   </section>
@@ -1186,12 +1200,12 @@ function render(s){
   sys+=kv('Live updates',s.live_updates?'On':'Off',s.live_updates?'ok':'muted');
   sys+=kv('Database',esc(s.files?.database_url||'—'));
   document.getElementById('system').innerHTML=sys;
-  const fileLabels={morning:'Morning candidates',confirmation:'9:45 confirmation',paper_performance:'Paper performance',dashboard:'Dashboard HTML',paper_trades:'Paper trades CSV'};
   let files='';
+  const fileLabels={morning_candidates:'Morning candidates (PG)',confirmation:'9:45 confirmation (PG)',paper_performance:'Paper performance (PG)',dashboard:'Dashboard HTML'};
   for(const [key,label] of Object.entries(fileLabels)){
     const f=s.files?.[key]||{};
-    const val=f.exists?('Updated '+fmtTime(f.modified_at)):'Missing';
-    files+=kv(label,val,f.exists?'ok':'muted');
+    const val=f.rows!=null?`${f.rows} rows in PostgreSQL`:(f.exists?'Available':'Missing');
+    files+=kv(label,val,f.rows>0?'ok':'muted');
   }
   document.getElementById('files').innerHTML=files;
   let jobs='';
@@ -1364,19 +1378,21 @@ refresh();setInterval(refresh,30000);
 
 
 def _saved_scanner_preview() -> tuple[list[str], list[dict], str]:
-    import pandas as pd
+    from stock_storage import read_latest_snapshot, read_snapshot
 
     today = today_key()
-    today_csv = WATCHLIST_EXPORT_DIR / f"morning_candidates_{today}.csv"
-    source = today_csv if today_csv.exists() else CANDIDATES_FILE
-    if not source.exists():
-        return [], [], "none"
+    frame = read_snapshot("morning_candidates", "scan_date", today)
+    source = f"postgresql:morning_candidates/{today}"
+    if frame.empty:
+        saved_date, frame = read_latest_snapshot("morning_candidates", "scan_date")
+        if frame.empty:
+            return [], [], "none"
+        source = f"postgresql:morning_candidates/{saved_date}"
     try:
-        frame = pd.read_csv(source)
         columns, rows = preview_rows(frame, limit=50)
-        return columns, rows, f"saved:{source.name}"
+        return columns, rows, source
     except Exception as exc:
-        return [], [{"error": f"Could not read {source.name}: {exc}"}], "saved"
+        return [], [{"error": f"Could not read morning candidates: {exc}"}], "saved"
 
 
 def _run_scanner_preview_worker() -> None:
@@ -1425,8 +1441,6 @@ def scanner_payload() -> dict:
         preview_result = STATE.scanner_preview_result
         preview_error = STATE.scanner_preview_error
 
-    today = today_key()
-    today_csv = WATCHLIST_EXPORT_DIR / f"morning_candidates_{today}.csv"
     if preview_result:
         preview_columns = preview_result.get("preview_columns") or []
         preview = preview_result.get("preview") or []
@@ -1436,6 +1450,9 @@ def scanner_payload() -> dict:
         preview_columns, preview, preview_source = _saved_scanner_preview()
         stats = None
 
+    today = today_key()
+    morning_html = WATCHLIST_EXPORT_DIR / f"morning_candidates_{today}.html"
+    latest_html = CANDIDATES_FILE.with_suffix(".html")
     last = last_run("morning")
     return {
         "server_time": datetime.now().astimezone().isoformat(timespec="seconds"),
@@ -1447,10 +1464,8 @@ def scanner_payload() -> dict:
         "preview": preview,
         "stats": stats,
         "files": {
-            "candidates_latest": file_info(CANDIDATES_FILE),
-            "candidates_html": file_info(CANDIDATES_FILE.with_suffix(".html")),
-            "today_scored": file_info(today_csv),
-            "today_html": file_info(today_csv.with_suffix(".html")),
+            "morning_html": file_info(morning_html if morning_html.exists() else latest_html),
+            "today_html": file_info(morning_html),
         },
         "last_scheduled_run": last,
     }
@@ -1473,17 +1488,14 @@ def scanner_html() -> bytes:
     payload = scanner_payload()
     nav = header_nav("/scanner")
     files = payload["files"]
-    latest = files["candidates_latest"]
-    html_link = files["candidates_html"]
+    html_link = files.get("morning_html") or {}
     last = payload.get("last_scheduled_run") or {}
     last_label = "OK" if last.get("ok") else ("Failed" if last else "Never")
     last_cls = "ok" if last.get("ok") else ("bad" if last else "muted")
-    html_name = CANDIDATES_FILE.with_suffix(".html").name
     exports_html = "—"
-    if latest.get("exists"):
-        exports_html = f'<a href="/exports/{escape(CANDIDATES_FILE.name)}">CSV</a>'
-        if html_link.get("exists"):
-            exports_html += f' · <a href="/exports/{escape(html_name)}">HTML</a>'
+    if html_link.get("exists"):
+        name = html_link.get("path", "").split("/")[-1]
+        exports_html = f'<a href="/exports/{escape(name)}">HTML report</a>'
     preview_cols = payload.get("preview_columns") or []
     preview_rows_data = payload.get("preview") or []
     preview_table = _render_preview_table(preview_cols, preview_rows_data)
@@ -1495,7 +1507,7 @@ def scanner_html() -> bytes:
             f"({stats.get('coverage_pct', 0)}% coverage)"
         )
     source_label = "Live preview" if payload.get("preview_source") == "live" else (
-        "Saved export" if str(payload.get("preview_source", "")).startswith("saved:") else "No data"
+        "PostgreSQL" if str(payload.get("preview_source", "")).startswith("postgresql:") else "No data"
     )
     running_style = "" if payload.get("preview_running") else "display:none"
 
@@ -1560,8 +1572,8 @@ function renderPreview(data){{
   const rows=data.preview||[];
   const target=document.getElementById('preview');
   document.getElementById('row-count').textContent=rows.length;
-  document.getElementById('preview-source').textContent=
-    data.preview_source==='live'?'Live preview':(String(data.preview_source||'').startsWith('saved:')?'Saved export':'No data');
+    document.getElementById('preview-source').textContent=
+    data.preview_source==='live'?'Live preview':(String(data.preview_source||'').startsWith('postgresql:')?'PostgreSQL':'No data');
   const statsEl=document.getElementById('preview-stats');
   if(data.stats){{
     const s=data.stats;

@@ -1,0 +1,11 @@
+[Unit]
+Description=Stock trading PostgreSQL backup to git
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/admin/stock
+EnvironmentFile=-/home/admin/stock/.env
+ExecStart=/home/admin/stock/deploy/db_backup_git.sh
+User=admin

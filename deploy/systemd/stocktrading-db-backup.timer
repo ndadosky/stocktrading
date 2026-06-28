@@ -1,0 +1,9 @@
+[Unit]
+Description=Nightly stock trading PostgreSQL backup
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 America/New_York
+Persistent=true
+
+[Install]
+WantedBy=timers.target

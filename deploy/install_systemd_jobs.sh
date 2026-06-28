@@ -10,7 +10,7 @@ if [ ! -d "$SYSTEMD_SRC" ]; then
   exit 1
 fi
 
-chmod +x "${REPO_DIR}/deploy/trigger_job.sh" "${REPO_DIR}/deploy/trigger_live_update.sh"
+chmod +x "${REPO_DIR}/deploy/trigger_job.sh" "${REPO_DIR}/deploy/trigger_live_update.sh" "${REPO_DIR}/deploy/db_backup_git.sh"
 
 echo "Installing systemd job units from ${SYSTEMD_SRC}..."
 sudo cp "${SYSTEMD_SRC}/stocktrading-job@.service" /etc/systemd/system/
@@ -25,6 +25,7 @@ TIMERS=(
   stocktrading-job-strategy_review.timer
   stocktrading-job-pnl_flashcard.timer
   stocktrading-live-update.timer
+  stocktrading-db-backup.timer
 )
 
 for timer in "${TIMERS[@]}"; do

@@ -24,6 +24,7 @@ from scanner_config import (
 )
 from market_calendar import sessions_until
 from pipeline_health import market_gate, record_stage
+from stock_storage import append_snapshot
 
 FINVIZ_FILTERS = {
     "Price": "Under $20",
@@ -272,21 +273,16 @@ def preview_rows(candidates: pd.DataFrame, limit: int = 50) -> tuple[list[str], 
 
 def persist_morning_candidates(raw: pd.DataFrame, candidates: pd.DataFrame, stats: dict) -> None:
     today = datetime.now().astimezone().strftime("%Y-%m-%d")
-    raw_csv = WATCHLIST_EXPORT_DIR / f"finviz_raw_{today}.csv"
-    raw_html = raw_csv.with_suffix(".html")
-    raw.to_csv(raw_csv, index=False)
+    raw_html = WATCHLIST_EXPORT_DIR / f"finviz_raw_{today}.html"
     raw_html.write_text(html_document(raw, f"Finviz raw candidates — {today}"), encoding="utf-8")
 
-    candidates.to_csv(CANDIDATES_FILE, index=False)
+    append_snapshot("morning_candidates", candidates, "scan_date", today)
     CANDIDATES_FILE.with_suffix(".html").write_text(
         html_document(candidates, f"Latest scored candidates — {today}"), encoding="utf-8"
     )
-    scored_csv = WATCHLIST_EXPORT_DIR / f"morning_candidates_{today}.csv"
-    candidates.to_csv(scored_csv, index=False)
-    scored_csv.with_suffix(".html").write_text(
-        html_document(candidates, f"Scored morning candidates — {today}"), encoding="utf-8"
-    )
-    print(f"Saved {len(candidates)} candidates to {CANDIDATES_FILE}")
+    scored_html = WATCHLIST_EXPORT_DIR / f"morning_candidates_{today}.html"
+    scored_html.write_text(html_document(candidates, f"Scored morning candidates — {today}"), encoding="utf-8")
+    print(f"Saved {len(candidates)} candidates to PostgreSQL (morning_candidates.scan_date={today})")
     record_stage(
         "morning",
         stats["status"],

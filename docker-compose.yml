@@ -39,6 +39,8 @@ services:
       APP_BUILT_AT: ${APP_BUILT_AT:-}
       STOCK_STARTING_CAPITAL: ${STOCK_STARTING_CAPITAL:-25000}
       STOCK_IMAGE_PYTHON: ${STOCK_IMAGE_PYTHON:-python3}
+      STOCK_REQUIRE_POSTGRES: ${STOCK_REQUIRE_POSTGRES:-true}
+      STOCK_SCHEDULER: ${STOCK_SCHEDULER:-internal}
       TZ: America/New_York
     volumes:
       - ./exports:/app/exports

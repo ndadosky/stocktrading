@@ -16,7 +16,7 @@ import pandas as pd
 from db import connect, database_url
 from job_storage import job_health
 from pipeline_health import health_snapshot
-from scanner_config import LOGS_DIR, PROJECT_DIR, PAPER_TRADES_FILE, STOCK_DB_FILE, WATCHLIST_EXPORT_DIR
+from scanner_config import LOGS_DIR, PROJECT_DIR, WATCHLIST_EXPORT_DIR
 from stock_storage import bankroll_base, table_count, total_bankroll_deposits
 from version import version_label
 
@@ -53,48 +53,34 @@ def check_postgresql() -> dict:
 
 
 def check_postgres_data_source() -> dict:
-    """Verify live app data is served from PostgreSQL, not legacy CSV/SQLite."""
-    require_postgres = os.getenv("STOCK_REQUIRE_POSTGRES", "").lower() in {"1", "true", "yes"}
+    """Verify live app data is served from PostgreSQL."""
     pg_trades = table_count("paper_trades")
     pg_jobs = table_count("job_runs")
     pg_events = table_count("account_events")
     pg_reviews = table_count("strategy_reviews")
+    pg_morning = table_count("morning_candidates")
+    pg_confirm = table_count("confirmations")
 
-    csv_rows = 0
-    if PAPER_TRADES_FILE.exists():
-        try:
-            csv_rows = len(pd.read_csv(PAPER_TRADES_FILE, usecols=["ticker"]))
-        except Exception:
-            try:
-                csv_rows = len(pd.read_csv(PAPER_TRADES_FILE))
-            except Exception:
-                csv_rows = 0
-
-    legacy_sqlite = STOCK_DB_FILE.exists()
-    app_sqlite = (WATCHLIST_EXPORT_DIR / "app_server.sqlite").exists()
+    legacy_sqlite = (WATCHLIST_EXPORT_DIR / "stock_app.sqlite").exists() or (WATCHLIST_EXPORT_DIR / "app_server.sqlite").exists()
+    legacy_csv = (PROJECT_DIR / "paper_trades.csv").exists()
 
     if pg_trades > 0:
         source = "postgresql"
-        detail = f"Live ledger in PostgreSQL ({pg_trades} trades, {pg_jobs} job runs, {pg_events} account events)"
-    elif require_postgres:
-        source = "postgresql_required_empty"
-        detail = "STOCK_REQUIRE_POSTGRES is set but paper_trades is empty — run migration or import data"
+        detail = (
+            f"PostgreSQL ledger ({pg_trades} trades, {pg_jobs} job runs, "
+            f"{pg_morning} morning rows, {pg_confirm} confirmations)"
+        )
     else:
-        source = "csv_fallback"
-        detail = f"PostgreSQL empty — would fall back to CSV ({csv_rows} rows) on next load"
+        source = "postgresql_empty"
+        detail = "PostgreSQL connected but paper_trades is empty"
 
     warnings: list[str] = []
-    if csv_rows and pg_trades and csv_rows != pg_trades:
-        warnings.append(f"CSV export ({csv_rows} rows) differs from PostgreSQL ({pg_trades} trades)")
-    if legacy_sqlite or app_sqlite:
-        warnings.append("Legacy SQLite files present (migration-only, not used at runtime)")
-    if require_postgres and pg_trades == 0:
-        warnings.append("Pi mode requires PostgreSQL data")
+    if legacy_sqlite:
+        warnings.append("Legacy SQLite files present — safe to delete after migration")
+    if legacy_csv:
+        warnings.append("Legacy paper_trades.csv present — no longer used at runtime")
 
     ok = pg_trades > 0 and source == "postgresql"
-    if require_postgres and pg_trades == 0:
-        ok = False
-
     return _status(
         ok,
         detail,
@@ -103,10 +89,10 @@ def check_postgres_data_source() -> dict:
         postgres_job_runs=pg_jobs,
         postgres_account_events=pg_events,
         postgres_strategy_reviews=pg_reviews,
-        csv_export_rows=csv_rows,
+        postgres_morning_candidates=pg_morning,
+        postgres_confirmations=pg_confirm,
         legacy_sqlite=legacy_sqlite,
-        legacy_app_sqlite=app_sqlite,
-        require_postgres=require_postgres,
+        legacy_csv=legacy_csv,
         bankroll_base=bankroll_base(),
         bankroll_deposits=total_bankroll_deposits(),
         warnings=warnings,
@@ -297,8 +283,9 @@ def architecture_nodes() -> list[dict]:
         {"id": "pi", "label": "Raspberry Pi", "layer": "edge", "detail": "Host network · port 80"},
         {"id": "docker", "label": "Docker · stock_app", "layer": "app", "detail": "app_server.py + job API"},
         {"id": "job_timers", "label": "systemd job timers", "layer": "app", "detail": "morning · confirm · report · live"},
-        {"id": "postgres", "label": "PostgreSQL", "layer": "data", "detail": "Trades, jobs, analytics"},
-        {"id": "exports", "label": "exports/ volume", "layer": "data", "detail": "CSV, HTML, infographics"},
+        {"id": "postgres", "label": "PostgreSQL", "layer": "data", "detail": "Trades, jobs, pipeline snapshots, analytics"},
+        {"id": "exports", "label": "HTML reports", "layer": "data", "detail": "Dashboard and daily HTML views"},
+        {"id": "backups", "label": "Git DB backups", "layer": "data", "detail": "Nightly pg_dump → backups/"},
         {"id": "github", "label": "GitHub", "layer": "deploy", "detail": "ndadosky/stocktrading main"},
         {"id": "timer", "label": "systemd timer", "layer": "deploy", "detail": "git pull + rebuild every 5m"},
         {"id": "codex", "label": "Codex CLI", "layer": "analysis", "detail": "Flashcards, reviews, chat probe"},
@@ -311,7 +298,8 @@ def architecture_edges() -> list[dict]:
         {"from": "browser", "to": "pi", "label": "HTTP :80"},
         {"from": "pi", "to": "docker", "label": "host network"},
         {"from": "docker", "to": "postgres", "label": "127.0.0.1:5432"},
-        {"from": "docker", "to": "exports", "label": "bind mount"},
+        {"from": "docker", "to": "exports", "label": "HTML bind mount"},
+        {"from": "timer", "to": "backups", "label": "nightly pg_dump"},
         {"from": "docker", "to": "finviz", "label": "morning / confirm jobs"},
         {"from": "docker", "to": "codex", "label": "pnl_flashcard · chat"},
         {"from": "timer", "to": "github", "label": "git fetch/pull"},

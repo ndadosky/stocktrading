@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 import pandas as pd
 
 from market_calendar import is_market_session
-from scanner_config import PIPELINE_STATE_FILE, WATCHLIST_EXPORT_DIR, ensure_directories
+from scanner_config import PIPELINE_STATE_FILE, ensure_directories
+from stock_storage import read_snapshot, snapshot_count
 
 
 def _load() -> dict:
@@ -26,7 +26,9 @@ def record_stage(stage: str, status: str, rows: Optional[int] = None, message: s
     ensure_directories()
     state = _load()
     state.setdefault("stages", {})[stage] = {
-        "status": status, "rows": rows, "message": message,
+        "status": status,
+        "rows": rows,
+        "message": message,
         "updated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "date": datetime.now().astimezone().date().isoformat(),
     }
@@ -43,19 +45,11 @@ def market_gate(stage: str) -> bool:
     return False
 
 
-def require_today_csv(path: Path, stage: str) -> Optional[pd.DataFrame]:
+def require_today_snapshot(table: str, date_column: str, stage: str) -> Optional[pd.DataFrame]:
     today = datetime.now().astimezone().date().isoformat()
-    if not path.exists():
-        record_stage(stage, "BLOCKED", 0, f"Missing upstream file: {path.name}")
-        return None
-    try:
-        frame = pd.read_csv(path)
-    except Exception as exc:
-        record_stage(stage, "BLOCKED", 0, f"Unreadable {path.name}: {exc}")
-        return None
-    file_date = datetime.fromtimestamp(path.stat().st_mtime).astimezone().date().isoformat()
-    if file_date != today:
-        record_stage(stage, "BLOCKED", len(frame), f"Stale upstream file: {path.name} ({file_date})")
+    frame = read_snapshot(table, date_column, today)
+    if frame.empty:
+        record_stage(stage, "BLOCKED", 0, f"Missing upstream PostgreSQL snapshot: {table} ({today})")
         return None
     return frame
 
@@ -64,28 +58,43 @@ def health_snapshot() -> dict:
     state = _load()
     today = datetime.now().astimezone().date().isoformat()
     expected = {
-        "morning": WATCHLIST_EXPORT_DIR / f"morning_candidates_{today}.csv",
-        "confirmation": WATCHLIST_EXPORT_DIR / f"confirm_945_{today}.csv",
-        "report": WATCHLIST_EXPORT_DIR / f"paper_performance_{today}.csv",
+        "morning": ("morning_candidates", "scan_date"),
+        "confirmation": ("confirmations", "confirm_date"),
+        "report": ("paper_performance", "report_date"),
     }
-    files = {}
-    for name, path in expected.items():
-        files[name] = {"exists": path.exists(), "path": str(path)}
-        if path.exists():
-            try:
-                files[name]["rows"] = len(pd.read_csv(path))
-            except Exception as exc:
-                files[name]["error"] = str(exc)
-    return {"date": today, "market_session": is_market_session(datetime.now().astimezone().date()), "stages": state.get("stages", {}), "files": files}
+    snapshots = {}
+    for name, (table, date_column) in expected.items():
+        rows = snapshot_count(table, date_column, today)
+        snapshots[name] = {
+            "exists": rows > 0,
+            "source": "postgresql",
+            "table": table,
+            "date_column": date_column,
+            "date": today,
+            "rows": rows,
+        }
+    return {
+        "date": today,
+        "market_session": is_market_session(datetime.now().astimezone().date()),
+        "stages": state.get("stages", {}),
+        "snapshots": snapshots,
+        "files": snapshots,
+    }
 
 
 def main() -> int:
     ensure_directories()
     snapshot = health_snapshot()
+    from scanner_config import WATCHLIST_EXPORT_DIR
+
     path = WATCHLIST_EXPORT_DIR / f"system_health_{snapshot['date']}.json"
     path.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
     print(json.dumps(snapshot, indent=2))
-    blocked = any(stage.get("status") in {"FAILED", "BLOCKED"} for stage in snapshot["stages"].values() if stage.get("date") == snapshot["date"])
+    blocked = any(
+        stage.get("status") in {"FAILED", "BLOCKED"}
+        for stage in snapshot["stages"].values()
+        if stage.get("date") == snapshot["date"]
+    )
     return 1 if blocked else 0
 
 

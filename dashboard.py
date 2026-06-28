@@ -12,12 +12,13 @@ import pandas as pd
 import yfinance as yf
 
 from scanner_config import (
-    DASHBOARD_FILE, PAPER_TRADES_FILE, PIPELINE_STATE_FILE,
+    DASHBOARD_FILE, PIPELINE_STATE_FILE,
     STARTING_CAPITAL, WATCHLIST_EXPORT_DIR, MAX_DAILY_PAPER_TRADES,
     MAX_OPEN_POSITIONS, MAX_PORTFOLIO_HEAT_PCT, MAX_SECTOR_EXPOSURE_PCT,
     RISK_PER_TRADE_PCT,
     ensure_directories,
 )
+from stock_storage import list_snapshot_dates, read_latest_snapshot, read_snapshot
 from version import version_label
 
 # Column selection for the positions table
@@ -45,23 +46,28 @@ _OPEN_HEADER_TOOLTIPS = {
 
 
 def daily_history() -> pd.DataFrame:
-    """Roll daily performance snapshots into one equity history."""
+    """Roll daily performance snapshots from PostgreSQL into one equity history."""
+    from daily_report import account_summary
+
     rows: List[dict] = []
-    for path in sorted(WATCHLIST_EXPORT_DIR.glob("paper_performance_*.csv")):
+    for report_date in list_snapshot_dates("paper_performance", "report_date"):
         try:
-            frame = pd.read_csv(path)
-            from daily_report import account_summary
+            frame = read_snapshot("paper_performance", "report_date", report_date)
+            if frame.empty:
+                continue
             summary = account_summary(frame)
-            report_date = path.stem.replace("paper_performance_", "")
             capital_base = float(summary.get("capital_base", STARTING_CAPITAL))
             rows.append({
-                "date": report_date, "trades": len(frame), "deployed": summary["deployed"],
-                "cash": summary["cash"], "equity": summary["equity"],
+                "date": report_date,
+                "trades": len(frame),
+                "deployed": summary["deployed"],
+                "cash": summary["cash"],
+                "equity": summary["equity"],
                 "p_l": summary["equity"] - capital_base,
                 "return_%": (summary["equity"] / capital_base - 1) * 100 if capital_base else 0,
             })
         except Exception as exc:
-            print(f"Skipped history snapshot {path.name}: {exc}")
+            print(f"Skipped history snapshot {report_date}: {exc}")
     return pd.DataFrame(rows)
 
 
@@ -252,22 +258,17 @@ def equity_svg(history: pd.DataFrame, capital_base: float = STARTING_CAPITAL) ->
 
 def company_names() -> dict[str, str]:
     names: dict[str, str] = {}
-    files = sorted(WATCHLIST_EXPORT_DIR.glob("morning_candidates_*.csv")) + [WATCHLIST_EXPORT_DIR / "candidates_latest.csv"]
-    for path in files:
-        if not path.exists():
-            continue
-        try:
-            frame = pd.read_csv(path, usecols=lambda column: column in {"Ticker", "ticker", "Company"})
-        except Exception:
-            continue
-        ticker_column = "Ticker" if "Ticker" in frame.columns else "ticker" if "ticker" in frame.columns else None
-        if ticker_column is None or "Company" not in frame.columns:
-            continue
-        for _, row in frame[[ticker_column, "Company"]].dropna().iterrows():
-            ticker = str(row[ticker_column]).strip().upper()
-            company = str(row["Company"]).strip()
-            if ticker and company:
-                names[ticker] = company
+    _, frame = read_latest_snapshot("morning_candidates", "scan_date")
+    if frame.empty:
+        return names
+    ticker_column = "Ticker" if "Ticker" in frame.columns else "ticker" if "ticker" in frame.columns else None
+    if ticker_column is None or "Company" not in frame.columns:
+        return names
+    for _, row in frame[[ticker_column, "Company"]].dropna().iterrows():
+        ticker = str(row[ticker_column]).strip().upper()
+        company = str(row["Company"]).strip()
+        if ticker and company:
+            names[ticker] = company
     return names
 
 
@@ -403,20 +404,10 @@ def infographic_links() -> str:
 
 
 def strategy_review_panel() -> str:
-    review_files = sorted(
-        list(WATCHLIST_EXPORT_DIR.glob("strategy_review_*.csv"))
-        + list(WATCHLIST_EXPORT_DIR.glob("strategy_optimizer_review_*.csv"))
-    )
-    if not review_files:
+    review_date, review = read_latest_snapshot("strategy_reviews", "stored_review_date")
+    if review.empty:
         return ("<div class='empty compact'><strong>No strategy review yet</strong>"
                 "<span>The 10:30 review will summarize improvement gates here.</span></div>")
-    latest = review_files[-1]
-    try:
-        review = pd.read_csv(latest)
-    except Exception as exc:
-        return f"<div class='empty compact'><strong>Review unreadable</strong><span>{escape(str(exc))}</span></div>"
-    if review.empty:
-        return "<div class='empty compact'><strong>Review empty</strong><span>No rows found.</span></div>"
 
     def metric_value(metric: str, default: str = "—") -> str:
         match = review[review["metric"].astype(str).eq(metric)] if "metric" in review else pd.DataFrame()
@@ -430,9 +421,9 @@ def strategy_review_panel() -> str:
             return default
         return str(match.iloc[-1].get("status", default)).lower()
 
-    html_file = latest.with_suffix(".html")
+    html_file = WATCHLIST_EXPORT_DIR / f"strategy_review_{review_date or 'latest'}.html"
     links = [f"<a href='/exports/{escape(html_file.name)}'>Open review</a>"] if html_file.exists() else []
-    links.append(f"<a href='/exports/{escape(latest.name)}'>CSV</a>")
+    links.append("<a href='/strategy-review'>Strategy review page</a>")
 
     decision = metric_value("recommended_action", metric_value("settings_change", "no review decision"))
     dec_status = metric_status("recommended_action", metric_status("settings_change"))
@@ -571,10 +562,9 @@ def build_dashboard(performance: pd.DataFrame, as_of: str) -> Path:
         history_display["return_%"] = history_display["return_%"].map(lambda x: f"{x:.2f}%")
     history_table = history_display.to_html(index=False, border=0) if not history_display.empty else ""
 
-    band_files = sorted(WATCHLIST_EXPORT_DIR.glob("score_band_performance_*.csv"))
-    component_files = sorted(WATCHLIST_EXPORT_DIR.glob("component_performance_*.csv"))
-    band = pd.read_csv(band_files[-1]) if band_files else pd.DataFrame()
-    components = pd.read_csv(component_files[-1]).head(12) if component_files else pd.DataFrame()
+    _, band = read_latest_snapshot("score_band_performance", "report_date")
+    _, components = read_latest_snapshot("component_performance", "report_date")
+    components = components.head(12) if not components.empty else components
     analytics_html = (
         band.to_html(index=False, border=0) if not band.empty
         else "<div class='empty compact'><strong>Awaiting resolved trades</strong>"

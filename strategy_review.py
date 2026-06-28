@@ -12,7 +12,7 @@ import pandas as pd
 from nav_html import header_nav
 from scanner_config import WATCHLIST_EXPORT_DIR, ensure_directories
 from job_storage import job_health
-from stock_storage import append_snapshot, read_table
+from stock_storage import append_snapshot, read_latest_snapshot, read_table
 
 
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -62,8 +62,8 @@ def build_review_rows(review_date: str | None = None) -> list[dict]:
     holdout_count = int(total_resolved * policy["chronological_holdout_pct"] / 100) if total_resolved >= policy["minimum_resolved_trades"] else 0
     training_count = max(0, total_resolved - holdout_count)
 
-    score_band = read_csv(latest_file("score_band_performance_*.csv") or Path())
-    components = read_csv(latest_file("component_performance_*.csv") or Path())
+    _, score_band = read_latest_snapshot("score_band_performance", "report_date")
+    _, components = read_latest_snapshot("component_performance", "report_date")
     backtest = latest_file("backtest_*.csv")
 
     rows: list[dict] = []
@@ -92,14 +92,10 @@ def build_review_rows(review_date: str | None = None) -> list[dict]:
 
 
 def load_latest_review_rows() -> tuple[list[dict], str, str | None]:
-    csv_path = latest_file("strategy_review_*.csv")
-    if csv_path is None:
-        return [], datetime.now().astimezone().date().isoformat(), None
-    frame = read_csv(csv_path)
+    review_date, frame = read_latest_snapshot("strategy_reviews", "stored_review_date")
     if frame.empty:
         return [], datetime.now().astimezone().date().isoformat(), None
-    review_date = csv_path.stem.replace("strategy_review_", "")
-    return frame.to_dict("records"), review_date, csv_path.name
+    return frame.to_dict("records"), review_date or datetime.now().astimezone().date().isoformat(), None
 
 
 def render_strategy_review_html(rows: list[dict], review_date: str, csv_filename: str | None = None) -> str:
@@ -245,11 +241,9 @@ def main() -> int:
     rows = build_review_rows(today)
     review = pd.DataFrame(rows)
     append_snapshot("strategy_reviews", review, "stored_review_date", today)
-    csv_path = WATCHLIST_EXPORT_DIR / f"strategy_review_{today}.csv"
     html_path = WATCHLIST_EXPORT_DIR / f"strategy_review_{today}.html"
-    review.to_csv(csv_path, index=False)
-    html_path.write_text(render_strategy_review_html(rows, today, csv_path.name), encoding="utf-8")
-    print(f"Saved strategy review to {csv_path} and {html_path}")
+    html_path.write_text(render_strategy_review_html(rows, today, None), encoding="utf-8")
+    print(f"Saved strategy review to PostgreSQL and {html_path}")
     return 0
 
 

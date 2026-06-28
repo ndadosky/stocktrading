@@ -1,10 +1,10 @@
-"""PostgreSQL persistence for live app data with CSV exports kept for reports."""
+"""PostgreSQL persistence for live app data. HTML exports are optional views only."""
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
-import os
 import pandas as pd
 from sqlalchemy import text
 
@@ -49,6 +49,57 @@ def replace_table(table: str, frame: pd.DataFrame) -> None:
         index=False,
         method="multi",
     )
+
+
+def read_snapshot(table: str, date_column: str, date_value: str) -> pd.DataFrame:
+    if not table_exists(table):
+        return pd.DataFrame()
+    engine = get_engine()
+    frame = pd.read_sql_query(
+        f'SELECT * FROM "{table.lower()}" WHERE "{date_column}" = %(date_value)s',
+        engine,
+        params={"date_value": date_value},
+    )
+    return frame.drop(columns=[date_column], errors="ignore")
+
+
+def snapshot_count(table: str, date_column: str, date_value: str) -> int:
+    if not table_exists(table):
+        return 0
+    engine = get_engine()
+    with engine.connect() as connection:
+        value = connection.execute(
+            text(f'SELECT count(*) FROM "{table.lower()}" WHERE "{date_column}" = :date_value'),
+            {"date_value": date_value},
+        ).scalar()
+    return int(value or 0)
+
+
+def read_latest_snapshot(table: str, date_column: str) -> tuple[Optional[str], pd.DataFrame]:
+    if not table_exists(table):
+        return None, pd.DataFrame()
+    engine = get_engine()
+    latest = pd.read_sql_query(
+        f'SELECT MAX("{date_column}") AS snapshot_date FROM "{table.lower()}"',
+        engine,
+    ).iloc[0]["snapshot_date"]
+    if latest is None or pd.isna(latest):
+        return None, pd.DataFrame()
+    date_value = str(latest)
+    return date_value, read_snapshot(table, date_column, date_value)
+
+
+def list_snapshot_dates(table: str, date_column: str) -> list[str]:
+    if not table_exists(table):
+        return []
+    engine = get_engine()
+    frame = pd.read_sql_query(
+        f'SELECT DISTINCT "{date_column}" AS snapshot_date FROM "{table.lower()}" ORDER BY 1',
+        engine,
+    )
+    if frame.empty:
+        return []
+    return [str(value) for value in frame["snapshot_date"].tolist()]
 
 
 def ensure_account_events() -> None:
@@ -113,32 +164,20 @@ def append_snapshot(table: str, frame: pd.DataFrame, date_column: str, date_valu
         )
 
 
-def load_paper_trades(columns: list[str], csv_fallback: Path) -> pd.DataFrame:
+def load_paper_trades(columns: list[str], csv_fallback: Path | None = None) -> pd.DataFrame:
+    del csv_fallback
     ensure_directories()
-    if table_count("paper_trades") > 0:
-        return read_table("paper_trades", columns)
-    require_postgres = os.getenv("STOCK_REQUIRE_POSTGRES", "").lower() in {"1", "true", "yes"}
-    if require_postgres:
-        return pd.DataFrame(columns=columns)
-    if not csv_fallback.exists():
-        return pd.DataFrame(columns=columns)
-    trades = pd.read_csv(csv_fallback, dtype={"ticker": str, "trade_id": str})
-    for column in columns:
-        if column not in trades.columns:
-            trades[column] = pd.NA
-    trades = trades[columns]
-    replace_table("paper_trades", trades)
-    return trades
+    init_schema()
+    return read_table("paper_trades", columns)
 
 
-def save_paper_trades(frame: pd.DataFrame, columns: list[str], csv_export: Path) -> None:
+def save_paper_trades(frame: pd.DataFrame, columns: list[str], csv_export: Path | None = None) -> None:
+    del csv_export
     export = frame.copy()
     for column in columns:
         if column not in export.columns:
             export[column] = pd.NA
-    export = export[columns]
-    replace_table("paper_trades", export)
-    export.to_csv(csv_export, index=False)
+    replace_table("paper_trades", export[columns])
 
 
 def query_rows(
