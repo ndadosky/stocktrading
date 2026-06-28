@@ -108,6 +108,36 @@ def init_schema() -> None:
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS home_api_cache (
+                cache_key TEXT PRIMARY KEY,
+                payload JSONB NOT NULL,
+                fetched_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS home_oauth_tokens (
+                provider TEXT PRIMARY KEY,
+                access_token TEXT NOT NULL,
+                refresh_token TEXT NOT NULL,
+                expires_at TIMESTAMPTZ NOT NULL,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS home_oauth_states (
+                provider TEXT PRIMARY KEY,
+                state TEXT NOT NULL,
+                redirect_uri TEXT NOT NULL,
+                expires_at TIMESTAMPTZ NOT NULL
+            )
+            """
+        )
 
 
 def wait_for_database(timeout_seconds: int = 60) -> None:

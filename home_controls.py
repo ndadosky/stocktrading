@@ -9,6 +9,8 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from enphase import solar_status as enphase_solar_status
+
 
 def _now() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
@@ -225,6 +227,7 @@ def home_controls_payload() -> dict[str, Any]:
     door = _entity(states, "HOME_FRONT_DOOR_ENTITY")
     solar_power = _entity(states, "HOME_SOLAR_POWER_ENTITY")
     solar_today = _entity(states, "HOME_SOLAR_TODAY_ENTITY")
+    enphase_solar = enphase_solar_status()
 
     cars = []
     for name, battery_env, charging_env in (
@@ -266,12 +269,14 @@ def home_controls_payload() -> dict[str, Any]:
             "state": door_state,
             "locked": door_state == "locked",
         },
-        "solar": {
+        "solar": enphase_solar if enphase_solar.get("configured") else {
             "configured": bool(os.getenv("HOME_SOLAR_POWER_ENTITY", "").strip()),
+            "connected": bool(solar_power),
             "power": _number(_state_value(solar_power)),
             "power_unit": (solar_power or {}).get("attributes", {}).get("unit_of_measurement", "kW"),
             "today": _number(_state_value(solar_today)),
             "today_unit": (solar_today or {}).get("attributes", {}).get("unit_of_measurement", "kWh"),
+            "source": "Home Assistant",
         },
         "cars": cars,
         "ewelink": {

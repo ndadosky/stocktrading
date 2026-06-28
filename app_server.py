@@ -34,6 +34,7 @@ from strategy_review import load_latest_review_rows, render_strategy_review_html
 from best_case_analysis import compute_best_case
 from morning_candidates import build_morning_candidates, preview_rows
 from home_controls import home_assistant_switch, home_controls_payload, poolsync_control
+from enphase import begin_authorization, complete_authorization
 from version import version_label
 
 
@@ -1255,6 +1256,7 @@ header{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line
 .control-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px}.control-btn{min-height:38px;border:1px solid #cbd5e1;background:#fff;color:var(--text);border-radius:9px;padding:8px 13px;font-weight:700;cursor:pointer}.control-btn:hover{border-color:#7da2da;background:#f8fbff}.control-btn:disabled{opacity:.5;cursor:wait}.control-btn.primary{background:#eff6ff;border-color:#93c5fd;color:#1e40af}.control-btn.danger{color:var(--red)}.stepper{display:flex;align-items:center;gap:7px;margin-right:auto}.stepper .control-btn{width:40px;padding:8px}.stepper-value{min-width:72px;text-align:center;font-weight:750}
 .ewelink-card{grid-column:1/-1}.ewelink-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.ewelink-channel{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--soft);border:1px solid var(--line);border-radius:11px;padding:13px}.ewelink-channel strong{display:block;font-size:13px}.ewelink-channel small{color:var(--muted);text-transform:uppercase;font-size:10px;font-weight:700}.action-message{font-size:12px;color:var(--muted);min-height:18px;margin-top:10px}.action-message.bad{color:var(--red)}
 .empty{color:var(--muted);font-size:13px;line-height:1.5;padding:8px 0}.loading{position:relative;color:transparent!important;border-radius:7px;background:linear-gradient(90deg,#e7ebf0 25%,#f6f7f9 50%,#e7ebf0 75%);background-size:200% 100%;animation:shimmer 1.3s infinite}.loading *{visibility:hidden}@keyframes shimmer{to{background-position:-200% 0}}
+.solar-auth{display:none;margin-top:14px;text-decoration:none;width:max-content}
 @media(max-width:900px){.ewelink-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:720px){.home-grid{grid-template-columns:1fr}.cars-card,.ewelink-card{grid-column:auto}.cars-grid,.ewelink-grid{grid-template-columns:1fr}.page-title{align-items:flex-start;flex-direction:column}.home-card{padding:18px}.hero-value{font-size:40px}.stepper{width:100%;margin-right:0}.control-row>.control-btn{flex:1}}
 @media(prefers-reduced-motion:reduce){.loading{animation:none}}
@@ -1276,8 +1278,9 @@ header{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line
     </section>
     <section class="home-card solar">
       <div class="card-head"><div class="card-title"><span class="icon">☀</span><div><h3>Solar</h3><div class="sub">Enphase energy</div></div></div><span class="pill" id="solar-status">Loading</span></div>
-      <div class="hero-value" id="solar-power">—<small> kW</small></div><div class="sub">Current production</div>
-      <div class="detail-row"><div class="detail"><small>Produced today</small><strong id="solar-today">—</strong></div><div class="detail"><small>Source</small><strong>Home Assistant</strong></div></div>
+      <div class="hero-value" id="solar-power">—<small> kW</small></div><div class="sub" id="solar-message">Current production</div>
+      <a class="control-btn primary solar-auth" id="solar-auth" href="/api/home/enphase/authorize">Connect Enphase</a>
+      <div class="detail-row"><div class="detail"><small>Produced today</small><strong id="solar-today">—</strong></div><div class="detail"><small>Source</small><strong id="solar-source">—</strong></div></div>
     </section>
     <section class="home-card ewelink-card">
       <div class="card-head"><div class="card-title"><span class="icon">⌁</span><div><h3>eWeLink</h3><div class="sub" id="ewelink-model">PSF-B04-GL relay</div></div></div><span class="pill" id="ewelink-status">Loading</span></div>
@@ -1315,8 +1318,11 @@ function renderHome(data){
   if(door.configured){const locked=door.locked;setPill('door-status',door.state,locked?'ok':'warn');document.getElementById('door-icon').textContent=locked?'●':'○';document.getElementById('door-state').textContent=door.state;document.getElementById('door-message').textContent=locked?'Secure':'Check the front door'}
   else{setPill('door-status','Setup needed','warn');document.getElementById('door-state').textContent='Not connected';document.getElementById('door-message').textContent='Choose the Yale lock entity in .env'}
   const solar=data.solar||{};
-  if(solar.configured){setPill('solar-status','Online','ok');document.getElementById('solar-power').innerHTML=esc(value(solar.power))+'<small> '+esc(solar.power_unit||'kW')+'</small>';document.getElementById('solar-today').textContent=value(solar.today)+' '+(solar.today_unit||'kWh')}
-  else{setPill('solar-status','Setup needed','warn');document.getElementById('solar-power').innerHTML='—<small> kW</small>';document.getElementById('solar-today').textContent='Choose Enphase entities in .env'}
+  const solarAuth=document.getElementById('solar-auth');solarAuth.style.display=solar.authorization_required?'inline-flex':'none';
+  document.getElementById('solar-source').textContent=solar.source||'—';
+  document.getElementById('solar-message').textContent=solar.message||(solar.cached?'Updated every 30 minutes':'Current production');
+  if(solar.configured){setPill('solar-status',solar.connected?'Online':(solar.authorization_required?'Authorize':'Unavailable'),solar.connected?'ok':'warn');document.getElementById('solar-power').innerHTML=esc(value(solar.power))+'<small> '+esc(solar.power_unit||'kW')+'</small>';document.getElementById('solar-today').textContent=value(solar.today)+' '+(solar.today_unit||'kWh')}
+  else{setPill('solar-status','Setup needed','warn');document.getElementById('solar-power').innerHTML='—<small> kW</small>';document.getElementById('solar-today').textContent='Add Enphase credentials in .env'}
   document.getElementById('cars-grid').innerHTML=(data.cars||[]).map(car=>{const charge=car.charge==null?0:Math.max(0,Math.min(100,car.charge));const charging=['on','charging','true'].includes(String(car.charging||'').toLowerCase());const status=car.configured?(charging?'Charging':'Connected'):'Setup needed';return '<article class="car"><div class="car-top"><h4>'+esc(car.name)+'</h4><span class="pill '+(car.configured?'ok':'warn')+'">'+esc(status)+'</span></div><div class="charge">'+(car.charge==null?'—':esc(car.charge)+'%')+'</div><div class="battery"><span style="width:'+charge+'%"></span></div></article>'}).join('');
   const ew=data.ewelink||{};document.getElementById('ewelink-model').textContent=(ew.model||'PSF-B04-GL')+(ew.device_id?' · '+ew.device_id:'');
   if(ew.configured){setPill('ewelink-status','Connected','ok');document.getElementById('ewelink-grid').innerHTML=(ew.channels||[]).map(channel=>{const on=channel.state==='on';return '<div class="ewelink-channel"><div><strong>'+esc(channel.name)+'</strong><small>'+esc(channel.state)+'</small></div><button type="button" class="control-btn '+(on?'danger':'primary')+'" data-ew-channel="'+channel.channel+'" data-ew-state="'+(on?'off':'on')+'">Turn '+(on?'off':'on')+'</button></div>'}).join('')}
@@ -1780,6 +1786,20 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def redirect(self, location: str) -> None:
+        self.send_response(HTTPStatus.SEE_OTHER)
+        self.send_header("Location", location)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def enphase_redirect_uri(self) -> str:
+        configured = os.getenv("ENPHASE_REDIRECT_URI", "").strip()
+        if configured:
+            return configured
+        scheme = self.headers.get("X-Forwarded-Proto", "http").split(",", 1)[0].strip()
+        host = self.headers.get("Host", "raspberrypi.local")
+        return f"{scheme}://{host}/api/home/enphase/callback"
+
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         path = unquote(parsed.path)
@@ -1873,6 +1893,27 @@ class Handler(SimpleHTTPRequestHandler):
             return
         elif path == "/api/home/status":
             self.send_json(home_controls_payload())
+            return
+        elif path == "/api/home/enphase/authorize":
+            try:
+                self.redirect(begin_authorization(self.enphase_redirect_uri()))
+            except Exception as exc:
+                self.send_json({"ok": False, "error": str(exc)}, HTTPStatus.CONFLICT)
+            return
+        elif path == "/api/home/enphase/callback":
+            if query.get("error"):
+                self.redirect("/home?enphase=denied")
+                return
+            code = query.get("code", [""])[0]
+            state = query.get("state", [""])[0]
+            if not code or not state:
+                self.send_json({"ok": False, "error": "Missing Enphase OAuth code or state"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                complete_authorization(code, state)
+                self.redirect("/home?enphase=connected")
+            except Exception as exc:
+                self.send_json({"ok": False, "error": str(exc)}, HTTPStatus.CONFLICT)
             return
         elif path == "/api/jobs":
             self.send_json(jobs_payload())

@@ -233,6 +233,20 @@ sudo systemctl enable --now stocktrading
 Set `STOCK_IMAGE_PYTHON` in `.env` if you want the P/L flash-card job to use
 Codex's bundled Python instead of the container Python.
 
+### Enphase solar OAuth
+
+The Home Controls solar card can read Enphase Cloud directly. Add the API key,
+client ID, client secret, full authorization URL, and redirect URI to `.env`
+using the names in `.env.example`, then recreate the app container. Open Home
+Controls and click **Connect Enphase** to approve access with the system owner's
+Enlighten account.
+
+OAuth access and refresh tokens are stored in PostgreSQL, not browser storage.
+Solar data is also cached in PostgreSQL; dashboard requests reuse it for at
+least 30 minutes. Set `ENPHASE_SYSTEM_ID` when known to skip the one-time system
+discovery request. The redirect URI used for approval must exactly match
+`ENPHASE_REDIRECT_URI`.
+
 ### Local/dev (bundled PostgreSQL)
 
 ```bash
