@@ -29,7 +29,7 @@ from job_storage import (
 from scanner_config import CANDIDATES_FILE, DASHBOARD_FILE, PIPELINE_STATE_FILE, WATCHLIST_EXPORT_DIR, ensure_directories
 from stock_storage import add_bankroll_deposit, bankroll_base, query_rows, snapshot_count, table_count, total_bankroll_deposits
 from platform_health import codex_chat, platform_health_payload
-from nav_html import header_nav
+from nav_html import finalize_page_html
 from strategy_review import load_latest_review_rows, render_strategy_review_html
 from best_case_analysis import compute_best_case
 from morning_candidates import build_morning_candidates, preview_rows
@@ -320,7 +320,7 @@ def health_payload() -> dict:
 
 def strategy_review_page_html() -> bytes:
     rows, review_date, csv_name = load_latest_review_rows()
-    return render_strategy_review_html(rows, review_date, csv_name).encode("utf-8")
+    return finalize_page_html(render_strategy_review_html(rows, review_date, csv_name), "/strategy-review")
 
 
 def architecture_svg(payload: dict) -> str:
@@ -463,7 +463,6 @@ def healthcheck_html() -> bytes:
     payload = health_payload()
     overall = "healthy" if payload["ok"] else "degraded"
     overall_cls = "ok" if payload["ok"] else "bad"
-    nav = header_nav("/healthcheck")
     html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Health check</title><style>
 :root{{--bg:#f4f6f8;--panel:#fff;--text:#17202a;--muted:#687386;--line:#dce3ec;--blue:#1d4ed8;--green:#16803c;--red:#b42318}}
@@ -510,7 +509,7 @@ a{{color:var(--blue)}}
 </style></head><body>
 <header>
   <div class="hdr-left"><h1>Health check</h1></div>
-  <nav class="hdr-nav">{nav}</nav>
+  <nav class="hdr-nav">__HEADER_NAV__</nav>
   <div class="hdr-right">
     <span class="badge-top {overall_cls}">{overall.upper()}</span>
     <span id="clock">{escape(payload['generated_at'])}</span>
@@ -571,7 +570,7 @@ document.getElementById('codex-send').onclick=async()=>{{
 }};
 </script>
 </body></html>"""
-    return html.encode("utf-8")
+    return finalize_page_html(html, "/healthcheck")
 
 
 def normalized_date(value: str | None) -> str:
@@ -917,7 +916,7 @@ tbody tr:hover td{{filter:brightness(.97)}}
 </style></head><body>
 <header>
   <div class="hdr-left"><h1>Live Infographic</h1></div>
-  <nav class="hdr-nav">{header_nav("/live-infographic")}</nav>
+  <nav class="hdr-nav">__HEADER_NAV__</nav>
   <div class="hdr-right"><span>Auto-refresh {payload['refresh_seconds']}s</span><span>{escape(payload['generated_at'])}</span></div>
 </header>
 <main>
@@ -975,7 +974,7 @@ tbody tr:hover td{{filter:brightness(.97)}}
 setTimeout(function(){{ window.location.reload(); }}, {payload['refresh_seconds'] * 1000});
 </script>
 </body></html>"""
-    return html.encode("utf-8")
+    return finalize_page_html(html, "/live-infographic")
 
 
 def day_html(target_date: str) -> bytes:
@@ -1045,7 +1044,7 @@ a{{color:var(--blue)}}
 </style></head><body>
 <header>
   <div class="hdr-left"><h1>Day Status</h1></div>
-  <nav class="hdr-nav">{header_nav("/day")}</nav>
+  <nav class="hdr-nav">__HEADER_NAV__</nav>
   <div class="hdr-right">
     <span class="status-badge {status_cls}">{escape(status_label)}</span>
     <form action="/day" method="get">
@@ -1091,7 +1090,7 @@ a{{color:var(--blue)}}
     </section>
   </div>
 </main></body></html>"""
-    return html.encode("utf-8")
+    return finalize_page_html(html, "/day")
 
 
 def settings_payload() -> dict:
@@ -1233,7 +1232,7 @@ document.getElementById('inject-bankroll').onclick=async()=>{
 async function refresh(){try{render(await loadSettings())}catch(e){document.getElementById('system').innerHTML=kv('Backend','unreachable','bad')}}
 refresh();setInterval(refresh,30000);
 </script></body></html>"""
-    return html.replace("__HEADER_NAV__", header_nav("/settings")).encode("utf-8")
+    return finalize_page_html(html, "/settings")
 
 
 def app_html() -> bytes:
@@ -1250,15 +1249,15 @@ header{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line
 .badge{border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:600;background:#fff;color:var(--muted)}
 .badge.open{background:#f0fdf4;border-color:#86efac;color:var(--green)}.badge.session{background:#eff6ff;border-color:#93c5fd;color:#1e40af}
 .clock-txt{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
-main{padding:14px;height:calc(100vh - 57px)}
-iframe{width:100%;height:100%;border:1px solid var(--line);border-radius:10px;background:#fff}
+main.dash-frame-main{padding:14px;height:calc(100vh - 57px)}
+main.dash-frame-main iframe{width:100%;height:100%;border:1px solid var(--line);border-radius:10px;background:#fff}
 </style></head><body>
 <header>
   <div class="hdr-left"><h1>Stock Strategy App</h1></div>
   <nav class="hdr-nav">__HEADER_NAV__</nav>
   <div class="hdr-right"><div id="market-badge" class="badge">Market —</div><span id="clock" class="clock-txt">—</span></div>
 </header>
-<main><iframe id="dash-frame" src="/dashboard" title="Strategy dashboard"></iframe></main>
+<main class="dash-frame-main"><iframe id="dash-frame" src="/dashboard" title="Strategy dashboard"></iframe></main>
 <script>
 function fmtTime(iso){if(!iso)return '—';return new Date(iso).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
 async function refresh(){
@@ -1273,7 +1272,7 @@ async function refresh(){
 }
 refresh();setInterval(refresh,30000);
 </script></body></html>"""
-    return html.replace("__HEADER_NAV__", header_nav("/")).encode("utf-8")
+    return finalize_page_html(html, "/")
 
 
 def jobs_html() -> bytes:
@@ -1374,7 +1373,7 @@ function render(data){
 async function refresh(){render(await loadJobs())}
 refresh();setInterval(refresh,30000);
 </script></body></html>"""
-    return html.replace("__HEADER_NAV__", header_nav("/jobs")).encode("utf-8")
+    return finalize_page_html(html, "/jobs")
 
 
 def _saved_scanner_preview() -> tuple[list[str], list[dict], str]:
@@ -1486,7 +1485,6 @@ def _render_preview_table(columns: list[str], rows: list[dict]) -> str:
 
 def scanner_html() -> bytes:
     payload = scanner_payload()
-    nav = header_nav("/scanner")
     files = payload["files"]
     html_link = files.get("morning_html") or {}
     last = payload.get("last_scheduled_run") or {}
@@ -1542,7 +1540,7 @@ a{{color:var(--blue)}}
 </style></head><body>
 <header>
   <div class="hdr-left"><h1>Scanner</h1></div>
-  <nav class="hdr-nav">{nav}</nav>
+  <nav class="hdr-nav">__HEADER_NAV__</nav>
   <div class="hdr-right" id="server-time">{escape(payload['server_time'])}</div>
 </header>
 <main>
@@ -1617,7 +1615,7 @@ document.getElementById('run-scanner').onclick=async()=>{{
 }};
 setInterval(refreshScanner,3000);
 </script></body></html>"""
-    return html.encode("utf-8")
+    return finalize_page_html(html, "/scanner")
 
 
 class Handler(SimpleHTTPRequestHandler):

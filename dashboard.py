@@ -11,6 +11,7 @@ from typing import List
 import pandas as pd
 import yfinance as yf
 
+from nav_html import finalize_dashboard_html
 from scanner_config import (
     DASHBOARD_FILE, PIPELINE_STATE_FILE,
     STARTING_CAPITAL, WATCHLIST_EXPORT_DIR, MAX_DAILY_PAPER_TRADES,
@@ -737,6 +738,7 @@ a{{color:var(--blue)}}
 }})();
 </script>
 </body></html>"""
+    html = finalize_dashboard_html(html)
     DASHBOARD_FILE.write_text(html, encoding="utf-8")
     print(f"Updated overall dashboard: {DASHBOARD_FILE}")
     return DASHBOARD_FILE

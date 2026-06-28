@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from nav_html import header_nav
+from nav_html import finalize_page_html
 from scanner_config import WATCHLIST_EXPORT_DIR, ensure_directories
 from job_storage import job_health
 from stock_storage import append_snapshot, read_latest_snapshot, read_table
@@ -123,7 +123,6 @@ def render_strategy_review_html(rows: list[dict], review_date: str, csv_filename
     table_html = review.to_html(index=False, escape=True, border=0) if not review.empty else "<p class='empty'>No review rows yet.</p>"
     generated_at = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
     csv_link = f"<a href='/exports/{escape(csv_filename)}'>Download CSV</a>" if csv_filename else "—"
-    nav = header_nav("/strategy-review")
 
     return f"""<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
 <title>Strategy review · {escape(review_date)}</title><style>
@@ -179,7 +178,7 @@ a{{color:var(--blue)}}
 </style></head><body>
 <header>
   <div class='hdr-left'><h1>Stock Strategy App</h1></div>
-  <nav class='hdr-nav'>{nav}</nav>
+  <nav class='hdr-nav'>__HEADER_NAV__</nav>
   <div class='hdr-right'>Generated {escape(generated_at)}</div>
 </header>
 <main>
@@ -242,7 +241,7 @@ def main() -> int:
     review = pd.DataFrame(rows)
     append_snapshot("strategy_reviews", review, "stored_review_date", today)
     html_path = WATCHLIST_EXPORT_DIR / f"strategy_review_{today}.html"
-    html_path.write_text(render_strategy_review_html(rows, today, None), encoding="utf-8")
+    html_path.write_bytes(finalize_page_html(render_strategy_review_html(rows, today, None), "/strategy-review"))
     print(f"Saved strategy review to PostgreSQL and {html_path}")
     return 0
 
