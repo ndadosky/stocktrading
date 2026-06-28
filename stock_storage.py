@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import os
 import pandas as pd
 from sqlalchemy import text
 
@@ -116,6 +117,9 @@ def load_paper_trades(columns: list[str], csv_fallback: Path) -> pd.DataFrame:
     ensure_directories()
     if table_count("paper_trades") > 0:
         return read_table("paper_trades", columns)
+    require_postgres = os.getenv("STOCK_REQUIRE_POSTGRES", "").lower() in {"1", "true", "yes"}
+    if require_postgres:
+        return pd.DataFrame(columns=columns)
     if not csv_fallback.exists():
         return pd.DataFrame(columns=columns)
     trades = pd.read_csv(csv_fallback, dtype={"ticker": str, "trade_id": str})

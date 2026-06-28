@@ -27,8 +27,11 @@ from job_storage import (
     scheduled_already_ran,
 )
 from scanner_config import DASHBOARD_FILE, PAPER_TRADES_FILE, PIPELINE_STATE_FILE, WATCHLIST_EXPORT_DIR, ensure_directories
-from stock_storage import add_bankroll_deposit, bankroll_base, query_rows, total_bankroll_deposits
+from stock_storage import add_bankroll_deposit, bankroll_base, query_rows, table_count, total_bankroll_deposits
 from platform_health import codex_chat, platform_health_payload
+from nav_html import header_nav
+from strategy_review import load_latest_review_rows, render_strategy_review_html
+from best_case_analysis import compute_best_case
 
 
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -297,21 +300,9 @@ def health_payload() -> dict:
     return platform_health_payload(app_state, status["jobs"])
 
 
-def header_nav(active: str) -> str:
-    links = (
-        ("/", "Dashboard", "nav-home"),
-        ("/live-infographic", "Live infographic", "nav-live"),
-        ("/jobs", "Jobs", "nav-jobs"),
-        ("/day", "Day status", "nav-day"),
-        ("/strategy-review", "Strategy review", "nav-review"),
-        ("/healthcheck", "Health", "nav-health"),
-    )
-    parts = []
-    for href, label, nav_id in links:
-        cls = "active" if active == href else ""
-        id_attr = f' id="{nav_id}"' if nav_id else ""
-        parts.append(f'<a href="{href}" class="{cls}"{id_attr}>{label}</a>')
-    return "".join(parts)
+def strategy_review_page_html() -> bytes:
+    rows, review_date, csv_name = load_latest_review_rows()
+    return render_strategy_review_html(rows, review_date, csv_name).encode("utf-8")
 
 
 def architecture_svg(payload: dict) -> str:
@@ -414,6 +405,42 @@ def scheduled_jobs_table(jobs: dict, running: Optional[str]) -> str:
     )
 
 
+def postgres_data_panel(payload: dict) -> str:
+    data = payload.get("components", {}).get("postgres_data", {})
+    db = payload.get("database", {})
+    ledger = payload.get("ledger", {})
+    warnings = data.get("warnings") or []
+    source = data.get("active_source", "unknown")
+    source_ok = source == "postgresql"
+    cls = "ok" if data.get("ok") else "bad"
+    rows = [
+        ("Database engine", db.get("engine", "postgresql")),
+        ("Connection", escape(str(db.get("target", "—")))),
+        ("Active data source", escape(source.replace("_", " "))),
+        ("Paper trades (PostgreSQL)", str(data.get("postgres_trades", ledger.get("paper_trades", 0)))),
+        ("Job runs (PostgreSQL)", str(data.get("postgres_job_runs", ledger.get("job_runs", 0)))),
+        ("Account events", str(data.get("postgres_account_events", 0))),
+        ("Strategy reviews", str(data.get("postgres_strategy_reviews", 0))),
+        ("Bankroll base", f"${data.get('bankroll_base', 0):,.0f}"),
+        ("Deposits", f"${data.get('bankroll_deposits', 0):,.0f}"),
+        ("CSV export rows", str(data.get("csv_export_rows", 0)) + " (export only)"),
+        ("Pi requires PostgreSQL", "yes" if db.get("require_postgres") else "no"),
+    ]
+    table_rows = "".join(f"<tr><th>{escape(str(label))}</th><td>{value}</td></tr>" for label, value in rows)
+    warn_html = ""
+    if warnings:
+        items = "".join(f"<li>{escape(str(w))}</li>" for w in warnings)
+        warn_html = f"<ul class='warn-list'>{items}</ul>"
+    return f"""
+<section class="panel">
+  <h2>PostgreSQL data source</h2>
+  <p class="sub">The Raspberry Pi uses host PostgreSQL as the live ledger. CSV and legacy SQLite files are exports or migration artifacts only.</p>
+  <div class="source-banner {cls}"><strong>{'Using PostgreSQL' if source_ok else 'PostgreSQL check failed'}</strong> — {escape(str(data.get('detail', '')))}</div>
+  <table class="ledger-table">{table_rows}</table>
+  {warn_html}
+</section>"""
+
+
 def healthcheck_html() -> bytes:
     payload = health_payload()
     overall = "healthy" if payload["ok"] else "degraded"
@@ -421,7 +448,7 @@ def healthcheck_html() -> bytes:
     nav = header_nav("/healthcheck")
     html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="refresh" content="60">
-<title>Platform health</title><style>
+<title>Health check</title><style>
 :root{{--bg:#f4f6f8;--panel:#fff;--text:#17202a;--muted:#687386;--line:#dce3ec;--blue:#1d4ed8;--green:#16803c;--red:#b42318}}
 *{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--text);font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}}
 header{{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:16px;position:sticky;top:0;z-index:3;height:52px}}
@@ -443,6 +470,12 @@ main{{max-width:1200px;margin:0 auto;padding:20px 20px 64px;display:grid;gap:16p
 .card p{{margin:0;color:var(--muted);font-size:12px;line-height:1.45;word-break:break-word}}
 .badge{{font-size:10px;font-weight:800;letter-spacing:.04em;padding:3px 8px;border-radius:999px}}
 .badge.ok{{background:#dcfce7;color:var(--green)}}.badge.bad{{background:#fee2e2;color:var(--red)}}
+.source-banner{{border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;border:1px solid var(--line)}}
+.source-banner.ok{{background:#f0fdf4;border-color:#86efac;color:#14532d}}
+.source-banner.bad{{background:#fef2f2;border-color:#fca5a5;color:#991b1b}}
+.ledger-table{{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}}
+.ledger-table th{{width:220px;color:var(--muted);font-weight:600;text-transform:none;letter-spacing:0}}
+.warn-list{{margin:12px 0 0;padding-left:18px;color:#92400e;font-size:13px}}
 table{{width:100%;border-collapse:collapse;font-size:13px}}
 th,td{{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}}
 th{{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em}}
@@ -459,7 +492,7 @@ button:disabled{{opacity:.55;cursor:not-allowed}}
 a{{color:var(--blue)}}
 </style></head><body>
 <header>
-  <div class="hdr-left"><h1>Platform health</h1></div>
+  <div class="hdr-left"><h1>Health check</h1></div>
   <nav class="hdr-nav">{nav}</nav>
   <div class="hdr-right">
     <span class="badge-top {overall_cls}">{overall.upper()}</span>
@@ -478,6 +511,7 @@ a{{color:var(--blue)}}
       <div><b>JSON API</b> — <a href="/api/healthcheck">/api/healthcheck</a></div>
     </div>
   </section>
+  {postgres_data_panel(payload)}
   <section class="panel">
     <h2>Component health</h2>
     <p class="sub">Live probes from this app instance.</p>
@@ -861,14 +895,7 @@ tbody tr:hover td{{filter:brightness(.97)}}
 </style></head><body>
 <header>
   <div class="hdr-left"><h1>Live Infographic</h1></div>
-  <nav class="hdr-nav">
-    <a href="/">Dashboard</a>
-    <a href="/live-infographic" class="active">Live infographic</a>
-    <a href="/jobs">Jobs</a>
-    <a href="/day">Day status</a>
-    <a href="/strategy-review">Strategy review</a>
-    <a href="/healthcheck">Health</a>
-  </nav>
+  <nav class="hdr-nav">{header_nav("/live-infographic")}</nav>
   <div class="hdr-right"><span>Auto-refresh {payload['refresh_seconds']}s</span><span>{escape(payload['generated_at'])}</span></div>
 </header>
 <main>
@@ -996,14 +1023,7 @@ a{{color:var(--blue)}}
 </style></head><body>
 <header>
   <div class="hdr-left"><h1>Day Status</h1></div>
-  <nav class="hdr-nav">
-    <a href="/">Dashboard</a>
-    <a href="/live-infographic">Live infographic</a>
-    <a href="/jobs">Jobs</a>
-    <a href="/day" class="active">Day status</a>
-    <a href="/strategy-review">Strategy review</a>
-    <a href="/healthcheck">Health</a>
-  </nav>
+  <nav class="hdr-nav">{header_nav("/day")}</nav>
   <div class="hdr-right">
     <span class="status-badge {status_cls}">{escape(status_label)}</span>
     <form action="/day" method="get">
@@ -1101,14 +1121,7 @@ a{color:var(--blue)}
 </style></head><body>
 <header>
   <div class="hdr-left"><h1>Stock Strategy App</h1></div>
-  <nav class="hdr-nav">
-    <a href="/" class="active" id="nav-home">Dashboard</a>
-    <a href="/live-infographic" id="nav-live">Live infographic</a>
-    <a href="/jobs" id="nav-jobs">Jobs</a>
-    <a href="/day" id="nav-day">Day status</a>
-    <a href="/strategy-review" id="nav-review">Strategy review</a>
-    <a href="/healthcheck" id="nav-health">Health</a>
-  </nav>
+  <nav class="hdr-nav">{header_nav("/")}</nav>
   <div class="hdr-right"><div id="market-badge" class="badge">Market —</div><span id="clock" class="clock-txt">—</span></div>
 </header>
 <main>
@@ -1215,14 +1228,7 @@ a{color:var(--blue)}
 </style></head><body>
 <header>
   <div class="hdr-left"><h1>Stock Strategy App</h1></div>
-  <nav class="hdr-nav">
-    <a href="/">Dashboard</a>
-    <a href="/live-infographic">Live infographic</a>
-    <a href="/jobs" class="active">Jobs</a>
-    <a href="/day">Day status</a>
-    <a href="/strategy-review">Strategy review</a>
-    <a href="/healthcheck">Health</a>
-  </nav>
+  <nav class="hdr-nav">{header_nav("/jobs")}</nav>
   <div class="hdr-right">
     <div id="market-badge" class="badge">Market —</div>
     <div id="run-indicator" class="run-indicator hidden"><span class="spinner"></span><span id="run-label">Running…</span></div>
@@ -1346,17 +1352,13 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
             return
         if path == "/strategy-review":
-            latest = newest_path("strategy_review_*.html")
-            if latest:
-                self.path = "/" + str(latest.relative_to(PROJECT_DIR))
-            else:
-                body = b"<html><body style='font:14px sans-serif;padding:48px;color:#374151'><h2>No strategy review yet</h2><p>The 10:30 review will appear here after it runs.</p><p><a href='/'>Back to app</a></p></body></html>"
-                self.send_response(HTTPStatus.NOT_FOUND)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-                return
+            body = strategy_review_page_html()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         elif path == "/dashboard":
             self.path = "/" + str(DASHBOARD_FILE.relative_to(PROJECT_DIR))
         elif path == "/api/status":
@@ -1370,6 +1372,9 @@ class Handler(SimpleHTTPRequestHandler):
             return
         elif path == "/api/healthcheck":
             self.send_json(health_payload())
+            return
+        elif path == "/api/strategy/best-case":
+            self.send_json(compute_best_case())
             return
         super().do_GET()
 
@@ -1419,6 +1424,7 @@ def main() -> int:
     wait_for_database()
     init_schema()
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    append_log(f"PostgreSQL ledger: {table_count('paper_trades')} trades @ {database_url().split('@')[-1]}")
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "80"))
     server = ThreadingHTTPServer((host, port), Handler)

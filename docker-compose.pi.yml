@@ -24,6 +24,7 @@ services:
       STOCK_IMAGE_PYTHON: ${STOCK_IMAGE_PYTHON:-python3}
       CODEX_BIN: ${CODEX_BIN:-codex}
       STOCK_SCHEDULER: ${STOCK_SCHEDULER:-systemd}
+      STOCK_REQUIRE_POSTGRES: ${STOCK_REQUIRE_POSTGRES:-true}
       TZ: America/New_York
     volumes:
       - ./exports:/app/exports

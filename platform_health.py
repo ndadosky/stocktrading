@@ -11,11 +11,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+import pandas as pd
+
 from db import connect, database_url
 from job_storage import job_health
 from pipeline_health import health_snapshot
-from scanner_config import LOGS_DIR, PROJECT_DIR, WATCHLIST_EXPORT_DIR
-from stock_storage import table_count
+from scanner_config import LOGS_DIR, PROJECT_DIR, PAPER_TRADES_FILE, STOCK_DB_FILE, WATCHLIST_EXPORT_DIR
+from stock_storage import bankroll_base, table_count, total_bankroll_deposits
 from version import version_label
 
 CODEX_BIN = os.getenv("CODEX_BIN", "codex")
@@ -32,11 +34,81 @@ def check_postgresql() -> dict:
     try:
         with connect(dict_rows=False) as (_, cursor):
             cursor.execute("SELECT 1")
+            cursor.execute("SELECT version()")
+            version = (cursor.fetchone()[0] or "").split(",")[0]
             cursor.execute("SELECT count(*) FROM paper_trades")
             trades = int(cursor.fetchone()[0])
-        return _status(True, f"{trades} paper trades in ledger", trades=trades, target=database_url().split("@")[-1])
+        target = database_url().split("@")[-1]
+        return _status(
+            True,
+            f"Connected · {trades} paper trades · {version}",
+            trades=trades,
+            target=target,
+            engine="postgresql",
+        )
     except Exception as exc:
-        return _status(False, str(exc), target=database_url().split("@")[-1])
+        return _status(False, str(exc), target=database_url().split("@")[-1], engine="postgresql")
+
+
+def check_postgres_data_source() -> dict:
+    """Verify live app data is served from PostgreSQL, not legacy CSV/SQLite."""
+    require_postgres = os.getenv("STOCK_REQUIRE_POSTGRES", "").lower() in {"1", "true", "yes"}
+    pg_trades = table_count("paper_trades")
+    pg_jobs = table_count("job_runs")
+    pg_events = table_count("account_events")
+    pg_reviews = table_count("strategy_reviews")
+
+    csv_rows = 0
+    if PAPER_TRADES_FILE.exists():
+        try:
+            csv_rows = len(pd.read_csv(PAPER_TRADES_FILE, usecols=["ticker"]))
+        except Exception:
+            try:
+                csv_rows = len(pd.read_csv(PAPER_TRADES_FILE))
+            except Exception:
+                csv_rows = 0
+
+    legacy_sqlite = STOCK_DB_FILE.exists()
+    app_sqlite = (WATCHLIST_EXPORT_DIR / "app_server.sqlite").exists()
+
+    if pg_trades > 0:
+        source = "postgresql"
+        detail = f"Live ledger in PostgreSQL ({pg_trades} trades, {pg_jobs} job runs, {pg_events} account events)"
+    elif require_postgres:
+        source = "postgresql_required_empty"
+        detail = "STOCK_REQUIRE_POSTGRES is set but paper_trades is empty — run migration or import data"
+    else:
+        source = "csv_fallback"
+        detail = f"PostgreSQL empty — would fall back to CSV ({csv_rows} rows) on next load"
+
+    warnings: list[str] = []
+    if csv_rows and pg_trades and csv_rows != pg_trades:
+        warnings.append(f"CSV export ({csv_rows} rows) differs from PostgreSQL ({pg_trades} trades)")
+    if legacy_sqlite or app_sqlite:
+        warnings.append("Legacy SQLite files present (migration-only, not used at runtime)")
+    if require_postgres and pg_trades == 0:
+        warnings.append("Pi mode requires PostgreSQL data")
+
+    ok = pg_trades > 0 and source == "postgresql"
+    if require_postgres and pg_trades == 0:
+        ok = False
+
+    return _status(
+        ok,
+        detail,
+        active_source=source,
+        postgres_trades=pg_trades,
+        postgres_job_runs=pg_jobs,
+        postgres_account_events=pg_events,
+        postgres_strategy_reviews=pg_reviews,
+        csv_export_rows=csv_rows,
+        legacy_sqlite=legacy_sqlite,
+        legacy_app_sqlite=app_sqlite,
+        require_postgres=require_postgres,
+        bankroll_base=bankroll_base(),
+        bankroll_deposits=total_bankroll_deposits(),
+        warnings=warnings,
+    )
 
 
 def check_docker() -> dict:
@@ -273,6 +345,7 @@ def platform_health_payload(app_state: dict, jobs: dict) -> dict:
         "app": check_app_process(),
         "docker": check_docker(),
         "postgresql": check_postgresql(),
+        "postgres_data": check_postgres_data_source(),
         "exports_volume": check_exports_volume(),
         "scheduler": check_scheduler(app_state),
         "git_autodeploy": check_git_autodeploy(),
@@ -303,12 +376,17 @@ def platform_health_payload(app_state: dict, jobs: dict) -> dict:
     }
     overall_ok = all(
         components[name]["ok"]
-        for name in ("app", "postgresql", "scheduler", "exports_volume")
+        for name in ("app", "postgresql", "postgres_data", "scheduler", "exports_volume")
     )
     return {
         "ok": overall_ok,
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "version": version_label(),
+        "database": {
+            "engine": "postgresql",
+            "target": database_url().split("@")[-1],
+            "require_postgres": os.getenv("STOCK_REQUIRE_POSTGRES", "").lower() in {"1", "true", "yes"},
+        },
         "architecture": {"nodes": architecture_nodes(), "edges": architecture_edges()},
         "components": components,
         "pipeline": pipeline,
