@@ -23,6 +23,7 @@ services:
       STOCK_STARTING_CAPITAL: ${STOCK_STARTING_CAPITAL:-25000}
       STOCK_IMAGE_PYTHON: ${STOCK_IMAGE_PYTHON:-python3}
       CODEX_BIN: ${CODEX_BIN:-codex}
+      STOCK_SCHEDULER: ${STOCK_SCHEDULER:-systemd}
       TZ: America/New_York
     volumes:
       - ./exports:/app/exports

@@ -1,0 +1,11 @@
+[Unit]
+Description=Morning Finviz scan (8:45 ET, market days)
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 08:45:00
+Timezone=America/New_York
+Persistent=true
+Unit=stocktrading-job@morning.service
+
+[Install]
+WantedBy=timers.target

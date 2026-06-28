@@ -77,9 +77,25 @@ def check_git_autodeploy() -> dict:
 
 
 def check_scheduler(state: dict) -> dict:
+    mode = os.getenv("STOCK_SCHEDULER", "internal").strip().lower()
+    log_path = LOGS_DIR / "systemd_jobs.log"
+    if mode == "systemd":
+        detail = "systemd timers on Pi host trigger /api/run"
+        if log_path.exists():
+            lines = log_path.read_text(encoding="utf-8", errors="replace").strip().splitlines()
+            if lines:
+                detail = f"{detail} · last: {lines[-1][-120:]}"
+        return _status(
+            True,
+            detail,
+            mode=mode,
+            live_updates=state.get("live_updates", False),
+            running_job=state.get("running"),
+        )
     return _status(
         True,
-        f"Started {state.get('scheduler_started_at', 'unknown')}",
+        f"Internal loop · started {state.get('scheduler_started_at', 'unknown')}",
+        mode=mode,
         live_updates=state.get("live_updates", False),
         poll_seconds=int(os.getenv("STOCK_CRON_POLL_SECONDS", "30")),
         running_job=state.get("running"),
@@ -171,7 +187,8 @@ def architecture_nodes() -> list[dict]:
     return [
         {"id": "browser", "label": "Your PC browser", "layer": "client", "detail": "Dashboard, jobs, health UI"},
         {"id": "pi", "label": "Raspberry Pi", "layer": "edge", "detail": "Host network · port 80"},
-        {"id": "docker", "label": "Docker · stock_app", "layer": "app", "detail": "app_server.py + scheduler"},
+        {"id": "docker", "label": "Docker · stock_app", "layer": "app", "detail": "app_server.py + job API"},
+        {"id": "job_timers", "label": "systemd job timers", "layer": "app", "detail": "morning · confirm · report · live"},
         {"id": "postgres", "label": "PostgreSQL", "layer": "data", "detail": "Trades, jobs, analytics"},
         {"id": "exports", "label": "exports/ volume", "layer": "data", "detail": "CSV, HTML, infographics"},
         {"id": "github", "label": "GitHub", "layer": "deploy", "detail": "ndadosky/stocktrading main"},
@@ -191,6 +208,7 @@ def architecture_edges() -> list[dict]:
         {"from": "docker", "to": "codex", "label": "pnl_flashcard · chat"},
         {"from": "timer", "to": "github", "label": "git fetch/pull"},
         {"from": "timer", "to": "docker", "label": "compose rebuild"},
+        {"from": "job_timers", "to": "docker", "label": "curl /api/run"},
         {"from": "github", "to": "pi", "label": "/home/admin/stock"},
     ]
 

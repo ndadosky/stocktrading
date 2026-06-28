@@ -39,6 +39,8 @@ IMAGE_PYTHON = os.getenv("STOCK_IMAGE_PYTHON", PYTHON)
 LIVE_UPDATE_SECONDS = int(os.getenv("STOCK_LIVE_UPDATE_SECONDS", "300"))
 POLL_SECONDS = int(os.getenv("STOCK_CRON_POLL_SECONDS", "30"))
 JOB_TIMEOUT_SECONDS = int(os.getenv("STOCK_JOB_TIMEOUT_SECONDS", "1800"))
+SCHEDULER_MODE = os.getenv("STOCK_SCHEDULER", "internal").strip().lower()
+AUTOMATED_DEDUP_REASONS = frozenset({"scheduled", "systemd"})
 
 
 @dataclass(frozen=True)
@@ -95,6 +97,12 @@ def run_job(name: str, reason: str = "manual") -> dict:
     if name not in JOBS:
         return {"ok": False, "error": f"Unknown job: {name}"}
     job = JOBS[name]
+    if job.schedule_time and reason in AUTOMATED_DEDUP_REASONS:
+        today = today_key()
+        if not is_market_session(datetime.now().astimezone().date()):
+            return {"ok": True, "skipped": True, "reason": reason, "detail": "not a market session"}
+        if scheduled_already_ran(name, today):
+            return {"ok": True, "skipped": True, "reason": reason, "detail": "already ran today"}
     with STATE.lock:
         if STATE.running:
             return {"ok": False, "error": f"Job already running: {STATE.running}"}
@@ -120,7 +128,7 @@ def run_job(name: str, reason: str = "manual") -> dict:
             "run_date": today_key(),
             "output_tail": output,
         }
-        if reason == "scheduled":
+        if reason in AUTOMATED_DEDUP_REASONS:
             result["scheduled_for"] = today_key()
         append_log(f"END {name}: rc={completed.returncode}\n{output}")
     except subprocess.TimeoutExpired as exc:
@@ -133,7 +141,7 @@ def run_job(name: str, reason: str = "manual") -> dict:
             "run_date": today_key(),
             "output_tail": f"Timed out after {JOB_TIMEOUT_SECONDS}s\n{exc.stdout or ''}",
         }
-        if reason == "scheduled":
+        if reason in AUTOMATED_DEDUP_REASONS:
             result["scheduled_for"] = today_key()
         append_log(f"TIMEOUT {name} after {JOB_TIMEOUT_SECONDS}s")
     except Exception as exc:
@@ -146,13 +154,28 @@ def run_job(name: str, reason: str = "manual") -> dict:
             "run_date": today_key(),
             "output_tail": str(exc),
         }
-        if reason == "scheduled":
+        if reason in AUTOMATED_DEDUP_REASONS:
             result["scheduled_for"] = today_key()
         append_log(f"ERROR {name}: {exc}")
     with STATE.lock:
         result = record_job_run(name, result)
         STATE.running = None
     return result
+
+
+def run_live_update(reason: str = "live-update") -> dict:
+    if not STATE.live_updates:
+        return {"ok": True, "skipped": True, "reason": reason, "detail": "live updates disabled"}
+    if not is_market_session(datetime.now().astimezone().date()):
+        return {"ok": True, "skipped": True, "reason": reason, "detail": "not a market session"}
+    if not market_open_now():
+        return {"ok": True, "skipped": True, "reason": reason, "detail": "outside market hours"}
+    with STATE.lock:
+        if STATE.running:
+            return {"ok": False, "error": f"Job already running: {STATE.running}"}
+    if confirmation_ready():
+        return run_job("report", reason)
+    return run_job("dashboard", reason)
 
 
 def next_run_for(job: Job) -> Optional[str]:
@@ -166,7 +189,8 @@ def next_run_for(job: Job) -> Optional[str]:
 
 
 def scheduler_loop() -> None:
-    append_log("Scheduler loop started")
+    """In-process scheduler (used when STOCK_SCHEDULER=internal, e.g. local dev)."""
+    append_log("Scheduler loop started (internal mode)")
     last_live = 0.0
     while True:
         now = datetime.now().astimezone()
@@ -228,6 +252,7 @@ def status_payload() -> dict:
         "market_session": is_market_session(datetime.now().astimezone().date()),
         "market_open_now": market_open_now(),
         "live_updates": STATE.live_updates,
+        "scheduler_mode": SCHEDULER_MODE,
         "bankroll": {
             "base": bankroll_base(),
             "deposits": total_bankroll_deposits(),
@@ -448,7 +473,7 @@ a{{color:var(--blue)}}
     {architecture_svg(payload)}
     <div class="legend">
       <div><b>Deploy loop</b> — systemd timer → git pull → docker rebuild</div>
-      <div><b>Trading loop</b> — scheduler inside app_server runs morning → confirm → report jobs</div>
+      <div><b>Trading loop</b> — systemd timers on the Pi host trigger jobs via the app API</div>
       <div><b>Codex</b> — P/L flashcards and optional chat probe below</div>
       <div><b>JSON API</b> — <a href="/api/healthcheck">/api/healthcheck</a></div>
     </div>
@@ -460,7 +485,7 @@ a{{color:var(--blue)}}
   </section>
   <section class="panel">
     <h2>Scheduled tasks</h2>
-    <p class="sub">Market-day ET schedule managed by the in-app scheduler. Manual runs available from the Jobs page.</p>
+    <p class="sub">Market-day ET schedule via systemd timers on the Pi (POST /api/run). Manual runs available from the Jobs page.</p>
     {scheduled_jobs_table(payload['scheduled_jobs'], payload['components']['scheduler'].get('running_job'))}
   </section>
   <section class="panel">
@@ -1353,10 +1378,22 @@ class Handler(SimpleHTTPRequestHandler):
         path = unquote(parsed.path)
         if path.startswith("/api/run/"):
             name = path.rsplit("/", 1)[-1]
-            result = run_job(name, "manual")
-            if name == "strategy_review" and result.get("ok"):
-                result["dashboard_refresh"] = run_job("dashboard", "strategy-review-refresh")
-            self.send_json(result, HTTPStatus.OK if result.get("ok") else HTTPStatus.CONFLICT)
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            raw = self.rfile.read(length) if length else b"{}"
+            try:
+                body = json.loads(raw.decode("utf-8")) if raw else {}
+            except json.JSONDecodeError:
+                self.send_json({"ok": False, "error": "Invalid JSON body"}, HTTPStatus.BAD_REQUEST)
+                return
+            reason = body.get("reason", "manual")
+            if name == "live":
+                result = run_live_update("live-update")
+            else:
+                result = run_job(name, reason)
+                if name == "strategy_review" and result.get("ok"):
+                    result["dashboard_refresh"] = run_job("dashboard", "strategy-review-refresh")
+            status = HTTPStatus.OK if result.get("ok") or result.get("skipped") else HTTPStatus.CONFLICT
+            self.send_json(result, status)
             return
         if path == "/api/bankroll/inject":
             event = add_bankroll_deposit(25000.0, "UI bankroll injection")
@@ -1386,8 +1423,12 @@ def main() -> int:
     port = int(os.getenv("PORT", "80"))
     server = ThreadingHTTPServer((host, port), Handler)
     run_job("dashboard", "startup")
-    thread = threading.Thread(target=scheduler_loop, daemon=True)
-    thread.start()
+    if SCHEDULER_MODE == "internal":
+        thread = threading.Thread(target=scheduler_loop, daemon=True)
+        thread.start()
+        append_log("Internal scheduler thread started")
+    else:
+        append_log(f"Scheduler mode={SCHEDULER_MODE} — job timing handled outside the app")
     append_log(f"Serving on http://{host}:{port}")
     print(f"Stock Strategy App running at http://{host}:{port}")
     print(f"Dashboard: http://{host}:{port}/dashboard")

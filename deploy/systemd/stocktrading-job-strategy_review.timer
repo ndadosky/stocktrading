@@ -1,0 +1,11 @@
+[Unit]
+Description=Strategy review (10:30 ET, market days)
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 10:30:00
+Timezone=America/New_York
+Persistent=true
+Unit=stocktrading-job@strategy_review.service
+
+[Install]
+WantedBy=timers.target

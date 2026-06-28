@@ -42,3 +42,7 @@ log "Rebuilding app v${APP_VERSION} (${APP_GIT_COMMIT})"
 
 "${REPO_DIR}/deploy/compose.sh" -f docker-compose.pi.yml up -d >>"$LOG_FILE" 2>&1
 log "Redeploy complete — v${APP_VERSION} (${APP_GIT_COMMIT})"
+
+if [ -x "${REPO_DIR}/deploy/install_systemd_jobs.sh" ]; then
+  "${REPO_DIR}/deploy/install_systemd_jobs.sh" >>"$LOG_FILE" 2>&1 || log "WARN: systemd job install failed"
+fi

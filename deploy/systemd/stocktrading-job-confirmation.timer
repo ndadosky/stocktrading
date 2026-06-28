@@ -1,0 +1,11 @@
+[Unit]
+Description=9:45 confirmation scan (9:50 ET, market days)
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 09:50:00
+Timezone=America/New_York
+Persistent=true
+Unit=stocktrading-job@confirmation.service
+
+[Install]
+WantedBy=timers.target

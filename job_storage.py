@@ -108,7 +108,7 @@ def scheduled_already_ran(job_name: str, run_date: str) -> bool:
         cursor.execute(
             """
             SELECT id FROM job_runs
-            WHERE job_name = %s AND reason = 'scheduled' AND scheduled_for = %s
+            WHERE job_name = %s AND reason IN ('scheduled', 'systemd') AND scheduled_for = %s
             LIMIT 1
             """,
             (job_name, run_date),

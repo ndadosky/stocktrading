@@ -1,0 +1,11 @@
+[Unit]
+Description=Live report/dashboard refresh every 5 minutes during market hours
+
+[Timer]
+OnCalendar=*:0/5
+Timezone=America/New_York
+Persistent=true
+Unit=stocktrading-live-update.service
+
+[Install]
+WantedBy=timers.target

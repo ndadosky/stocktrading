@@ -37,5 +37,10 @@ sudo cp deploy/stocktrading-pull.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now stocktrading-pull.timer
 
+echo "Installing trading job systemd timers..."
+chmod +x deploy/trigger_job.sh deploy/trigger_live_update.sh deploy/install_systemd_jobs.sh
+./deploy/install_systemd_jobs.sh
+
 echo "App should be available at http://$(hostname -I | awk '{print $1}')/"
 echo "Auto-deploy: git push to main → Pi pulls and rebuilds within 5 minutes."
+echo "Scheduled jobs: systemd timers → POST http://127.0.0.1/api/run/<job>"

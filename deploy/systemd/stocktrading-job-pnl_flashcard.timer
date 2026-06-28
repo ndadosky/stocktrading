@@ -1,0 +1,11 @@
+[Unit]
+Description=Post-market P/L flashcard (16:15 ET, market days)
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 16:15:00
+Timezone=America/New_York
+Persistent=true
+Unit=stocktrading-job@pnl_flashcard.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=Stock trading live dashboard/report refresh
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+User=admin
+WorkingDirectory=/home/admin/stock
+Environment=STOCK_REPO_DIR=/home/admin/stock
+Environment=STOCK_COMPOSE_FILE=docker-compose.pi.yml
+Environment=STOCK_APP_PORT=80
+ExecStart=/home/admin/stock/deploy/trigger_live_update.sh

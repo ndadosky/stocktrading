@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily report and dashboard (10:10 ET, market days)
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 10:10:00
+Timezone=America/New_York
+Persistent=true
+Unit=stocktrading-job@report.service
+
+[Install]
+WantedBy=timers.target

@@ -164,7 +164,7 @@ stock/
 ├── db.py                      # PostgreSQL connection and schema bootstrap
 ├── stock_storage.py           # Paper ledger and analytics persistence
 ├── job_storage.py             # Scheduler job history
-├── app_server.py              # Web UI, API, and background scheduler
+├── app_server.py              # Web UI, API, and job runner
 ├── docker-compose.yml         # App + PostgreSQL (local/dev)
 ├── docker-compose.pi.yml      # Pi: host network on port 80 + host PostgreSQL
 ├── paper_trades.csv           # Compatibility export of the live paper ledger
@@ -242,10 +242,11 @@ Open `http://localhost/`.
 
 ### What the app serves
 
-The app serves the dashboard, exposes `/api/status`, and runs the market-day
-schedule in the background. The scheduled-jobs screen at `/jobs` shows every
-job, next run, last result, run history, and lets you run the morning scan,
-confirmation, report, strategy review, health, and dashboard jobs on demand.
+The app serves the dashboard, exposes `/api/status`, and runs trading jobs when
+triggered by **systemd timers** on the Pi (or an optional in-process loop for
+local dev). The scheduled-jobs screen at `/jobs` shows every job, next run,
+last result, run history, and lets you run the morning scan, confirmation,
+report, strategy review, health, and dashboard jobs on demand.
 The main app also includes an **Inject $25,000 bankroll** button. It records a
 paper deposit in PostgreSQL account events, rebuilds the dashboard, and keeps the
 deposit separate from trading P/L.
@@ -260,8 +261,37 @@ dashboard shows the latest decision, sample gates, holdout status, latest-50
 success, and job health. While the market is open, it refreshes the
 paper-trading report and dashboard every five minutes after the same-day
 confirmation file exists.
-Override `PORT`, `HOST`, `DATABASE_URL`, or `STOCK_LIVE_UPDATE_SECONDS` in
-`.env` if needed.
+Override `PORT`, `HOST`, `DATABASE_URL`, `STOCK_SCHEDULER`, or
+`STOCK_LIVE_UPDATE_SECONDS` in `.env` if needed.
+
+### Scheduled jobs (systemd on Raspberry Pi)
+
+Trading jobs are **not** cron and **not** an in-app polling loop on the Pi.
+`docker-compose.pi.yml` sets `STOCK_SCHEDULER=systemd`, and host timers call
+the app API:
+
+| Timer | Time (ET) | Job |
+|-------|-----------|-----|
+| `stocktrading-job-morning.timer` | 8:45 Mon–Fri | morning scan |
+| `stocktrading-job-confirmation.timer` | 9:50 | 9:45 confirmation |
+| `stocktrading-job-report.timer` | 10:10 | daily report |
+| `stocktrading-job-strategy_review.timer` | 10:30 | strategy review |
+| `stocktrading-job-pnl_flashcard.timer` | 16:15 | P/L flashcard |
+| `stocktrading-live-update.timer` | every 5 min | live report/dashboard |
+
+Each timer runs `deploy/trigger_job.sh` (or `trigger_live_update.sh`), which
+skips non-market days and `POST`s to `http://127.0.0.1/api/run/<job>`. Logs:
+`logs/systemd_jobs.log`.
+
+Install or refresh timers after a pull:
+
+```bash
+./deploy/install_systemd_jobs.sh
+systemctl list-timers 'stocktrading-*'
+```
+
+For local dev without systemd, set `STOCK_SCHEDULER=internal` to use the
+background loop inside `app_server.py`.
 
 ### Auto-deploy from git (Raspberry Pi)
 
