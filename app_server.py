@@ -1249,18 +1249,40 @@ header{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line
 .badge{border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:600;background:#fff;color:var(--muted)}
 .badge.open{background:#f0fdf4;border-color:#86efac;color:var(--green)}.badge.session{background:#eff6ff;border-color:#93c5fd;color:#1e40af}
 .clock-txt{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
-main.dash-frame-main{padding:14px;height:calc(100vh - 57px)}
-main.dash-frame-main iframe{width:100%;height:100%;border:1px solid var(--line);border-radius:10px;background:#fff}
+main.dash-frame-main{position:relative;padding:0;height:auto}
+main.dash-frame-main #dash-frame{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .2s ease}
+main.dash-frame-main.dashboard-ready #dash-frame{position:static;opacity:1;pointer-events:auto}
+.dashboard-skeleton{padding:38px 28px 64px;display:grid;gap:18px;opacity:1;transition:opacity .2s ease;background:var(--bg)}
+.dashboard-ready .dashboard-skeleton{position:absolute;inset:0;opacity:0;visibility:hidden;pointer-events:none}
+.sk-row{display:flex;justify-content:space-between;align-items:center;gap:18px}.sk-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.sk-panels{display:grid;grid-template-columns:1.65fr .75fr;gap:16px}
+.sk{display:block;border-radius:8px;background:linear-gradient(90deg,#e5e9ef 25%,#f5f7fa 50%,#e5e9ef 75%);background-size:200% 100%;animation:skeleton-shimmer 1.4s ease-in-out infinite}
+.sk-brand{width:240px;height:38px}.sk-status{width:170px;height:34px;border-radius:999px}.sk-hero{height:170px;border-radius:20px}.sk-card{height:92px;border-radius:14px}.sk-panel{height:300px;border-radius:18px}.sk-panel.short{height:300px}
+@keyframes skeleton-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@media(max-width:900px){.dashboard-skeleton{padding:24px 12px 48px}.sk-grid{grid-template-columns:repeat(2,1fr)}.sk-panels{grid-template-columns:1fr}.sk-status{display:none}}
+@media(prefers-reduced-motion:reduce){.sk{animation:none}.dashboard-skeleton,#dash-frame{transition:none}}
 </style></head><body>
 <header>
   <div class="hdr-left"><h1>Stock Strategy App</h1></div>
   <nav class="hdr-nav">__HEADER_NAV__</nav>
   <div class="hdr-right"><div id="market-badge" class="badge">Market —</div><span id="clock" class="clock-txt">—</span></div>
 </header>
-<main class="dash-frame-main"><iframe id="dash-frame" src="/dashboard" title="Strategy dashboard" scrolling="no"></iframe></main>
+<main class="dash-frame-main" id="dashboard-shell" aria-busy="true">
+  <div class="dashboard-skeleton" id="dashboard-skeleton" aria-hidden="true">
+    <div class="sk-row"><span class="sk sk-brand"></span><span class="sk sk-status"></span></div>
+    <span class="sk sk-hero"></span>
+    <div class="sk-grid"><span class="sk sk-card"></span><span class="sk sk-card"></span><span class="sk sk-card"></span><span class="sk sk-card"></span></div>
+    <div class="sk-panels"><span class="sk sk-panel"></span><span class="sk sk-panel short"></span></div>
+  </div>
+  <iframe id="dash-frame" src="/dashboard" title="Strategy dashboard" scrolling="no"></iframe>
+</main>
 <script>
 function fmtTime(iso){if(!iso)return '—';return new Date(iso).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
 const dashFrame=document.getElementById('dash-frame');
+const dashboardShell=document.getElementById('dashboard-shell');
+function showDashboardSkeleton(){
+  dashboardShell.classList.remove('dashboard-ready');
+  dashboardShell.setAttribute('aria-busy','true');
+}
 function sizeDashboardFrame(){
   try{
     const doc=dashFrame.contentDocument;
@@ -1270,6 +1292,11 @@ function sizeDashboardFrame(){
     dashFrame.style.height='1px';
     const height=Math.max(doc.documentElement.scrollHeight,doc.body.scrollHeight);
     dashFrame.style.height=`${height}px`;
+    dashFrame.contentWindow.addEventListener('beforeunload',showDashboardSkeleton,{once:true});
+    requestAnimationFrame(()=>{
+      dashboardShell.classList.add('dashboard-ready');
+      dashboardShell.setAttribute('aria-busy','false');
+    });
   }catch(e){}
 }
 dashFrame.addEventListener('load',sizeDashboardFrame);
