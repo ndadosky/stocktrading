@@ -80,7 +80,10 @@ def effective_stops(trades: pd.DataFrame) -> pd.Series:
     """Return the protective stop currently active for each trade."""
     entry = pd.to_numeric(trades["entry_price"], errors="coerce").fillna(0)
     original = pd.to_numeric(trades["stop_8"], errors="coerce").fillna(entry)
-    stored = pd.to_numeric(trades.get("active_stop"), errors="coerce").fillna(original)
+    if "active_stop" in trades.columns:
+        stored = pd.to_numeric(trades["active_stop"], errors="coerce").fillna(original)
+    else:
+        stored = original.copy()
     sold10 = pd.to_numeric(trades["shares_sold_10"], errors="coerce").fillna(0)
     sold20 = pd.to_numeric(trades["shares_sold_20"], errors="coerce").fillna(0)
     calculated = original.copy()

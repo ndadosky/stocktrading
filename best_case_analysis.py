@@ -6,9 +6,9 @@ from datetime import datetime
 
 import pandas as pd
 
-from daily_report import account_summary
+from daily_report import account_summary, load_trades
 from scanner_config import SCALE_OUT_10_PCT, SCALE_OUT_20_PCT
-from stock_storage import read_table, total_bankroll_deposits, bankroll_base
+from stock_storage import total_bankroll_deposits, bankroll_base
 
 
 def _planned_qty(initial_shares: float, pct: float) -> int:
@@ -79,7 +79,7 @@ def _position_snapshot(row: pd.Series) -> dict:
 
 
 def compute_best_case() -> dict:
-    trades = read_table("paper_trades")
+    trades = load_trades()
     summary = account_summary(trades)
     positions = [_position_snapshot(row) for _, row in trades.iterrows()] if not trades.empty else []
 
