@@ -35,10 +35,10 @@ APP_BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 export APP_VERSION APP_GIT_COMMIT APP_BUILT_AT
 
 log "Rebuilding app v${APP_VERSION} (${APP_GIT_COMMIT})"
-docker compose -f docker-compose.pi.yml build \
+"${REPO_DIR}/deploy/compose.sh" -f docker-compose.pi.yml build \
   --build-arg "APP_VERSION=${APP_VERSION}" \
   --build-arg "APP_GIT_COMMIT=${APP_GIT_COMMIT}" \
   --build-arg "APP_BUILT_AT=${APP_BUILT_AT}" >>"$LOG_FILE" 2>&1
 
-docker compose -f docker-compose.pi.yml up -d >>"$LOG_FILE" 2>&1
+"${REPO_DIR}/deploy/compose.sh" -f docker-compose.pi.yml up -d >>"$LOG_FILE" 2>&1
 log "Redeploy complete — v${APP_VERSION} (${APP_GIT_COMMIT})"
