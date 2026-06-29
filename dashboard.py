@@ -25,7 +25,7 @@ from version import version_label
 
 # Column selection for the positions table
 _OPEN_COLS = [
-    "ticker", "name", "sector", "entry_price", "current_price",
+    "ticker", "name", "sector", "remaining_shares", "entry_price", "current_price",
     "p_l", "p_l_%", "holding_days", "bid_ask_spread_pct", "confirmation_band",
 ]
 _CLOSED_COLS = [
@@ -35,11 +35,13 @@ _CLOSED_COLS = [
 _COL_LABELS = {
     "ticker": "Ticker", "name": "Name", "sector": "Sector", "earnings_date": "Earnings",
     "entry_price": "Entry", "current_price": "Price", "exit_price": "Exit",
+    "remaining_shares": "Shares",
     "p_l": "P/L", "p_l_%": "P/L %", "holding_days": "Days",
     "bid_ask_spread_pct": "Spread", "confirmation_band": "Band",
     "exit_reason": "Exit reason",
 }
 _OPEN_HEADER_TOOLTIPS = {
+    "Shares": "Shares currently held, after any partial profit-taking exits.",
     "P/L %": "Unrealized return for the open position, including partial exits already booked.",
     "Days": "Market sessions held since entry. Positions time-exit after the configured max holding period.",
     "Spread": "Bid/ask spread percentage captured at entry or the 5-minute range proxy when live quotes were unavailable.",
@@ -327,6 +329,14 @@ def trade_table(frame: pd.DataFrame, is_open: bool = True) -> str:
         if col in display.columns and col in frame.columns:
             num = pd.to_numeric(frame.loc[display.index, col], errors="coerce")
             display[col] = num.map(lambda x: f"${x:,.2f}" if pd.notna(x) else "")
+
+    # Show the live position size; partial exits reduce this value.
+    if "remaining_shares" in display.columns and "remaining_shares" in frame.columns:
+        num = pd.to_numeric(frame.loc[display.index, "remaining_shares"], errors="coerce")
+        display["remaining_shares"] = num.map(
+            lambda x: f"{int(x):,}" if pd.notna(x) and float(x).is_integer()
+            else f"{x:,.2f}" if pd.notna(x) else ""
+        )
 
     # Format P/L columns
     if "p_l" in display.columns and "p_l" in frame.columns:

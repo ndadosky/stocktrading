@@ -590,6 +590,55 @@ def normalized_date(value: str | None) -> str:
         return today_key()
 
 
+def trade_exit_activity(rows: list[dict]) -> list[dict]:
+    """Expand recorded trade sale buckets into readable Day-page activity rows."""
+    buckets = (
+        ("shares_sold_10", "Scale +10%", "target_10", "target_10_hit_at"),
+        ("shares_sold_20", "Scale +20%", "target_20", "target_20_hit_at"),
+        ("shares_sold_30", "Final +30%", "target_30", "target_30_hit_at"),
+        ("shares_sold_protect", "Protective exit", "active_stop", "exit_datetime"),
+        ("shares_sold_stop", "Stop exit", "stop_8", "exit_datetime"),
+        ("shares_sold_time", "Time exit", "exit_price", "exit_datetime"),
+    )
+    activity: list[dict] = []
+    for row in rows:
+        for shares_column, event, reference_column, time_column in buckets:
+            try:
+                shares_sold = float(row.get(shares_column) or 0)
+            except (TypeError, ValueError):
+                shares_sold = 0
+            if shares_sold <= 0:
+                continue
+            activity.append(
+                {
+                    "ticker": row.get("ticker"),
+                    "event": event,
+                    "shares sold": int(shares_sold) if shares_sold.is_integer() else shares_sold,
+                    "reference price": row.get(reference_column),
+                    "remaining shares": row.get("remaining_shares"),
+                    "total realized P/L": row.get("realized_p_l"),
+                    "recorded at": row.get(time_column) or row.get("exit_datetime"),
+                    "position": "Open remainder" if float(row.get("remaining_shares") or 0) > 0 else "Resolved",
+                }
+            )
+    return sorted(activity, key=lambda row: (str(row.get("recorded at") or ""), str(row.get("ticker") or "")), reverse=True)
+
+
+def morning_purchase_summary(rows: list[dict], target_date: str) -> dict:
+    """Summarize new paper positions entered on the selected trading date."""
+    purchases = [
+        row for row in rows
+        if str(row.get("trade_date") or "")[:10] == target_date
+    ]
+    tickers = [str(row.get("ticker") or "").upper() for row in purchases if row.get("ticker")]
+    count = len(purchases)
+    noun = "stock" if count == 1 else "stocks"
+    message = f"{count} {noun} bought this morning"
+    if tickers:
+        message += f": {', '.join(tickers)}"
+    return {"count": count, "tickers": tickers, "message": message}
+
+
 def day_payload(target_date: str) -> dict:
     target_date = normalized_date(target_date)
     paper_performance = query_rows("paper_performance", "WHERE report_date = ?", (target_date,), 500)
@@ -602,6 +651,7 @@ def day_payload(target_date: str) -> dict:
         200,
     )
     paper_trades = query_rows("paper_trades", "WHERE trade_date <= ?", (target_date,), 500)
+    morning_purchases = morning_purchase_summary(paper_trades, target_date)
     jobs = job_rows_for_date(target_date)
     pipeline = pipeline_state()
     stages = {
@@ -610,6 +660,10 @@ def day_payload(target_date: str) -> dict:
     }
     open_positions = sum(1 for row in paper_performance if float(row.get("remaining_shares") or 0) > 0)
     resolved = sum(1 for row in paper_performance if float(row.get("remaining_shares") or 0) <= 0)
+    exit_activity = trade_exit_activity(paper_performance)
+    partial_exits = len({
+        str(row.get("ticker")) for row in exit_activity if row.get("position") == "Open remainder"
+    })
     failed_jobs = sum(1 for row in jobs if not bool(row.get("ok")))
     decision_rows = [row for row in strategy_reviews if row.get("section") == "decision"]
     decision = decision_rows[-1].get("value") if decision_rows else "no strategy review"
@@ -620,8 +674,10 @@ def day_payload(target_date: str) -> dict:
         "summary": {
             "paper_rows": len(paper_performance),
             "current_trade_rows": len(paper_trades),
+            "stocks_bought": morning_purchases["count"],
             "open_positions": open_positions,
             "resolved_trades": resolved,
+            "partial_exits": partial_exits,
             "job_runs": len(jobs),
             "failed_jobs": failed_jobs,
             "strategy_decision": decision,
@@ -630,9 +686,11 @@ def day_payload(target_date: str) -> dict:
         "jobs": jobs,
         "strategy_reviews": strategy_reviews,
         "paper_performance": paper_performance,
+        "exit_activity": exit_activity,
         "score_band": score_band,
         "components": components,
         "paper_trades": paper_trades,
+        "morning_purchases": morning_purchases,
     }
 
 
@@ -991,12 +1049,15 @@ def day_html(target_date: str) -> bytes:
     failed = summary["failed_jobs"]
     status_cls = "bad" if failed else "ok"
     status_label = f"{failed} failed job{'s' if failed != 1 else ''}" if failed else "Pipeline clear"
+    morning_purchases = payload["morning_purchases"]
+    purchase_cls = "has-buys" if morning_purchases["count"] else "no-buys"
     cards = {
         "Bankroll": f"${payload['bankroll']['base']:,.2f}",
         "Deposits": f"${payload['bankroll']['deposits']:,.2f}",
         "Paper rows": summary["paper_rows"],
         "Open positions": summary["open_positions"],
         "Resolved trades": summary["resolved_trades"],
+        "Partial exits": summary["partial_exits"],
         "Job runs": summary["job_runs"],
         "Failed jobs": summary["failed_jobs"],
         "Decision": summary["strategy_decision"],
@@ -1029,6 +1090,10 @@ main{{max-width:1400px;margin:0 auto;padding:24px 20px 64px}}
 .page-title{{margin:0 0 20px}}
 .page-title h2{{font-size:22px;font-weight:700;letter-spacing:-.02em;margin:0 0 3px}}
 .page-title .sub{{font-size:12px;color:var(--muted)}}
+.purchase-status{{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);border-left:5px solid #94a3b8;border-radius:12px;padding:17px 20px;margin-bottom:16px;box-shadow:0 1px 6px rgba(17,24,39,.03)}}
+.purchase-status.has-buys{{border-left-color:var(--green);background:#f7fdf9}}
+.purchase-count{{font-size:32px;line-height:1;font-weight:800;letter-spacing:-.04em}}
+.purchase-copy strong{{display:block;font-size:17px;letter-spacing:-.01em}}.purchase-copy span{{display:block;color:var(--muted);font-size:12px;margin-top:3px}}
 .cards{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}}
 .card{{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:0 1px 6px rgba(17,24,39,.03)}}
 .card small{{display:block;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}}
@@ -1066,6 +1131,10 @@ a{{color:var(--blue)}}
     <h2>{escape(payload['date'])}</h2>
     <div class="sub">Generated {escape(payload['generated_at'])}</div>
   </div>
+  <section class="purchase-status {purchase_cls}" aria-label="Morning purchases">
+    <div class="purchase-count">{morning_purchases['count']}</div>
+    <div class="purchase-copy"><strong>{escape(morning_purchases['message'])}</strong><span>Based on paper-trade entries dated {escape(payload['date'])}</span></div>
+  </section>
   <section class="cards">{card_html}</section>
   <div class="grid">
     <section class="panel full">
@@ -1075,6 +1144,10 @@ a{{color:var(--blue)}}
     <section class="panel full">
       <div class="panel-head"><h3>Job runs</h3><span class="sub">Scheduler activity</span></div>
       {html_table(payload['jobs'], "No job runs recorded for this date.", 10)}
+    </section>
+    <section class="panel full">
+      <div class="panel-head"><h3>Scale-outs &amp; exits</h3><span class="sub">Partial profits, stops, and final exits recorded in the paper ledger</span></div>
+      {html_table(payload['exit_activity'], "No shares were sold in this snapshot.")}
     </section>
     <section class="panel full">
       <div class="panel-head"><h3>Strategy review</h3><span class="sub">Improvement and tuning gates</span></div>
