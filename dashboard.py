@@ -398,26 +398,6 @@ def sector_warning_html(open_pos: pd.DataFrame, equity: float) -> str:
     )
 
 
-def infographic_links() -> str:
-    grouped: dict[str, dict[str, Path]] = {}
-    for path in sorted(WATCHLIST_EXPORT_DIR.glob("infographic_summary_*.*")):
-        if path.suffix.lower() not in {".html", ".png"}:
-            continue
-        date_key = path.stem.replace("infographic_summary_", "")
-        grouped.setdefault(date_key, {})[path.suffix.lower()] = path
-    if not grouped:
-        return ("<div class='empty compact'><div class='empty-icon'>▧</div>"
-                "<strong>No infographic exports yet</strong>"
-                "<span>Daily summaries will appear here after generation.</span></div>")
-    rows = []
-    for date_key in sorted(grouped, reverse=True):
-        rows.append(
-            f"<div><b>{escape(date_key)}</b>"
-            f"<span><a href='/day?date={escape(date_key)}'>Status page</a></span></div>"
-        )
-    return "<div class='schedule'>" + "".join(rows) + "</div>"
-
-
 def strategy_review_panel() -> str:
     review_date, review = read_latest_snapshot("strategy_reviews", "stored_review_date")
     if review.empty:
@@ -726,17 +706,6 @@ def build_dashboard(performance: pd.DataFrame, as_of: str) -> Path:
     review_html = strategy_review_panel()
     indices_html = market_indices_html()
 
-    stage_order = ["morning", "confirmation", "report"]
-    health_rows = []
-    for stage in stage_order:
-        info = pipeline.get(stage, {})
-        status = info.get("status", "PENDING")
-        health_rows.append(
-            f"<div><b>{escape(stage.title())}</b>"
-            f"<span class='health {escape(status.lower())}'>{escape(status)}</span></div>"
-        )
-    health_html = "<div class='schedule'>" + "".join(health_rows) + "</div>"
-
     sector_warn = sector_warning_html(open_positions, equity)
     return_color = "var(--green)" if pnl >= 0 else "var(--red)"
 
@@ -792,7 +761,6 @@ svg{{width:100%;height:auto}}
 .schedule{{display:grid;gap:0}}
 .schedule div{{display:flex;justify-content:space-between;padding:11px 0;border-top:1px solid #dbeafe}}
 .schedule b{{font-size:12px}}.schedule span{{color:var(--muted);font-size:12px}}
-.health{{font-weight:750}}.health.success{{color:var(--green)}}.health.failed,.health.blocked{{color:var(--red)}}.health.skipped,.health.degraded{{color:#b7791f}}
 .decision-badge{{display:inline-block;padding:9px 18px;border-radius:10px;font-size:15px;font-weight:700;margin-bottom:16px;border:1px solid}}
 .decision-badge.pass,.decision-badge.approved{{background:#f0fdf4;border-color:#86efac;color:var(--green)}}
 .decision-badge.blocked,.decision-badge.failed{{background:#fef2f2;border-color:#fca5a5;color:var(--red)}}
@@ -856,8 +824,6 @@ a{{color:var(--blue)}}
   <section class='panel'><div class='panel-head'><h2>Score-band performance</h2><span class='subtle'>Resolved outcomes</span></div>{analytics_html}</section>
   <section class='panel full'><div class='panel-head'><h2>Signal contribution</h2><span class='subtle'>Top components</span></div>{components_html}</section>
   <section class='panel full'><div class='panel-head'><h2>Strategy review</h2><span class='subtle'>10:30 improvement gate</span></div>{review_html}</section>
-  <section class='panel full'><div class='panel-head'><h2>Pipeline health</h2><span class='subtle'>Same-day dependency gates</span></div>{health_html}</section>
-  <section class='panel full'><div class='panel-head'><h2>Daily infographics</h2><span class='subtle'>Generated summaries</span></div>{infographic_links()}</section>
   <section class='panel full'><div class='panel-head'><h2>Account history</h2><span class='subtle'>Daily snapshots</span></div>{history_table if history_table else "<div class='empty compact'><div class='empty-icon'>▦</div><strong>No history yet</strong><span>Your first daily snapshot will appear tomorrow.</span></div>"}</section>
 </div>
 </main>
