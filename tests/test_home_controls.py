@@ -14,6 +14,7 @@ POOL_ENV = {
     "HOME_POOL_NO_POOL_JETS_ENTITY": "switch.pool_sonoff_1001e73d82_3",
     "HOME_POOL_SPA_UPPER_JETS_ENTITY": "switch.pool_sonoff_1001e73d82_4",
     "HOME_POOL_DECK_JETS_ENTITY": "switch.pool_sonoff_1001e73d82_2",
+    "HOME_POOL_LIGHTS_ENTITY": "switch.pool_lights",
 }
 
 DOOR_ENV = {
@@ -72,6 +73,19 @@ class PoolModeTests(unittest.TestCase):
         self.assertEqual(
             request.call_args.kwargs["payload"]["entity_id"],
             [POOL_ENV["HOME_POOL_DECK_JETS_ENTITY"]],
+        )
+
+    def test_pool_lights_are_controlled_independently(self) -> None:
+        with patch.dict(os.environ, POOL_ENV, clear=True), patch(
+            "home_controls._json_request", return_value={}
+        ) as request:
+            result = home_controls.home_assistant_pool_control("set_pool_lights", "on")
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["pool_lights"], "on")
+        self.assertEqual(
+            request.call_args.kwargs["payload"]["entity_id"],
+            [POOL_ENV["HOME_POOL_LIGHTS_ENTITY"]],
         )
 
 

@@ -18,6 +18,7 @@ POOL_MODE_ENTITIES = {
     "spa_upper_jets": "HOME_POOL_SPA_UPPER_JETS_ENTITY",
 }
 DECK_JETS_ENTITY = "HOME_POOL_DECK_JETS_ENTITY"
+POOL_LIGHTS_ENTITY = "HOME_POOL_LIGHTS_ENTITY"
 
 
 def _now() -> str:
@@ -245,16 +246,20 @@ def home_assistant_pool_control(action: str, value: Any = None) -> dict[str, Any
         if result.get("ok"):
             result.update({"action": action, "mode": mode})
         return result
-    if action == "set_deck_jets":
-        entity_id = os.getenv(DECK_JETS_ENTITY, "").strip()
+    if action in {"set_deck_jets", "set_pool_lights"}:
+        is_lights = action == "set_pool_lights"
+        env_name = POOL_LIGHTS_ENTITY if is_lights else DECK_JETS_ENTITY
+        label = "Pool Lights" if is_lights else "Deck Jets"
+        result_key = "pool_lights" if is_lights else "deck_jets"
+        entity_id = os.getenv(env_name, "").strip()
         if not entity_id:
-            return {"ok": False, "error": "Deck Jets switch entity is not configured"}
+            return {"ok": False, "error": f"{label} switch entity is not configured"}
         state = str(value or "").strip().lower()
         if state not in {"on", "off"}:
-            return {"ok": False, "error": "Deck Jets state must be on or off"}
+            return {"ok": False, "error": f"{label} state must be on or off"}
         result = _home_assistant_switches([entity_id], state == "on")
         if result.get("ok"):
-            result.update({"action": action, "deck_jets": state})
+            result.update({"action": action, result_key: state})
         return result
     return {"ok": False, "error": "Unknown pool-mode action"}
 
@@ -302,8 +307,10 @@ def home_controls_payload() -> dict[str, Any]:
         name: _entity(states, env_name) for name, env_name in POOL_MODE_ENTITIES.items()
     }
     deck_jets = _entity(states, DECK_JETS_ENTITY)
+    pool_lights = _entity(states, POOL_LIGHTS_ENTITY)
     pool_mode_configured = all(os.getenv(env_name, "").strip() for env_name in POOL_MODE_ENTITIES.values())
     deck_jets_configured = bool(os.getenv(DECK_JETS_ENTITY, "").strip())
+    pool_lights_configured = bool(os.getenv(POOL_LIGHTS_ENTITY, "").strip())
     valve_states = [str(_state_value(entity) or "unavailable").lower() for entity in pool_mode_entities.values()]
     pool_mode_connected = pool_mode_configured and all(entity is not None for entity in pool_mode_entities.values())
     if pool_mode_connected and all(state == "on" for state in valve_states):
@@ -375,11 +382,12 @@ def home_controls_payload() -> dict[str, Any]:
         "generated_at": _now(),
         "pool": poolsync_status(),
         "pool_mode": {
-            "configured": pool_mode_configured and deck_jets_configured,
-            "connected": pool_mode_connected and deck_jets is not None,
+            "configured": pool_mode_configured and deck_jets_configured and pool_lights_configured,
+            "connected": pool_mode_connected and deck_jets is not None and pool_lights is not None,
             "mode": selected_pool_mode,
             "valves": dict(zip(POOL_MODE_ENTITIES, valve_states)),
             "deck_jets": str(_state_value(deck_jets) or "unavailable").lower(),
+            "pool_lights": str(_state_value(pool_lights) or "unavailable").lower(),
         },
         "front_door": {
             "configured": bool(os.getenv("HOME_FRONT_DOOR_ENTITY", "").strip()),
