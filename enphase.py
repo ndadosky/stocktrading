@@ -209,6 +209,67 @@ def _normalize(system: dict[str, Any], *, system_id: str) -> dict[str, Any]:
     }
 
 
+def _interval_rows(payload: Any, *, value_name: str) -> dict[int, float]:
+    """Normalize Enphase's meter interval payload into epoch -> Wh readings."""
+    if not isinstance(payload, dict):
+        return {}
+    rows = payload.get("intervals") or payload.get("telemetry") or payload.get("data") or []
+    if not isinstance(rows, list):
+        return {}
+    normalized: dict[int, float] = {}
+    value_keys = (value_name, "wh_del", "enwh", "watt_hours", "energy", "wh")
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        timestamp = next(
+            (row.get(key) for key in ("end_at", "interval_end_at", "timestamp", "start_at") if row.get(key) is not None),
+            None,
+        )
+        value = next((row.get(key) for key in value_keys if row.get(key) is not None), None)
+        try:
+            epoch = int(float(timestamp))
+            watt_hours = float(value)
+        except (TypeError, ValueError):
+            continue
+        if epoch > 0 and watt_hours >= 0:
+            normalized[epoch] = round(watt_hours, 2)
+    return normalized
+
+
+def _merge_intervals(production: Any, consumption: Any) -> list[dict[str, Any]]:
+    produced = _interval_rows(production, value_name="production_wh")
+    consumed = _interval_rows(consumption, value_name="consumption_wh")
+    return [
+        {
+            "end_at": epoch,
+            "production_wh": produced.get(epoch),
+            "consumption_wh": consumed.get(epoch),
+        }
+        for epoch in sorted(set(produced) | set(consumed))
+    ]
+
+
+def _fetch_meter_intervals(
+    access_token: str, api_key: str, system_id: str
+) -> tuple[list[dict[str, Any]], str | None]:
+    headers = {"Authorization": f"Bearer {access_token}", "key": api_key, "Accept": "application/json"}
+    payloads: dict[str, Any] = {}
+    failures: list[str] = []
+    for name, endpoint in (
+        ("production", "production_meter"),
+        ("consumption", "consumption_meter"),
+    ):
+        query = urlencode({"key": api_key, "granularity": "day"})
+        url = f"{API_ROOT}/api/v4/systems/{system_id}/telemetry/{endpoint}?{query}"
+        try:
+            payloads[name] = _request_json(url, headers)
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError):
+            payloads[name] = {}
+            failures.append(name)
+    message = f"No {', '.join(failures)} interval data returned." if failures else None
+    return _merge_intervals(payloads.get("production"), payloads.get("consumption")), message
+
+
 def _fetch_solar(access_token: str, previous: dict[str, Any] | None) -> dict[str, Any]:
     api_key = os.getenv("ENPHASE_API_KEY", "").strip()
     system_id = os.getenv("ENPHASE_SYSTEM_ID", "").strip() or str((previous or {}).get("system_id") or "")
@@ -219,7 +280,11 @@ def _fetch_solar(access_token: str, previous: dict[str, Any] | None) -> dict[str
         summary = payload.get("system") if isinstance(payload, dict) and isinstance(payload.get("system"), dict) else payload
         if not isinstance(summary, dict):
             raise ValueError("Enphase returned an unexpected system summary")
-        return _normalize(summary, system_id=system_id)
+        solar = _normalize(summary, system_id=system_id)
+        intervals, chart_message = _fetch_meter_intervals(access_token, api_key, system_id)
+        solar["intervals"] = intervals
+        solar["chart_message"] = chart_message
+        return solar
 
     url = f"{API_ROOT}/api/v4/systems?{urlencode({'key': api_key})}"
     payload = _request_json(url, headers)
@@ -227,7 +292,11 @@ def _fetch_solar(access_token: str, previous: dict[str, Any] | None) -> dict[str
     if not isinstance(systems, list) or not systems:
         raise ValueError("No authorized Enphase systems were found")
     system = systems[0]
-    return _normalize(system, system_id=str(system.get("system_id") or ""))
+    discovered_id = str(system.get("system_id") or "")
+    solar = _normalize(system, system_id=discovered_id)
+    solar["intervals"] = []
+    solar["chart_message"] = "Interval history will load on the next refresh."
+    return solar
 
 
 def _solar_status_locked() -> dict[str, Any]:
@@ -236,7 +305,8 @@ def _solar_status_locked() -> dict[str, Any]:
     try:
         cached, fetched_at = _cached_solar()
         cache_minutes = max(30, int(os.getenv("ENPHASE_CACHE_MINUTES", "30")))
-        if cached and fetched_at and fetched_at > _utcnow() - timedelta(minutes=cache_minutes):
+        cache_has_chart = isinstance(cached, dict) and "intervals" in cached
+        if cached and cache_has_chart and fetched_at and fetched_at > _utcnow() - timedelta(minutes=cache_minutes):
             return {**cached, "cached": True, "fetched_at": fetched_at.isoformat()}
         access_token = _valid_access_token()
         if not access_token:
