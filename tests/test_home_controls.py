@@ -26,9 +26,11 @@ CAR_ENV = {
     "HOME_KIA_BATTERY_ENTITY": "sensor.ev9_ev_battery_level",
     "HOME_KIA_CHARGING_ENTITY": "binary_sensor.ev9_charging",
     "HOME_KIA_RANGE_ENTITY": "sensor.ev9_range",
+    "HOME_KIA_LOCK_ENTITY": "lock.ev9_door_lock",
     "HOME_VOLVO_BATTERY_ENTITY": "sensor.xc40_battery_charge_level",
     "HOME_VOLVO_CHARGING_ENTITY": "binary_sensor.xc40_charging",
     "HOME_VOLVO_RANGE_ENTITY": "sensor.xc40_electric_range",
+    "HOME_VOLVO_LOCK_ENTITY": "lock.volvo_xc40_lock",
 }
 
 
@@ -113,12 +115,14 @@ class VehicleStatusTests(unittest.TestCase):
                 "state": "241",
                 "attributes": {"unit_of_measurement": "mi"},
             },
+            CAR_ENV["HOME_KIA_LOCK_ENTITY"]: {"state": "locked", "attributes": {}},
             CAR_ENV["HOME_VOLVO_BATTERY_ENTITY"]: {"state": "48", "attributes": {}},
             CAR_ENV["HOME_VOLVO_CHARGING_ENTITY"]: {"state": "on", "attributes": {}},
             CAR_ENV["HOME_VOLVO_RANGE_ENTITY"]: {
                 "state": "116",
                 "attributes": {"unit_of_measurement": "mi"},
             },
+            CAR_ENV["HOME_VOLVO_LOCK_ENTITY"]: {"state": "unlocked", "attributes": {}},
         }
         with patch.dict(os.environ, CAR_ENV, clear=True), patch(
             "home_controls._ha_states", return_value=(states, None)
@@ -133,7 +137,9 @@ class VehicleStatusTests(unittest.TestCase):
         self.assertEqual(cars[0]["range"], 241.0)
         self.assertEqual(cars[0]["range_unit"], "mi")
         self.assertEqual(cars[0]["image"], "/assets/home/kia-ev9-white.jpg")
+        self.assertTrue(cars[0]["locked"])
         self.assertEqual(cars[1]["name"], "Volvo XC40")
+        self.assertEqual(cars[1]["lock_state"], "unlocked")
         self.assertIn("black-roof", cars[1]["image"])
 
 
