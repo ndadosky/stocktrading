@@ -11,3 +11,7 @@ review_date,status,setting,old_value,new_value,training_sample,holdout_sample,ba
 2026-06-27,user_approved,risk.max_sector_positions,unlimited,1,,,,,,,,,,,pending,"Allow only one active name per sector"
 2026-06-27,user_approved,risk.minimum_cash_reserve_pct,0,40,,,,,,,,,,,pending,"Preserve capacity for stronger future setups"
 2026-06-27,user_approved,risk.post_target_10_stop,-8_pct,breakeven,,,,,,,,,,,pending,"Lock approximately half of the first 10 percent move instead of allowing the balance to reach the original stop"
+2026-06-29,user_approved,risk.max_open_positions,unlimited,50,,,,,,,,,,,pending,"Cap the portfolio at 50 simultaneously open companies"
+2026-06-29,user_approved,risk.max_shares_per_position,unlimited,500,,,,,,,,,,,pending,"Cap each company position at 500 shares"
+2026-06-29,user_approved,risk.max_new_positions_per_day,6,15,,,,,,,,,,,pending,"Allow up to 15 new purchases per trading day"
+2026-06-29,user_approved,risk.max_open_positions,50,unlimited,,,,,,,,,,,pending,"Rely on daily entry, cash, heat, and sector controls instead of a fixed total-position cap"

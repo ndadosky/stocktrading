@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 from db import get_engine, init_schema, table_exists
 from scanner_config import STARTING_CAPITAL, ensure_directories
@@ -16,6 +16,30 @@ def normalize_for_sql(frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
         return frame.copy()
     return frame.copy().where(pd.notna(frame), None)
+
+
+def ensure_snapshot_columns(connection, table: str, frame: pd.DataFrame) -> None:
+    """Add newly introduced snapshot columns without dropping historical rows."""
+    existing = {column["name"] for column in inspect(connection).get_columns(table.lower())}
+    for column in frame.columns:
+        if column in existing:
+            continue
+        series = frame[column]
+        values = series.dropna()
+        if pd.api.types.is_bool_dtype(series) or (
+            not values.empty and values.map(lambda value: isinstance(value, bool)).all()
+        ):
+            sql_type = "BOOLEAN"
+        elif pd.api.types.is_integer_dtype(series):
+            sql_type = "BIGINT"
+        elif pd.api.types.is_numeric_dtype(series):
+            sql_type = "DOUBLE PRECISION"
+        else:
+            sql_type = "TEXT"
+        safe_column = str(column).replace('"', '""')
+        safe_table = table.lower().replace('"', '""')
+        connection.execute(text(f'ALTER TABLE "{safe_table}" ADD COLUMN "{safe_column}" {sql_type}'))
+        existing.add(column)
 
 
 def table_count(table: str) -> int:
@@ -151,6 +175,7 @@ def append_snapshot(table: str, frame: pd.DataFrame, date_column: str, date_valu
     engine = get_engine()
     with engine.begin() as connection:
         if table_exists(table):
+            ensure_snapshot_columns(connection, table, snapshot)
             connection.execute(
                 text(f'DELETE FROM "{table.lower()}" WHERE "{date_column}" = :date_value'),
                 {"date_value": date_value},

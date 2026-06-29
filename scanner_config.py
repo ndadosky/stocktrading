@@ -49,6 +49,7 @@ def load_strategy_settings() -> dict:
 
 
 STRATEGY = load_strategy_settings()
+STRATEGY_VERSION = str(STRATEGY["version"])
 MORNING_WEIGHTS = STRATEGY["morning_weights"]
 CONFIRMATION_WEIGHTS = STRATEGY["confirmation_weights"]
 FIRST_TARGET_GAIN_PCT = float(STRATEGY["risk"]["scale_out"]["first_target_gain_pct"])
@@ -61,6 +62,9 @@ MAX_PORTFOLIO_HEAT_PCT = float(STRATEGY["risk"]["max_portfolio_heat_pct"])
 RISK_PER_TRADE_PCT = float(STRATEGY["risk"]["risk_per_trade_pct"])
 MAX_DAILY_PAPER_TRADES = int(os.getenv(
     "STOCK_MAX_DAILY_TRADES", str(STRATEGY["risk"]["max_new_positions_per_day"])
+))
+MAX_SHARES_PER_POSITION = int(os.getenv(
+    "STOCK_MAX_SHARES_PER_POSITION", str(STRATEGY["risk"]["max_shares_per_position"])
 ))
 MAX_POSITION_EXPOSURE_PCT = float(STRATEGY["risk"]["max_position_exposure_pct"])
 MINIMUM_CASH_RESERVE_PCT = float(STRATEGY["risk"]["minimum_cash_reserve_pct"])

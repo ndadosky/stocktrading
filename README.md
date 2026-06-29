@@ -67,7 +67,8 @@ earnings proximity, score band, and every scoring component that fired.
 
 - Starting capital: **$25,000**
 - Entry size: **dynamic**, risking at most **0.5% of current equity** at the stop
-- Maximum: **one new confirmed trade per day** and **six open positions**
+- Maximum: **15 new confirmed trades per day** with **no fixed total-position cap**
+- Share ceiling: **500 shares per company**
 - Position ceiling: **10% of current equity**
 - Sector ceiling: **20% of current equity** and **one open position per sector**
 - Portfolio heat ceiling: **3% of current equity at the active stops**

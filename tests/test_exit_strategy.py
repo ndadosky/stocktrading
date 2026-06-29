@@ -37,6 +37,10 @@ class ExitStrategyTests(unittest.TestCase):
         self.assertTrue(pd.isna(trades.iloc[0]["target_30"]))
         self.assertAlmostEqual(float(trades.iloc[0]["stop_8"]), 9.5)
         self.assertAlmostEqual(float(trades.iloc[0]["active_stop"]), 9.5)
+        self.assertEqual(trades.iloc[0]["entry_strategy_version"], daily_report.LEGACY_STRATEGY_VERSION)
+        self.assertEqual(trades.iloc[0]["active_strategy_version"], daily_report.STRATEGY_VERSION)
+        self.assertTrue(bool(trades.iloc[0]["strategy_changed_mid_trade"]))
+        self.assertTrue(pd.notna(trades.iloc[0]["strategy_changed_at"]))
 
     def test_runner_becomes_due_after_two_market_sessions(self) -> None:
         hit = "2026-06-29T10:00:00-04:00"

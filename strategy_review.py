@@ -54,10 +54,30 @@ def build_review_rows(review_date: str | None = None) -> list[dict]:
         resolved["p_l"] = pd.to_numeric(resolved.get("realized_p_l"), errors="coerce").fillna(0)
         resolved["return_pct"] = resolved["p_l"] / resolved["cost"] * 100
 
-    total_resolved = len(resolved)
-    hit_rate = float(resolved["success"].mean() * 100) if total_resolved else 0.0
-    expectancy = float(resolved["return_pct"].mean()) if total_resolved else 0.0
-    latest50 = resolved.tail(50)
+    current_version = str(settings.get("version") or "unknown")
+    if not resolved.empty:
+        if "entry_strategy_version" not in resolved:
+            resolved["entry_strategy_version"] = "legacy-unversioned"
+        if "active_strategy_version" not in resolved:
+            resolved["active_strategy_version"] = resolved["entry_strategy_version"]
+        if "exit_strategy_version" not in resolved:
+            resolved["exit_strategy_version"] = resolved["active_strategy_version"]
+        changed = (
+            resolved.get("strategy_changed_mid_trade", pd.Series(False, index=resolved.index))
+            .astype(str).str.lower().isin({"1", "true", "yes"})
+        )
+        resolved["strategy_changed_mid_trade"] = changed
+        clean_current = resolved[
+            resolved["entry_strategy_version"].astype(str).eq(current_version) & ~changed
+        ].copy()
+    else:
+        clean_current = resolved
+
+    all_resolved = len(resolved)
+    total_resolved = len(clean_current)
+    hit_rate = float(clean_current["success"].mean() * 100) if total_resolved else 0.0
+    expectancy = float(clean_current["return_pct"].mean()) if total_resolved else 0.0
+    latest50 = clean_current.tail(50)
     latest50_hit = float(latest50["success"].mean() * 100) if len(latest50) else 0.0
     holdout_count = int(total_resolved * policy["chronological_holdout_pct"] / 100) if total_resolved >= policy["minimum_resolved_trades"] else 0
     training_count = max(0, total_resolved - holdout_count)
@@ -73,14 +93,36 @@ def build_review_rows(review_date: str | None = None) -> list[dict]:
 
     min_resolved = int(policy["minimum_resolved_trades"])
     min_holdout = int(policy["minimum_holdout_trades"])
-    add("sample", "resolved_trades", total_resolved, "blocked" if total_resolved < min_resolved else "pass", f"Need {max(0, min_resolved - total_resolved)} more before tuning.")
+    add("sample", "resolved_trades", total_resolved, "blocked" if total_resolved < min_resolved else "pass", f"Clean {current_version} cohort only; {all_resolved} resolved across all cohorts. Need {max(0, min_resolved - total_resolved)} more before tuning.")
+    add("sample", "all_resolved_trades", all_resolved, "monitor", "Historical baseline retained across strategy versions.")
+    mixed_count = int(resolved["strategy_changed_mid_trade"].sum()) if not resolved.empty else 0
+    add("sample", "mixed_transition_trades", mixed_count, "monitor", "Excluded from clean before/after tuning samples.")
     add("holdout", "training_trades", training_count, "blocked" if holdout_count < min_holdout else "pass")
     add("holdout", "frozen_holdout_trades", holdout_count, "blocked" if holdout_count < min_holdout else "pass", f"Minimum holdout trades: {min_holdout}.")
-    add("performance", "overall_success_rate", f"{hit_rate:.1f}%", "monitor", "Success is shares_sold_10 > 0 before the -8% stop.")
+    first_target = settings["risk"]["scale_out"]["first_target_gain_pct"]
+    stop_loss = settings["risk"]["stop_loss_pct"]
+    add("performance", "overall_success_rate", f"{hit_rate:.1f}%", "monitor", f"Clean {current_version}: reached +{first_target}% before the -{stop_loss}% stop.")
     add("performance", "latest_50_success_rate", f"{latest50_hit:.1f}%", "monitor", f"Target is {policy['target_success_rate_pct']}%.")
     add("performance", "expectancy", f"{expectancy:.2f}%", "monitor")
     add("analytics", "score_band_rows", len(score_band), "blocked" if score_band.empty else "pass")
     add("analytics", "component_rows", len(components), "blocked" if components.empty else "pass")
+    if not resolved.empty:
+        cohort_labels = resolved["entry_strategy_version"].fillna("legacy-unversioned").astype(str)
+        cohort_labels = cohort_labels.where(
+            ~resolved["strategy_changed_mid_trade"],
+            cohort_labels + " → " + resolved["exit_strategy_version"].fillna(resolved["active_strategy_version"]).astype(str) + " (mixed)",
+        )
+        for cohort, indexes in resolved.groupby(cohort_labels, sort=True).groups.items():
+            cohort_rows = resolved.loc[indexes]
+            cohort_hit = float(cohort_rows["success"].mean() * 100)
+            cohort_expectancy = float(cohort_rows["return_pct"].mean())
+            add(
+                "strategy_cohort",
+                f"cohort_{cohort}",
+                f"{len(cohort_rows)} trades · {cohort_hit:.1f}% hit · {cohort_expectancy:+.2f}% expectancy",
+                "monitor",
+                "Mixed cohorts are descriptive only and excluded from tuning gates." if "(mixed)" in cohort else "Clean entry/exit cohort.",
+            )
     add("database", "app_job_runs", health["job_runs"], "pass")
     add("database", "failed_job_runs", health["failed_runs"], "blocked" if health["failed_runs"] else "pass", health["latest_failure"])
     add("risk", "controls", "unchanged", "pass", f"Stop {settings['risk']['stop_loss_pct']}%, slippage {settings['execution']['slippage_bps']} bps, heat {settings['risk']['max_portfolio_heat_pct']}%, spread max {settings['risk']['max_bid_ask_spread_pct']}%.")

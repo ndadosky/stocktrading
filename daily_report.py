@@ -15,10 +15,11 @@ from scanner_config import (
     FIRST_TARGET_GAIN_PCT, MAX_BID_ASK_SPREAD_PCT, MAX_DAILY_PAPER_TRADES,
     MAX_HOLDING_DAYS, MAX_PORTFOLIO_HEAT_PCT,
     MAX_POSITION_EXPOSURE_PCT, MAX_SECTOR_EXPOSURE_PCT, MAX_SECTOR_POSITIONS,
+    MAX_SHARES_PER_POSITION,
     MINIMUM_CASH_RESERVE_PCT, MIN_CONFIRMATION_SCORE_TO_BUY, PAPER_TRADES_FILE,
     RISK_PER_TRADE_PCT, RUNNER_EXIT_SESSIONS, RUNNER_STOP_GAIN_PCT,
     SCALE_OUT_FIRST_PCT, SCALE_OUT_SECOND_PCT, SECOND_TARGET_GAIN_PCT,
-    SLIPPAGE_BPS, STARTING_CAPITAL, STOP_LOSS_PCT,
+    SLIPPAGE_BPS, STARTING_CAPITAL, STOP_LOSS_PCT, STRATEGY_VERSION,
     WATCHLIST_EXPORT_DIR, ensure_directories,
 )
 from market_calendar import sessions_until
@@ -36,9 +37,12 @@ TRADE_COLUMNS = [
     "shares_sold_30", "shares_sold_protect", "shares_sold_stop", "shares_sold_time",
     "target_10_hit_at", "target_20_hit_at", "target_30_hit_at", "last_evaluated_at",
     "corporate_action_factor", "last_corporate_action_at", "data_failure_count", "review_flag",
-    "holding_days", "last_updated",
+    "holding_days", "entry_strategy_version", "active_strategy_version",
+    "exit_strategy_version", "strategy_changed_mid_trade", "strategy_changed_at",
+    "last_updated",
 ]
 OPEN_STATUS = "OPEN"
+LEGACY_STRATEGY_VERSION = "legacy-pre-v2.2.5"
 
 
 def flatten_columns(frame: pd.DataFrame) -> pd.DataFrame:
@@ -78,6 +82,22 @@ def load_trades() -> pd.DataFrame:
             pd.to_numeric(trades["shares"], errors="coerce").fillna(0)
         )
         active = remaining.gt(0)
+        now = datetime.now().astimezone().isoformat(timespec="seconds")
+        missing_entry = trades["entry_strategy_version"].isna() | trades["entry_strategy_version"].astype(str).str.strip().eq("")
+        trades.loc[missing_entry, "entry_strategy_version"] = LEGACY_STRATEGY_VERSION
+        missing_active = trades["active_strategy_version"].isna() | trades["active_strategy_version"].astype(str).str.strip().eq("")
+        trades.loc[missing_active & ~active, "active_strategy_version"] = trades.loc[missing_active & ~active, "entry_strategy_version"]
+        trades.loc[missing_active & active, "active_strategy_version"] = STRATEGY_VERSION
+        strategy_change = active & trades["active_strategy_version"].astype(str).ne(STRATEGY_VERSION)
+        trades.loc[strategy_change, "active_strategy_version"] = STRATEGY_VERSION
+        entry_differs = active & trades["entry_strategy_version"].astype(str).ne(trades["active_strategy_version"].astype(str))
+        trades["strategy_changed_mid_trade"] = (
+            trades["strategy_changed_mid_trade"].astype(str).str.lower().isin({"1", "true", "yes"}) | entry_differs
+        )
+        changed_at_missing = trades["strategy_changed_at"].isna() | trades["strategy_changed_at"].astype(str).str.strip().eq("")
+        trades.loc[entry_differs & changed_at_missing, "strategy_changed_at"] = now
+        missing_exit = trades["exit_strategy_version"].isna() | trades["exit_strategy_version"].astype(str).str.strip().eq("")
+        trades.loc[~active & missing_exit, "exit_strategy_version"] = trades.loc[~active & missing_exit, "active_strategy_version"]
         # Apply the active strategy to positions still carrying shares. Database
         # column names remain legacy names for compatibility with existing Pi data.
         trades.loc[active, "target_10"] = entry[active] * (1 + FIRST_TARGET_GAIN_PCT / 100)
@@ -122,6 +142,7 @@ def calculate_position_size(equity: float, available_cash: float, entry_price: f
     if risk_per_share <= 0 or deployable_cash <= 0:
         return 0
     return max(0, min(
+        MAX_SHARES_PER_POSITION,
         floor(risk_budget / risk_per_share),
         floor(exposure_budget / entry_price),
         floor(deployable_cash / entry_price),
@@ -285,6 +306,11 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
             "last_evaluated_at": _entry_datetime(row, today), "holding_days": 1,
             "corporate_action_factor": 1.0, "last_corporate_action_at": pd.NA,
             "data_failure_count": 0, "review_flag": "",
+            "entry_strategy_version": STRATEGY_VERSION,
+            "active_strategy_version": STRATEGY_VERSION,
+            "exit_strategy_version": pd.NA,
+            "strategy_changed_mid_trade": False,
+            "strategy_changed_at": pd.NA,
             "last_updated": datetime.now().astimezone().isoformat(timespec="seconds"),
         })
         available_cash -= trade_cost
@@ -379,6 +405,11 @@ def _sell_lot(
     frame.at[idx, "exit_price"] = fill
     frame.at[idx, "exit_reason"] = reason
     frame.at[idx, "status"] = "CLOSED" if remaining - quantity <= 0 else "PARTIAL"
+    if remaining - quantity <= 0:
+        active_version = frame.at[idx, "active_strategy_version"]
+        frame.at[idx, "exit_strategy_version"] = (
+            str(active_version) if pd.notna(active_version) and str(active_version).strip() else STRATEGY_VERSION
+        )
 
 
 def update_trade_lifecycle(trades: pd.DataFrame) -> pd.DataFrame:
