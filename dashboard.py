@@ -500,6 +500,138 @@ def market_indices_html() -> str:
     return "<div class='indices'>" + "".join(index_card(symbol, label) for symbol, label in symbols) + "</div>"
 
 
+def trading_statistics(performance: pd.DataFrame, capital_base: float) -> dict:
+    """Calculate resolved-trade performance and morning-score diagnostics."""
+    empty = {
+        "total_trades": 0, "win_rate": 0.0, "average_winner": 0.0,
+        "average_loser": 0.0, "average_holding_period": 0.0,
+        "average_return": 0.0, "largest_drawdown": 0.0,
+        "largest_drawdown_pct": 0.0, "profit_factor": None,
+        "maximum_consecutive_losses": 0, "maximum_consecutive_wins": 0,
+        "score_bands": [],
+    }
+    if performance.empty or "remaining_shares" not in performance.columns:
+        return empty
+
+    remaining = pd.to_numeric(performance["remaining_shares"], errors="coerce").fillna(0)
+    closed = performance.loc[remaining.le(0)].copy()
+    if closed.empty:
+        return empty
+
+    def numeric(column: str) -> pd.Series:
+        if column not in closed.columns:
+            return pd.Series(0.0, index=closed.index, dtype=float)
+        return pd.to_numeric(closed[column], errors="coerce").fillna(0.0)
+
+    order_source = closed["exit_datetime"] if "exit_datetime" in closed else closed.get("entry_datetime")
+    if order_source is not None:
+        closed["_order"] = pd.to_datetime(order_source, errors="coerce", utc=True)
+        closed = closed.sort_values("_order", kind="mergesort", na_position="last")
+
+    pnl = numeric("p_l").reindex(closed.index)
+    returns = numeric("p_l_%").reindex(closed.index)
+    holding = numeric("holding_days").reindex(closed.index)
+    winners = pnl[pnl.gt(0)]
+    losers = pnl[pnl.lt(0)]
+    gross_profit = float(winners.sum())
+    gross_loss = abs(float(losers.sum()))
+
+    cumulative = 0.0
+    peak = 0.0
+    largest_drawdown = 0.0
+    max_wins = max_losses = current_wins = current_losses = 0
+    for value in pnl.tolist():
+        cumulative += float(value)
+        peak = max(peak, cumulative)
+        largest_drawdown = max(largest_drawdown, peak - cumulative)
+        if value > 0:
+            current_wins += 1
+            current_losses = 0
+            max_wins = max(max_wins, current_wins)
+        elif value < 0:
+            current_losses += 1
+            current_wins = 0
+            max_losses = max(max_losses, current_losses)
+        else:
+            current_wins = current_losses = 0
+
+    score_bands = []
+    if "morning_score" in closed.columns:
+        scores = pd.to_numeric(closed["morning_score"], errors="coerce")
+        band_masks = (
+            ("45+", scores.ge(45)),
+            ("40–44", scores.ge(40) & scores.lt(45)),
+            ("35–39", scores.ge(35) & scores.lt(40)),
+            ("Below 35", scores.lt(35)),
+        )
+        for label, mask in band_masks:
+            indexes = closed.index[mask.fillna(False)]
+            if indexes.empty:
+                continue
+            band_pnl = pnl.reindex(indexes)
+            band_returns = returns.reindex(indexes)
+            score_bands.append({
+                "score": label,
+                "trades": len(indexes),
+                "win_rate": float(band_pnl.gt(0).mean() * 100),
+                "average_return": float(band_returns.mean()),
+                "total_p_l": float(band_pnl.sum()),
+            })
+
+    total = len(closed)
+    return {
+        "total_trades": total,
+        "win_rate": float(winners.size / total * 100) if total else 0.0,
+        "average_winner": float(winners.mean()) if not winners.empty else 0.0,
+        "average_loser": float(losers.mean()) if not losers.empty else 0.0,
+        "average_holding_period": float(holding.mean()) if total else 0.0,
+        "average_return": float(returns.mean()) if total else 0.0,
+        "largest_drawdown": largest_drawdown,
+        "largest_drawdown_pct": largest_drawdown / capital_base * 100 if capital_base else 0.0,
+        "profit_factor": gross_profit / gross_loss if gross_loss else None,
+        "maximum_consecutive_losses": max_losses,
+        "maximum_consecutive_wins": max_wins,
+        "score_bands": score_bands,
+    }
+
+
+def trading_statistics_html(stats: dict) -> str:
+    """Render the dashboard statistics cards and score-band comparison."""
+    if not stats["total_trades"]:
+        return ("<div class='empty compact'><strong>Awaiting resolved trades</strong>"
+                "<span>Trading statistics appear after positions fully close.</span></div>")
+    profit_factor = "∞" if stats["profit_factor"] is None else f"{stats['profit_factor']:.2f}"
+    items = (
+        ("Total trades", f"{stats['total_trades']}"),
+        ("Win rate", f"{stats['win_rate']:.1f}%"),
+        ("Average winner", f"${stats['average_winner']:,.2f}"),
+        ("Average loser", f"-${abs(stats['average_loser']):,.2f}"),
+        ("Average holding period", f"{stats['average_holding_period']:.1f} sessions"),
+        ("Average return / trade", f"{stats['average_return']:+.2f}%"),
+        ("Largest drawdown", f"-${stats['largest_drawdown']:,.2f} ({stats['largest_drawdown_pct']:.2f}%)"),
+        ("Profit factor", profit_factor),
+        ("Maximum consecutive losses", f"{stats['maximum_consecutive_losses']}"),
+        ("Maximum consecutive wins", f"{stats['maximum_consecutive_wins']}"),
+    )
+    cards = "".join(
+        f"<div class='stat-card'><small>{escape(label)}</small><strong>{escape(value)}</strong></div>"
+        for label, value in items
+    )
+    score_rows = "".join(
+        f"<tr><td><b>{escape(row['score'])}</b></td><td>{row['trades']}</td>"
+        f"<td>{row['win_rate']:.1f}%</td><td>{row['average_return']:+.2f}%</td>"
+        f"<td>${row['total_p_l']:,.2f}</td></tr>"
+        for row in stats["score_bands"]
+    )
+    score_table = (
+        "<table><thead><tr><th>Morning score</th><th>Trades</th><th>Win rate</th>"
+        "<th>Avg return</th><th>Total P/L</th></tr></thead>"
+        f"<tbody>{score_rows}</tbody></table>"
+        if score_rows else "<div class='empty compact'><span>No resolved trades have a morning score yet.</span></div>"
+    )
+    return f"<div class='stats-grid'>{cards}</div><h3 class='stats-subhead'>Return by screener score</h3>{score_table}"
+
+
 def build_dashboard(performance: pd.DataFrame, as_of: str) -> Path:
     ensure_directories()
     from daily_report import account_summary
@@ -522,6 +654,7 @@ def build_dashboard(performance: pd.DataFrame, as_of: str) -> Path:
     else:
         hit_rate = 0.0
     account_return = pnl / capital_base * 100 if capital_base else 0.0
+    stats_html = trading_statistics_html(trading_statistics(performance, capital_base))
     utilization_pct = min(cost / capital_base * 100 if capital_base else 0.0, 100.0)
     util_bar_color = "#2563eb" if utilization_pct < 80 else "#b45309"
 
@@ -636,6 +769,11 @@ h1{{font-size:18px;letter-spacing:-.02em;margin:0}}
 .card strong{{font-size:19px;letter-spacing:-.025em;margin-top:8px}}
 .card strong.positive{{color:var(--green)}}.card strong.negative{{color:var(--red)}}
 .card strong.grade-positive{{color:var(--green)}}.card strong.grade-warning{{color:#b45309}}.card strong.grade-negative{{color:var(--red)}}.card strong.grade-neutral{{color:var(--muted)}}
+.stats-grid{{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}}
+.stat-card{{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fbfcfe;min-width:0}}
+.stat-card small{{display:block;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;line-height:1.35}}
+.stat-card strong{{display:block;margin-top:8px;font-size:18px;letter-spacing:-.02em}}
+.stats-subhead{{font-size:13px;margin:22px 0 8px}}
 .util-bar{{height:4px;background:#f3f4f6;border-radius:999px;margin-top:10px;overflow:hidden}}
 .util-fill{{height:100%;border-radius:999px}}
 .util-label{{font-size:11px;color:var(--muted);display:block;margin-top:5px}}
@@ -684,8 +822,8 @@ a{{color:var(--blue)}}
 #open-pos-table th[data-sort='desc']::after{{content:'↓';opacity:1}}
 #open-pos-table th:hover{{color:var(--ink)}}
 @media(max-width:1050px){{.hero{{grid-template-columns:1fr}}.return{{text-align:left}}.indices{{grid-template-columns:repeat(3,minmax(0,1fr))}}}}
-@media(max-width:900px){{.cards{{grid-template-columns:repeat(2,1fr)}}.layout{{grid-template-columns:1fr}}.panel.full{{grid-column:auto}}}}
-@media(max-width:560px){{main{{padding:24px 16px}}header{{align-items:flex-start}}.status{{display:none}}.hero{{padding:25px;align-items:flex-start}}.equity{{font-size:40px}}.indices{{grid-template-columns:1fr}}.cards{{grid-template-columns:1fr 1fr}}}}
+@media(max-width:900px){{.cards{{grid-template-columns:repeat(2,1fr)}}.stats-grid{{grid-template-columns:repeat(2,1fr)}}.layout{{grid-template-columns:1fr}}.panel.full{{grid-column:auto}}}}
+@media(max-width:560px){{main{{padding:24px 16px}}header{{align-items:flex-start}}.status{{display:none}}.hero{{padding:25px;align-items:flex-start}}.equity{{font-size:40px}}.indices{{grid-template-columns:1fr}}.cards{{grid-template-columns:1fr 1fr}}.stats-grid{{grid-template-columns:1fr 1fr}}}}
 </style></head><body><main>
 <header>
   <div class='brand'><div class='mark'>P</div><div><p class='eyebrow'>Paper trading</p><h1>Pre-Breakout Portfolio</h1></div></div>
@@ -708,6 +846,10 @@ a{{color:var(--blue)}}
   <section class='panel full'>
     <div class='panel-head'><h2>Resolved trades</h2><span class='subtle'>{len(closed)} completed</span></div>
     {trade_table(closed, is_open=False)}
+  </section>
+  <section class='panel full'>
+    <div class='panel-head'><h2>Trading statistics</h2><span class='subtle'>Resolved trades only</span></div>
+    {stats_html}
   </section>
   <section class='panel'><div class='panel-head'><h2>Score-band performance</h2><span class='subtle'>Resolved outcomes</span></div>{analytics_html}</section>
   <section class='panel full'><div class='panel-head'><h2>Signal contribution</h2><span class='subtle'>Top components</span></div>{components_html}</section>
