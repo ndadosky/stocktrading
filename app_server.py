@@ -29,8 +29,11 @@ from job_storage import (
 from scanner_config import (
     CANDIDATES_FILE,
     DASHBOARD_FILE,
+    FIRST_TARGET_GAIN_PCT,
     MIN_CONFIRMATION_SCORE_TO_BUY,
     PIPELINE_STATE_FILE,
+    RUNNER_EXIT_SESSIONS,
+    SECOND_TARGET_GAIN_PCT,
     WATCHLIST_EXPORT_DIR,
     ensure_directories,
 )
@@ -600,12 +603,12 @@ def normalized_date(value: str | None) -> str:
 def trade_exit_activity(rows: list[dict]) -> list[dict]:
     """Expand recorded trade sale buckets into readable Day-page activity rows."""
     buckets = (
-        ("shares_sold_10", "Scale +10%", "target_10", "target_10_hit_at"),
-        ("shares_sold_20", "Scale +20%", "target_20", "target_20_hit_at"),
-        ("shares_sold_30", "Final +30%", "target_30", "target_30_hit_at"),
+        ("shares_sold_10", f"Scale +{FIRST_TARGET_GAIN_PCT:g}%", "target_10", "target_10_hit_at"),
+        ("shares_sold_20", f"Scale +{SECOND_TARGET_GAIN_PCT:g}%", "target_20", "target_20_hit_at"),
+        ("shares_sold_30", "Legacy final target", "target_30", "target_30_hit_at"),
         ("shares_sold_protect", "Protective exit", "active_stop", "exit_datetime"),
         ("shares_sold_stop", "Stop exit", "stop_8", "exit_datetime"),
-        ("shares_sold_time", "Time exit", "exit_price", "exit_datetime"),
+        ("shares_sold_time", f"Runner/time exit ({RUNNER_EXIT_SESSIONS} sessions)", "exit_price", "exit_datetime"),
     )
     activity: list[dict] = []
     for row in rows:

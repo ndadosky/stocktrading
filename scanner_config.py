@@ -51,7 +51,8 @@ def load_strategy_settings() -> dict:
 STRATEGY = load_strategy_settings()
 MORNING_WEIGHTS = STRATEGY["morning_weights"]
 CONFIRMATION_WEIGHTS = STRATEGY["confirmation_weights"]
-TAKE_PROFIT_PCT = float(STRATEGY["risk"]["take_profit_pct"])
+FIRST_TARGET_GAIN_PCT = float(STRATEGY["risk"]["scale_out"]["first_target_gain_pct"])
+SECOND_TARGET_GAIN_PCT = float(STRATEGY["risk"]["scale_out"]["second_target_gain_pct"])
 STOP_LOSS_PCT = float(STRATEGY["risk"]["stop_loss_pct"])
 MAX_HOLDING_DAYS = int(STRATEGY["risk"]["max_holding_days"])
 SLIPPAGE_BPS = float(STRATEGY["execution"]["slippage_bps"])
@@ -66,12 +67,15 @@ MINIMUM_CASH_RESERVE_PCT = float(STRATEGY["risk"]["minimum_cash_reserve_pct"])
 MAX_SECTOR_POSITIONS = int(STRATEGY["risk"]["max_sector_positions"])
 EARNINGS_BLACKOUT_SESSIONS = int(STRATEGY["risk"]["earnings_blackout_sessions"])
 MAX_BID_ASK_SPREAD_PCT = float(STRATEGY["risk"]["max_bid_ask_spread_pct"])
-SCALE_OUT_10_PCT = float(STRATEGY["risk"]["scale_out"]["target_10_initial_shares_pct"])
-SCALE_OUT_20_PCT = float(STRATEGY["risk"]["scale_out"]["target_20_initial_shares_pct"])
-BREAKEVEN_AFTER_TARGET_10_PCT = float(
-    STRATEGY["risk"]["scale_out"]["breakeven_after_target_10_pct"]
+SCALE_OUT_FIRST_PCT = float(STRATEGY["risk"]["scale_out"]["first_target_initial_shares_pct"])
+SCALE_OUT_SECOND_PCT = float(STRATEGY["risk"]["scale_out"]["second_target_initial_shares_pct"])
+BREAKEVEN_AFTER_FIRST_TARGET_PCT = float(
+    STRATEGY["risk"]["scale_out"]["breakeven_after_first_target_pct"]
 )
-FINAL_LOT_FALLBACK_PCT = float(STRATEGY["risk"]["scale_out"]["final_lot_fallback_pct"])
+RUNNER_STOP_GAIN_PCT = float(STRATEGY["risk"]["scale_out"]["runner_stop_gain_pct"])
+RUNNER_EXIT_SESSIONS = int(
+    STRATEGY["risk"]["scale_out"]["runner_exit_sessions_after_second_target"]
+)
 
 
 def ensure_directories() -> None:

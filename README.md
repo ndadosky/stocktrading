@@ -81,13 +81,12 @@ earnings proximity, score band, and every scoring component that fired.
 Trades remain open from day to day. Every dynamically sized position scales out
 by percentage as follows:
 
-1. Sell 50% of the initial shares at **+10%**.
+1. Sell 50% of the initial shares at **+5%**.
 2. Immediately move the protective stop on the balance to **breakeven**.
-3. Sell 25% of the initial shares at **+20%**.
-4. Sell the final shares at **+30%**.
-5. After +20% is reached, protect the final lot with a fallback exit at **+10%**.
+3. Sell 25% of the initial shares at **+10%**.
+4. Protect the final lot at **+10%** and exit it two market sessions later.
 
-An **−8% stop** or **10-session time stop** closes every share still held. If a
+An **−5% stop** or **10-session fallback time stop** closes every share still held. If a
 target and stop occur inside the same five-minute bar, the system conservatively
 records the stop first. Exit processing is idempotent, so rerunning a report
 cannot sell the same tranche twice.
@@ -125,7 +124,7 @@ live in `strategy_settings.json`, experiment safeguards live in
 
 The 10:00 AM optimizer:
 
-- Defines success as reaching the +10% scale-out before the −8% stop.
+- Defines success as reaching the +5% scale-out before the −5% stop.
 - Waits for at least 60 resolved trades before tuning.
 - Reserves the newest 20% as a frozen chronological holdout with at least 12
   trades; it is never used to select parameters.
@@ -133,7 +132,7 @@ The 10:00 AM optimizer:
 - Evaluates hit rate, expectancy, profit factor, drawdown, regime, sector,
   spread, score band, and signal components.
 - Ranks strategy quality by realized expectancy, profit factor, maximum
-  drawdown, +10% hit rate, and time required to reach +10%, in that order.
+  drawdown, +5% hit rate, and time required to reach +5%, in that order.
 - Adopts at most one evidence-backed setting change per day.
 - Never weakens capital, slippage, stop, concentration, or sample safeguards to
   inflate the hit rate.

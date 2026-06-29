@@ -1,7 +1,7 @@
 {
   "version": "selective-growth-v2",
   "baseline": "strategy_baseline.json",
-  "success_definition": "Reached +10% target before -8% stop",
+  "success_definition": "Reached +5% first target before -5% stop",
   "morning_weights": {
     "early_weekly_momentum": 8,
     "controlled_daily_move": 6,
@@ -27,8 +27,8 @@
     "too_extended_penalty": -15
   },
   "risk": {
-    "take_profit_pct": 10,
-    "stop_loss_pct": 8,
+    "take_profit_pct": 5,
+    "stop_loss_pct": 5,
     "max_holding_days": 10,
     "risk_per_trade_pct": 0.5,
     "max_new_positions_per_day": 6,
@@ -40,11 +40,13 @@
     "earnings_blackout_sessions": 5,
     "max_bid_ask_spread_pct": 1.0,
     "scale_out": {
-      "target_10_initial_shares_pct": 50,
-      "target_20_initial_shares_pct": 25,
-      "target_30_remaining_shares_pct": 100,
-      "breakeven_after_target_10_pct": 0,
-      "final_lot_fallback_pct": 10
+      "first_target_gain_pct": 5,
+      "first_target_initial_shares_pct": 50,
+      "second_target_gain_pct": 10,
+      "second_target_initial_shares_pct": 25,
+      "breakeven_after_first_target_pct": 0,
+      "runner_stop_gain_pct": 10,
+      "runner_exit_sessions_after_second_target": 2
     }
   },
   "execution": {

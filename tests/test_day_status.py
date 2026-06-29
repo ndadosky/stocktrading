@@ -22,7 +22,7 @@ class DayStatusExitActivityTests(unittest.TestCase):
         activity = trade_exit_activity(rows)
 
         self.assertEqual(len(activity), 1)
-        self.assertEqual(activity[0]["event"], "Scale +10%")
+        self.assertEqual(activity[0]["event"], "Scale +5%")
         self.assertEqual(activity[0]["shares sold"], 50)
         self.assertEqual(activity[0]["remaining shares"], 50)
         self.assertEqual(activity[0]["position"], "Open remainder")

@@ -11,13 +11,14 @@ import pandas as pd
 import yfinance as yf
 
 from scanner_config import (
-    BREAKEVEN_AFTER_TARGET_10_PCT, EARNINGS_BLACKOUT_SESSIONS,
-    FINAL_LOT_FALLBACK_PCT, MAX_BID_ASK_SPREAD_PCT, MAX_DAILY_PAPER_TRADES,
+    BREAKEVEN_AFTER_FIRST_TARGET_PCT, EARNINGS_BLACKOUT_SESSIONS,
+    FIRST_TARGET_GAIN_PCT, MAX_BID_ASK_SPREAD_PCT, MAX_DAILY_PAPER_TRADES,
     MAX_HOLDING_DAYS, MAX_PORTFOLIO_HEAT_PCT,
     MAX_POSITION_EXPOSURE_PCT, MAX_SECTOR_EXPOSURE_PCT, MAX_SECTOR_POSITIONS,
     MINIMUM_CASH_RESERVE_PCT, MIN_CONFIRMATION_SCORE_TO_BUY, PAPER_TRADES_FILE,
-    RISK_PER_TRADE_PCT, SCALE_OUT_10_PCT, SCALE_OUT_20_PCT, SLIPPAGE_BPS,
-    STARTING_CAPITAL, STOP_LOSS_PCT, TAKE_PROFIT_PCT,
+    RISK_PER_TRADE_PCT, RUNNER_EXIT_SESSIONS, RUNNER_STOP_GAIN_PCT,
+    SCALE_OUT_FIRST_PCT, SCALE_OUT_SECOND_PCT, SECOND_TARGET_GAIN_PCT,
+    SLIPPAGE_BPS, STARTING_CAPITAL, STOP_LOSS_PCT,
     WATCHLIST_EXPORT_DIR, ensure_directories,
 )
 from market_calendar import sessions_until
@@ -72,6 +73,17 @@ def load_trades() -> pd.DataFrame:
             trades[column] = pd.NA
     if not trades.empty:
         trades["status"] = trades["status"].fillna(OPEN_STATUS)
+        entry = pd.to_numeric(trades["entry_price"], errors="coerce")
+        remaining = pd.to_numeric(trades["remaining_shares"], errors="coerce").fillna(
+            pd.to_numeric(trades["shares"], errors="coerce").fillna(0)
+        )
+        active = remaining.gt(0)
+        # Apply the active strategy to positions still carrying shares. Database
+        # column names remain legacy names for compatibility with existing Pi data.
+        trades.loc[active, "target_10"] = entry[active] * (1 + FIRST_TARGET_GAIN_PCT / 100)
+        trades.loc[active, "target_20"] = entry[active] * (1 + SECOND_TARGET_GAIN_PCT / 100)
+        trades.loc[active, "target_30"] = pd.NA
+        trades.loc[active, "stop_8"] = entry[active] * (1 - STOP_LOSS_PCT / 100)
         trades["active_stop"] = effective_stops(trades)
     return trades[TRADE_COLUMNS]
 
@@ -88,10 +100,10 @@ def effective_stops(trades: pd.DataFrame) -> pd.Series:
     sold20 = pd.to_numeric(trades["shares_sold_20"], errors="coerce").fillna(0)
     calculated = original.copy()
     calculated = calculated.where(
-        sold10.le(0), entry * (1 + BREAKEVEN_AFTER_TARGET_10_PCT / 100)
+        sold10.le(0), entry * (1 + BREAKEVEN_AFTER_FIRST_TARGET_PCT / 100)
     )
     calculated = calculated.where(
-        sold20.le(0), entry * (1 + FINAL_LOT_FALLBACK_PCT / 100)
+        sold20.le(0), entry * (1 + RUNNER_STOP_GAIN_PCT / 100)
     )
     return pd.concat([original, stored, calculated], axis=1).max(axis=1)
 
@@ -261,8 +273,8 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
             "initial_cost": trade_cost, "initial_risk": initial_risk,
             "shares": shares, "remaining_shares": shares,
             "status": OPEN_STATUS, "current_price": execution,
-            "target_10": execution * (1 + TAKE_PROFIT_PCT / 100),
-            "target_20": execution * 1.20, "target_30": execution * 1.30,
+            "target_10": execution * (1 + FIRST_TARGET_GAIN_PCT / 100),
+            "target_20": execution * (1 + SECOND_TARGET_GAIN_PCT / 100), "target_30": pd.NA,
             "stop_8": execution * (1 - STOP_LOSS_PCT / 100),
             "active_stop": execution * (1 - STOP_LOSS_PCT / 100),
             "exit_datetime": pd.NA, "exit_price": pd.NA, "exit_reason": pd.NA,
@@ -288,6 +300,22 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
 
 def _holding_days(entry: pd.Timestamp, current: pd.Timestamp) -> int:
     return max(1, sessions_until(entry.date(), current.date()) + 1)
+
+
+def runner_exit_due(second_target_hit_at: object, current: pd.Timestamp) -> bool:
+    """Return true after the configured sessions following the second target."""
+    if second_target_hit_at is None or pd.isna(second_target_hit_at):
+        return False
+    hit = pd.Timestamp(second_target_hit_at)
+    if hit.tzinfo is None:
+        hit = hit.tz_localize("America/New_York")
+    else:
+        hit = hit.tz_convert("America/New_York")
+    if current.tzinfo is None:
+        current = current.tz_localize("America/New_York")
+    else:
+        current = current.tz_convert("America/New_York")
+    return sessions_until(hit.date(), current.date()) >= RUNNER_EXIT_SESSIONS
 
 
 def apply_corporate_actions(trades: pd.DataFrame) -> pd.DataFrame:
@@ -400,10 +428,10 @@ def update_trade_lifecycle(trades: pd.DataFrame) -> pd.DataFrame:
             result.at[idx, "current_price"] = current
             days = _holding_days(entry_time, now)
             result.at[idx, "holding_days"] = days
-            target = float(row["target_10"])
+            first_target = float(row["target_10"])
             entry = float(row["entry_price"])
-            breakeven_floor = entry * (1 + BREAKEVEN_AFTER_TARGET_10_PCT / 100)
-            protect_floor = entry * (1 + FINAL_LOT_FALLBACK_PCT / 100)
+            breakeven_floor = entry * (1 + BREAKEVEN_AFTER_FIRST_TARGET_PCT / 100)
+            protect_floor = entry * (1 + RUNNER_STOP_GAIN_PCT / 100)
             for timestamp, bar in after.iterrows():
                 remaining = float(result.at[idx, "remaining_shares"])
                 if remaining <= 0:
@@ -417,28 +445,28 @@ def update_trade_lifecycle(trades: pd.DataFrame) -> pd.DataFrame:
                 if low <= active_stop:
                     gap_aware_stop = min(active_stop, float(bar["Open"]))
                     if target20_already_active:
-                        reason, bucket = "PROTECT +10%", "shares_sold_protect"
+                        reason, bucket = f"PROTECT +{RUNNER_STOP_GAIN_PCT:g}%", "shares_sold_protect"
                     elif target10_already_active:
                         reason, bucket = "PROTECT BREAKEVEN", "shares_sold_protect"
                     else:
-                        reason, bucket = "STOP -8%", "shares_sold_stop"
+                        reason, bucket = f"STOP -{STOP_LOSS_PCT:g}%", "shares_sold_stop"
                     _sell_lot(result, idx, remaining, gap_aware_stop, reason, timestamp, bucket)
                     break
+                if target20_already_active and runner_exit_due(result.at[idx, "target_20_hit_at"], timestamp):
+                    reason = f"RUNNER EXIT {RUNNER_EXIT_SESSIONS}D AFTER +{SECOND_TARGET_GAIN_PCT:g}%"
+                    _sell_lot(result, idx, remaining, float(bar["Open"]), reason, timestamp, "shares_sold_time")
+                    break
                 initial = float(result.at[idx, "shares"])
-                if float(result.at[idx, "shares_sold_10"]) <= 0 and high >= target:
-                    quantity = max(1, round(initial * SCALE_OUT_10_PCT / 100))
-                    _sell_lot(result, idx, quantity, target, "SCALE +10%", timestamp, "shares_sold_10")
+                if float(result.at[idx, "shares_sold_10"]) <= 0 and high >= first_target:
+                    quantity = max(1, round(initial * SCALE_OUT_FIRST_PCT / 100))
+                    _sell_lot(result, idx, quantity, first_target, f"SCALE +{FIRST_TARGET_GAIN_PCT:g}%", timestamp, "shares_sold_10")
                     result.at[idx, "target_10_hit_at"] = timestamp.isoformat()
                     result.at[idx, "active_stop"] = max(float(result.at[idx, "active_stop"]), breakeven_floor)
                 if float(result.at[idx, "remaining_shares"]) > 0 and float(result.at[idx, "shares_sold_20"]) <= 0 and high >= float(row["target_20"]):
-                    quantity = max(1, round(initial * SCALE_OUT_20_PCT / 100))
-                    _sell_lot(result, idx, quantity, float(row["target_20"]), "SCALE +20%", timestamp, "shares_sold_20")
+                    quantity = max(1, round(initial * SCALE_OUT_SECOND_PCT / 100))
+                    _sell_lot(result, idx, quantity, float(row["target_20"]), f"SCALE +{SECOND_TARGET_GAIN_PCT:g}%", timestamp, "shares_sold_20")
                     result.at[idx, "target_20_hit_at"] = timestamp.isoformat()
                     result.at[idx, "active_stop"] = max(float(result.at[idx, "active_stop"]), protect_floor)
-                if float(result.at[idx, "remaining_shares"]) > 0 and float(result.at[idx, "shares_sold_20"]) > 0 and high >= float(row["target_30"]):
-                    _sell_lot(result, idx, float(result.at[idx, "remaining_shares"]), float(row["target_30"]), "FINAL +30%", timestamp, "shares_sold_30")
-                    result.at[idx, "target_30_hit_at"] = timestamp.isoformat()
-                    break
             remaining = float(result.at[idx, "remaining_shares"])
             if remaining > 0 and days >= MAX_HOLDING_DAYS:
                 timestamp = after.index[-1] if not after.empty else bars.index[-1]

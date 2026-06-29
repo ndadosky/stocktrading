@@ -18,14 +18,15 @@ import pandas as pd
 import yfinance as yf
 
 from scanner_config import (
-    BREAKEVEN_AFTER_TARGET_10_PCT, CONFIRMATION_WEIGHTS, FINAL_LOT_FALLBACK_PCT,
+    BREAKEVEN_AFTER_FIRST_TARGET_PCT, CONFIRMATION_WEIGHTS, FIRST_TARGET_GAIN_PCT,
     MAX_DAILY_PAPER_TRADES, MAX_HOLDING_DAYS, MAX_PORTFOLIO_HEAT_PCT,
     MAX_POSITION_EXPOSURE_PCT, MAX_SECTOR_EXPOSURE_PCT, MAX_SECTOR_POSITIONS,
-    MINIMUM_CASH_RESERVE_PCT, RISK_PER_TRADE_PCT, SCALE_OUT_10_PCT,
-    SCALE_OUT_20_PCT, SLIPPAGE_BPS, STARTING_CAPITAL, STOP_LOSS_PCT,
-    TAKE_PROFIT_PCT,
+    MINIMUM_CASH_RESERVE_PCT, RISK_PER_TRADE_PCT, RUNNER_EXIT_SESSIONS,
+    RUNNER_STOP_GAIN_PCT, SCALE_OUT_FIRST_PCT, SCALE_OUT_SECOND_PCT,
+    SECOND_TARGET_GAIN_PCT, SLIPPAGE_BPS, STARTING_CAPITAL, STOP_LOSS_PCT,
     WATCHLIST_EXPORT_DIR, ensure_directories,
 )
+from market_calendar import sessions_until
 
 REFERENCE_SHARES = 100
 
@@ -95,13 +96,15 @@ def fetch_intraday(tickers: List[str], target: date) -> Dict[str, pd.DataFrame]:
 
 
 def simulate_scaled_exit(entry_quote: float, bars: pd.DataFrame) -> dict:
-    """Mirror production slippage, 50/25/25 scale-outs, gap stops, and time exit."""
+    """Mirror production slippage, 50/25/runner exits, gap stops, and time exits."""
     entry = entry_quote * (1 + SLIPPAGE_BPS / 10_000)
-    target10, target20, target30 = entry * 1.10, entry * 1.20, entry * 1.30
+    target10 = entry * (1 + FIRST_TARGET_GAIN_PCT / 100)
+    target20 = entry * (1 + SECOND_TARGET_GAIN_PCT / 100)
     stop = entry * (1 - STOP_LOSS_PCT / 100)
     remaining = float(REFERENCE_SHARES)
     proceeds = 0.0
     sold10 = sold20 = sold30 = sold_protect = sold_stop = sold_time = 0.0
+    second_target_date = None
     exit_reason = "OPEN"
     session_dates = []
     for value in bars.index.date:
@@ -123,14 +126,14 @@ def simulate_scaled_exit(entry_quote: float, bars: pd.DataFrame) -> dict:
         if remaining <= 0:
             break
         low, high, opening = float(bar["Low"]), float(bar["High"]), float(bar["Open"])
-        active_stop = target10 if sold20 > 0 else entry * (1 + BREAKEVEN_AFTER_TARGET_10_PCT / 100) if sold10 > 0 else stop
+        active_stop = entry * (1 + RUNNER_STOP_GAIN_PCT / 100) if sold20 > 0 else entry * (1 + BREAKEVEN_AFTER_FIRST_TARGET_PCT / 100) if sold10 > 0 else stop
         if low <= active_stop:
             if sold20 > 0:
-                reason = "PROTECT +10%"
+                reason = f"PROTECT +{RUNNER_STOP_GAIN_PCT:g}%"
             elif sold10 > 0:
                 reason = "PROTECT BREAKEVEN"
             else:
-                reason = "STOP -8%"
+                reason = f"STOP -{STOP_LOSS_PCT:g}%"
             bucket = "protect" if sold10 > 0 else "stop"
             sold = sell(remaining, min(active_stop, opening), reason)
             if bucket == "protect":
@@ -138,13 +141,14 @@ def simulate_scaled_exit(entry_quote: float, bars: pd.DataFrame) -> dict:
             else:
                 sold_stop += sold
             break
-        if sold10 <= 0 and high >= target10:
-            sold10 += sell(max(1, round(REFERENCE_SHARES * SCALE_OUT_10_PCT / 100)), target10, "SCALE +10%")
-        if remaining > 0 and sold20 <= 0 and high >= target20:
-            sold20 += sell(max(1, round(REFERENCE_SHARES * SCALE_OUT_20_PCT / 100)), target20, "SCALE +20%")
-        if remaining > 0 and sold20 > 0 and high >= target30:
-            sold30 += sell(remaining, target30, "FINAL +30%")
+        if sold20 > 0 and second_target_date is not None and sessions_until(second_target_date, timestamp.date()) >= RUNNER_EXIT_SESSIONS:
+            sold_time += sell(remaining, opening, f"RUNNER EXIT {RUNNER_EXIT_SESSIONS}D AFTER +{SECOND_TARGET_GAIN_PCT:g}%")
             break
+        if sold10 <= 0 and high >= target10:
+            sold10 += sell(max(1, round(REFERENCE_SHARES * SCALE_OUT_FIRST_PCT / 100)), target10, f"SCALE +{FIRST_TARGET_GAIN_PCT:g}%")
+        if remaining > 0 and sold20 <= 0 and high >= target20:
+            sold20 += sell(max(1, round(REFERENCE_SHARES * SCALE_OUT_SECOND_PCT / 100)), target20, f"SCALE +{SECOND_TARGET_GAIN_PCT:g}%")
+            second_target_date = timestamp.date()
     complete_window = len(session_dates) >= MAX_HOLDING_DAYS
     mark = float(test_bars["Close"].iloc[-1]) if not test_bars.empty else entry
     if remaining > 0 and complete_window:

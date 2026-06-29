@@ -7,7 +7,13 @@ from datetime import datetime
 import pandas as pd
 
 from daily_report import account_summary, load_trades
-from scanner_config import SCALE_OUT_10_PCT, SCALE_OUT_20_PCT
+from scanner_config import (
+    FIRST_TARGET_GAIN_PCT,
+    RUNNER_EXIT_SESSIONS,
+    SCALE_OUT_FIRST_PCT,
+    SCALE_OUT_SECOND_PCT,
+    SECOND_TARGET_GAIN_PCT,
+)
 from stock_storage import total_bankroll_deposits, bankroll_base
 
 
@@ -26,9 +32,8 @@ def _position_snapshot(row: pd.Series) -> dict:
     realized_proceeds = float(pd.to_numeric(row.get("realized_proceeds"), errors="coerce") or 0)
     sold10 = float(pd.to_numeric(row.get("shares_sold_10"), errors="coerce") or 0)
     sold20 = float(pd.to_numeric(row.get("shares_sold_20"), errors="coerce") or 0)
-    t10 = float(pd.to_numeric(row.get("target_10"), errors="coerce") or entry * 1.10)
-    t20 = float(pd.to_numeric(row.get("target_20"), errors="coerce") or entry * 1.20)
-    t30 = float(pd.to_numeric(row.get("target_30"), errors="coerce") or entry * 1.30)
+    t10 = float(pd.to_numeric(row.get("target_10"), errors="coerce") or entry * (1 + FIRST_TARGET_GAIN_PCT / 100))
+    t20 = float(pd.to_numeric(row.get("target_20"), errors="coerce") or entry * (1 + SECOND_TARGET_GAIN_PCT / 100))
 
     current_value = realized_proceeds + remaining * current
     current_p_l = current_value - initial_cost
@@ -45,8 +50,8 @@ def _position_snapshot(row: pd.Series) -> dict:
             "notes": "Already closed — actual result.",
         }
 
-    q10 = _planned_qty(initial_shares, SCALE_OUT_10_PCT)
-    q20 = _planned_qty(initial_shares, SCALE_OUT_20_PCT)
+    q10 = _planned_qty(initial_shares, SCALE_OUT_FIRST_PCT)
+    q20 = _planned_qty(initial_shares, SCALE_OUT_SECOND_PCT)
     best_proceeds = realized_proceeds
     rem = remaining
 
@@ -59,11 +64,14 @@ def _position_snapshot(row: pd.Series) -> dict:
         best_proceeds += qty * t20
         rem -= qty
     if rem > 0:
-        best_proceeds += rem * t30
+        best_proceeds += rem * t20
 
     best_p_l = best_proceeds - initial_cost
     uplift = best_p_l - current_p_l
-    notes = "Assumes remaining shares hit +10% / +20% / +30% scale-out targets."
+    notes = (
+        f"Assumes +{FIRST_TARGET_GAIN_PCT:g}% / +{SECOND_TARGET_GAIN_PCT:g}% scale-outs "
+        f"and the runner exits {RUNNER_EXIT_SESSIONS} sessions later at +{SECOND_TARGET_GAIN_PCT:g}%."
+    )
     if sold10 > 0 or sold20 > 0:
         notes = "Uses actual partial exits; projects unsold tranches at targets."
 
@@ -92,7 +100,10 @@ def compute_best_case() -> dict:
     return {
         "ok": True,
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-        "assumption": "Open positions complete the +10% / +20% / +30% scale-out ladder at target prices.",
+        "assumption": (
+            f"Open positions scale 50% at +{FIRST_TARGET_GAIN_PCT:g}%, 25% at "
+            f"+{SECOND_TARGET_GAIN_PCT:g}%, and the runner exits {RUNNER_EXIT_SESSIONS} sessions later."
+        ),
         "current": {
             "equity": round(float(summary.get("equity", capital_base)), 2),
             "total_p_l": round(current_total_p_l, 2),

@@ -4,6 +4,8 @@ review_date,status,setting,old_value,new_value,training_sample,holdout_sample,ba
 2026-06-27,user_approved,risk.max_open_positions,unlimited,6,,,,,,,,,,,pending,"Maintain a smaller active portfolio"
 2026-06-29,user_approved,risk.max_open_positions,6,unlimited,,,,,,,,,,,pending,"Replace the total-position cap with daily entry and portfolio-risk controls"
 2026-06-29,user_approved,risk.max_new_positions_per_day,1,6,,,,,,,,,,,pending,"Allow up to six new purchases per trading day"
+2026-06-29,user_approved,risk.scale_out_targets,10_20_30_pct,5_10_then_2_sessions,,,,,,,,,,,pending,"Take 50 percent at +5, 25 percent at +10, and time-exit the runner two sessions later"
+2026-06-29,user_approved,risk.stop_loss_pct,8,5,,,,,,,,,,,pending,"Tighten the initial protective stop to five percent"
 2026-06-27,user_approved,risk.max_portfolio_heat_pct,6,3,,,,,,,,,,,pending,"Limit aggregate open stop risk"
 2026-06-27,user_approved,risk.max_sector_exposure_pct,25,20,,,,,,,,,,,pending,"Reduce correlated sector concentration"
 2026-06-27,user_approved,risk.max_sector_positions,unlimited,1,,,,,,,,,,,pending,"Allow only one active name per sector"

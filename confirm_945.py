@@ -10,7 +10,8 @@ import pandas as pd
 import yfinance as yf
 
 from scanner_config import (
-    CANDIDATES_FILE, CONFIRMATION_WEIGHTS, WATCHLIST_EXPORT_DIR, ensure_directories,
+    CANDIDATES_FILE, CONFIRMATION_WEIGHTS, FIRST_TARGET_GAIN_PCT,
+    SECOND_TARGET_GAIN_PCT, STOP_LOSS_PCT, WATCHLIST_EXPORT_DIR, ensure_directories,
 )
 from pipeline_health import market_gate, record_stage, require_today_snapshot
 from stock_storage import append_snapshot
@@ -82,8 +83,11 @@ def confirm_ticker(ticker: str) -> Optional[dict]:
         "score": score, "signal": signal, "notes": ", ".join(notes),
         "confirmation_volume": int(session["Volume"].fillna(0).sum()),
         "spread_proxy_pct": round((float(session["High"].iloc[-1]) - float(session["Low"].iloc[-1])) / current * 100, 3),
-        "target_10": round(current * 1.10, 4), "target_20": round(current * 1.20, 4),
-        "target_30": round(current * 1.30, 4), "stop_8": round(current * 0.92, 4),
+        # Legacy column names are retained for PostgreSQL compatibility.
+        "target_10": round(current * (1 + FIRST_TARGET_GAIN_PCT / 100), 4),
+        "target_20": round(current * (1 + SECOND_TARGET_GAIN_PCT / 100), 4),
+        "target_30": pd.NA,
+        "stop_8": round(current * (1 - STOP_LOSS_PCT / 100), 4),
     }
 
 
