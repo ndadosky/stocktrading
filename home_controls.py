@@ -316,18 +316,36 @@ def home_controls_payload() -> dict[str, Any]:
         selected_pool_mode = "unavailable"
 
     cars = []
-    for name, battery_env, charging_env in (
-        ("Kia EV9", "HOME_KIA_BATTERY_ENTITY", "HOME_KIA_CHARGING_ENTITY"),
-        ("Volvo EX40", "HOME_VOLVO_BATTERY_ENTITY", "HOME_VOLVO_CHARGING_ENTITY"),
+    for name, battery_env, charging_env, range_env, image in (
+        (
+            "Kia EV9",
+            "HOME_KIA_BATTERY_ENTITY",
+            "HOME_KIA_CHARGING_ENTITY",
+            "HOME_KIA_RANGE_ENTITY",
+            "/assets/home/kia-ev9-white.jpg",
+        ),
+        (
+            "Volvo XC40",
+            "HOME_VOLVO_BATTERY_ENTITY",
+            "HOME_VOLVO_CHARGING_ENTITY",
+            "HOME_VOLVO_RANGE_ENTITY",
+            "/assets/home/volvo-xc40-white-black-roof.jpg",
+        ),
     ):
         battery = _entity(states, battery_env)
         charging = _entity(states, charging_env)
+        vehicle_range = _entity(states, range_env)
         cars.append(
             {
                 "name": name,
                 "configured": bool(os.getenv(battery_env, "").strip()),
                 "charge": _number(_state_value(battery)),
                 "charging": _state_value(charging),
+                "range": _number(_state_value(vehicle_range)),
+                "range_unit": (vehicle_range or {}).get("attributes", {}).get(
+                    "unit_of_measurement", "mi"
+                ),
+                "image": image,
             }
         )
 
