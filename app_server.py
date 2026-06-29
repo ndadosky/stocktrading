@@ -33,7 +33,13 @@ from nav_html import finalize_page_html
 from strategy_review import load_latest_review_rows, render_strategy_review_html
 from best_case_analysis import compute_best_case
 from morning_candidates import build_morning_candidates, preview_rows
-from home_controls import home_assistant_switch, home_controls_payload, poolsync_control
+from home_controls import (
+    home_assistant_door_control,
+    home_assistant_pool_control,
+    home_assistant_switch,
+    home_controls_payload,
+    poolsync_control,
+)
 from enphase import begin_authorization, complete_authorization
 from version import version_label
 
@@ -1251,7 +1257,8 @@ header{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line
 .card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:22px}.card-title{display:flex;align-items:center;gap:11px}.card-title h3{font-size:16px;margin:0 0 3px}.icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-size:19px;background:#eff6ff}.pool .icon{background:#ecfeff}.door .icon{background:#f3f4f6}.solar .icon{background:#fffbeb}.cars-card .icon{background:#eef2ff}
 .pill{font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;background:#f1f5f9;color:var(--muted);white-space:nowrap}.pill.ok{background:#f0fdf4;color:var(--green)}.pill.warn{background:#fffbeb;color:var(--amber)}.pill.bad{background:#fef2f2;color:var(--red)}
 .hero-value{font-size:46px;line-height:1;font-weight:800;letter-spacing:-.055em;margin:5px 0 8px}.hero-value small{font-size:19px;color:var(--muted);letter-spacing:0}.detail-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:20px}.detail{background:var(--soft);border:1px solid #edf1f5;border-radius:10px;padding:12px}.detail small{display:block;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}.detail strong{font-size:14px}
-.door-state{display:flex;align-items:center;gap:16px;padding:10px 0}.door-state .lock{font-size:42px}.door-state strong{display:block;font-size:25px;letter-spacing:-.03em;text-transform:capitalize}.door-state span{color:var(--muted);font-size:12px}
+.door-state{display:flex;align-items:center;gap:16px;padding:5px 0 15px}.door-state .lock{font-size:42px}.door-state strong{display:block;font-size:25px;letter-spacing:-.03em;text-transform:capitalize}.door-state span{color:var(--muted);font-size:12px}.door-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.door-actions .control-btn{width:100%;min-height:54px;font-size:14px}.door-actions .control-btn.active{background:#e8f5ed;border-color:#73bd8d;color:#116530}
+.pool-mode-card .icon{background:#eefbf3}.mode-current{font-size:30px;font-weight:800;letter-spacing:-.04em;margin:4px 0 16px}.mode-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.mode-choice{min-height:54px!important;width:100%;font-size:14px}.mode-choice.active{background:#e8f5ed;border-color:#73bd8d;color:#116530}.deck-jets-row{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-radius:11px;background:var(--soft)}.deck-jets-row strong{display:block}.deck-jets-row small{display:block;margin-top:3px;color:var(--muted);text-transform:capitalize}.deck-jets-row .control-btn{min-width:112px;width:auto;max-width:none;flex:0 0 auto}
 .cars-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.car{border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--soft)}.car-top{display:flex;justify-content:space-between;gap:10px;align-items:center}.car h4{font-size:14px;margin:0}.charge{font-size:32px;font-weight:800;letter-spacing:-.04em;margin:18px 0 9px}.battery{height:7px;background:#e5e7eb;border-radius:999px;overflow:hidden}.battery span{display:block;height:100%;background:var(--green);border-radius:999px;transition:width .3s ease}
 .control-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px}.control-btn{min-height:38px;border:1px solid #cbd5e1;background:#fff;color:var(--text);border-radius:9px;padding:8px 13px;font-weight:700;cursor:pointer}.control-btn:hover{border-color:#7da2da;background:#f8fbff}.control-btn:disabled{opacity:.5;cursor:wait}.control-btn.primary{background:#eff6ff;border-color:#93c5fd;color:#1e40af}.control-btn.danger{color:var(--red)}.stepper{display:flex;align-items:center;gap:7px;margin-right:auto}.stepper .control-btn{width:40px;padding:8px}.stepper-value{min-width:72px;text-align:center;font-weight:750}
 .ewelink-card{grid-column:1/-1}.ewelink-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.ewelink-channel{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--soft);border:1px solid var(--line);border-radius:11px;padding:13px}.ewelink-channel strong{display:block;font-size:13px}.ewelink-channel small{color:var(--muted);text-transform:uppercase;font-size:10px;font-weight:700}.action-message{font-size:12px;color:var(--muted);min-height:18px;margin-top:10px}.action-message.bad{color:var(--red)}
@@ -1271,7 +1278,7 @@ header{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line
 <header><div class="hdr-left"><h1>Stock Strategy App</h1></div><nav class="hdr-nav">__HEADER_NAV__</nav><div class="hdr-right" id="home-updated">Loading…</div></header>
 <main>
   <div class="page-title"><div><h2>Home Controls</h2><div class="sub">A calm glance at the systems keeping home moving.</div></div><span class="pill" id="ha-status">Connecting</span></div>
-  <div class="deck-meta"><span>Swipe to move between controls</span><div class="deck-dots" aria-label="Home control pages"><button class="deck-dot active" type="button" aria-label="Show pool"></button><button class="deck-dot" type="button" aria-label="Show front door"></button><button class="deck-dot" type="button" aria-label="Show solar"></button><button class="deck-dot" type="button" aria-label="Show eWeLink"></button><button class="deck-dot" type="button" aria-label="Show cars"></button></div></div>
+  <div class="deck-meta"><span>Swipe to move between controls</span><div class="deck-dots" aria-label="Home control pages"><button class="deck-dot active" type="button" aria-label="Show pool"></button><button class="deck-dot" type="button" aria-label="Show pool mode"></button><button class="deck-dot" type="button" aria-label="Show front door"></button><button class="deck-dot" type="button" aria-label="Show solar"></button><button class="deck-dot" type="button" aria-label="Show eWeLink"></button><button class="deck-dot" type="button" aria-label="Show cars"></button></div></div>
   <div class="home-grid">
     <section class="home-card pool" id="pool-card">
       <div class="card-head"><div class="card-title"><span class="icon">≈</span><div><h3>Pool</h3><div class="sub">PoolSync heat pump</div></div></div><span class="pill" id="pool-status">Loading</span></div>
@@ -1280,9 +1287,18 @@ header{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line
       <div class="control-row"><div class="stepper"><button class="control-btn" id="pool-down" type="button" aria-label="Lower pool setpoint">−</button><span class="stepper-value" id="pool-target">— °F</span><button class="control-btn" id="pool-up" type="button" aria-label="Raise pool setpoint">+</button></div><button class="control-btn primary" id="pool-heat" type="button">Heat pool</button><button class="control-btn danger" id="pool-off" type="button">Turn off</button></div>
       <div class="action-message" id="pool-action-message"></div>
     </section>
+    <section class="home-card pool-mode-card">
+      <div class="card-head"><div class="card-title"><span class="icon">⇄</span><div><h3>Pool Mode</h3><div class="sub">Sonoff valve controls</div></div></div><span class="pill" id="pool-mode-status">Loading</span></div>
+      <div class="mode-current" id="pool-mode-current">Checking valves…</div>
+      <div class="mode-actions"><button class="control-btn mode-choice" id="pool-mode-pool" type="button">Pool Mode</button><button class="control-btn mode-choice" id="pool-mode-spa" type="button">Spa Mode</button></div>
+      <div class="deck-jets-row"><div><strong>Deck Jets</strong><small id="deck-jets-state">Checking state…</small></div><button class="control-btn primary" id="deck-jets-toggle" type="button">Turn on</button></div>
+      <div class="action-message" id="pool-mode-action-message"></div>
+    </section>
     <section class="home-card door">
       <div class="card-head"><div class="card-title"><span class="icon">⌂</span><div><h3>Front door</h3><div class="sub">Yale lock</div></div></div><span class="pill" id="door-status">Loading</span></div>
       <div class="door-state"><div class="lock" id="door-icon">◌</div><div><strong id="door-state">—</strong><span id="door-message">Waiting for Home Assistant</span></div></div>
+      <div class="door-actions"><button class="control-btn" id="door-lock" type="button">Lock</button><button class="control-btn" id="door-unlock" type="button">Unlock</button></div>
+      <div class="action-message" id="door-action-message"></div>
     </section>
     <section class="home-card solar">
       <div class="card-head"><div class="card-title"><span class="icon">☀</span><div><h3>Solar</h3><div class="sub">Enphase energy</div></div></div><span class="pill" id="solar-status">Loading</span></div>
@@ -1334,7 +1350,13 @@ function renderHome(data){
     setPill('pool-status',pool.configured?'Unavailable':'Setup needed',pool.configured?'bad':'warn');
     document.getElementById('pool-message').textContent=pool.message||'PoolSync is not configured';
   }
+  const poolMode=data.pool_mode||{};const poolButton=document.getElementById('pool-mode-pool');const spaButton=document.getElementById('pool-mode-spa');const deckButton=document.getElementById('deck-jets-toggle');
+  poolButton.classList.toggle('active',poolMode.mode==='pool');spaButton.classList.toggle('active',poolMode.mode==='spa');
+  if(poolMode.configured){const modeLabel=poolMode.mode==='pool'?'Pool Mode':poolMode.mode==='spa'?'Spa Mode':poolMode.mode==='mixed'?'Custom valve state':'Unavailable';document.getElementById('pool-mode-current').textContent=modeLabel;setPill('pool-mode-status',poolMode.connected?'Connected':'Unavailable',poolMode.connected?'ok':'bad')}
+  else{document.getElementById('pool-mode-current').textContent='Setup needed';setPill('pool-mode-status','Setup needed','warn')}
+  const deckOn=poolMode.deck_jets==='on';document.getElementById('deck-jets-state').textContent=deckOn?'On':poolMode.deck_jets==='off'?'Off':'Unavailable';deckButton.textContent=deckOn?'Turn off':'Turn on';deckButton.className='control-btn '+(deckOn?'danger':'primary');
   const door=data.front_door||{};
+  const lockButton=document.getElementById('door-lock');const unlockButton=document.getElementById('door-unlock');lockButton.classList.toggle('active',door.state==='locked');unlockButton.classList.toggle('active',door.state==='unlocked');
   if(door.configured){const locked=door.locked;setPill('door-status',door.state,locked?'ok':'warn');document.getElementById('door-icon').textContent=locked?'●':'○';document.getElementById('door-state').textContent=door.state;document.getElementById('door-message').textContent=locked?'Secure':'Check the front door'}
   else{setPill('door-status','Setup needed','warn');document.getElementById('door-state').textContent='Not connected';document.getElementById('door-message').textContent='Choose the Yale lock entity in .env'}
   const solar=data.solar||{};
@@ -1360,6 +1382,11 @@ document.getElementById('pool-down').onclick=()=>sendControl('/api/home/pool',{a
 document.getElementById('pool-up').onclick=()=>sendControl('/api/home/pool',{action:'adjust_temperature',value:1},'pool-action-message');
 document.getElementById('pool-heat').onclick=()=>sendControl('/api/home/pool',{action:'set_mode',value:'heat'},'pool-action-message');
 document.getElementById('pool-off').onclick=()=>sendControl('/api/home/pool',{action:'set_mode',value:'off'},'pool-action-message');
+document.getElementById('pool-mode-pool').onclick=()=>sendControl('/api/home/pool-mode',{action:'set_mode',value:'pool'},'pool-mode-action-message');
+document.getElementById('pool-mode-spa').onclick=()=>sendControl('/api/home/pool-mode',{action:'set_mode',value:'spa'},'pool-mode-action-message');
+document.getElementById('deck-jets-toggle').onclick=()=>{const state=latestHome?.pool_mode?.deck_jets==='on'?'off':'on';sendControl('/api/home/pool-mode',{action:'set_deck_jets',value:state},'pool-mode-action-message')};
+document.getElementById('door-lock').onclick=()=>sendControl('/api/home/front-door',{action:'lock'},'door-action-message');
+document.getElementById('door-unlock').onclick=()=>sendControl('/api/home/front-door',{action:'unlock'},'door-action-message');
 document.getElementById('ewelink-grid').onclick=event=>{const button=event.target.closest('[data-ew-channel]');if(!button)return;sendControl('/api/home/ewelink',{channel:Number(button.dataset.ewChannel),state:button.dataset.ewState},'ewelink-action-message')};
 refreshHome();setInterval(refreshHome,30000);
 </script></body></html>"""
@@ -1959,7 +1986,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
         path = unquote(parsed.path)
-        if path in {"/api/home/pool", "/api/home/ewelink"}:
+        if path in {"/api/home/pool", "/api/home/pool-mode", "/api/home/front-door", "/api/home/ewelink"}:
             length = int(self.headers.get("Content-Length", "0") or "0")
             raw = self.rfile.read(length) if length else b"{}"
             try:
@@ -1969,6 +1996,12 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             if path == "/api/home/pool":
                 result = poolsync_control(str(payload.get("action") or ""), payload.get("value"))
+            elif path == "/api/home/pool-mode":
+                result = home_assistant_pool_control(
+                    str(payload.get("action") or ""), payload.get("value")
+                )
+            elif path == "/api/home/front-door":
+                result = home_assistant_door_control(str(payload.get("action") or ""))
             else:
                 try:
                     channel = int(payload.get("channel"))

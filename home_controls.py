@@ -12,6 +12,14 @@ from urllib.request import Request, urlopen
 from enphase import solar_status as enphase_solar_status
 
 
+POOL_MODE_ENTITIES = {
+    "main_drain": "HOME_POOL_MAIN_DRAIN_ENTITY",
+    "no_pool_jets": "HOME_POOL_NO_POOL_JETS_ENTITY",
+    "spa_upper_jets": "HOME_POOL_SPA_UPPER_JETS_ENTITY",
+}
+DECK_JETS_ENTITY = "HOME_POOL_DECK_JETS_ENTITY"
+
+
 def _now() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
@@ -200,15 +208,77 @@ def home_assistant_switch(channel: int, turn_on: bool) -> dict[str, Any]:
         return {"ok": False, "error": f"eWeLink channel {channel} is not configured"}
     if not entity_id.startswith("switch."):
         return {"ok": False, "error": "eWeLink controls must map to Home Assistant switch entities"}
+    return _home_assistant_switches([entity_id], turn_on)
+
+
+def _home_assistant_switches(entity_ids: list[str], turn_on: bool) -> dict[str, Any]:
+    """Set one or more explicitly configured Home Assistant switch entities."""
+    if not entity_ids or any(not entity_id.startswith("switch.") for entity_id in entity_ids):
+        return {"ok": False, "error": "Pool controls must map to Home Assistant switch entities"}
+    base_url = os.getenv("HOME_ASSISTANT_URL", "").strip().rstrip("/")
+    token = os.getenv("HOME_ASSISTANT_TOKEN", "").strip()
+    if not base_url or not token:
+        return {"ok": False, "error": "Home Assistant is not configured"}
     action = "turn_on" if turn_on else "turn_off"
     try:
         _json_request(
             f"{base_url}/api/services/switch/{action}",
             {"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             method="POST",
+            payload={"entity_id": entity_ids},
+        )
+        return {"ok": True, "entities": entity_ids, "state": "on" if turn_on else "off"}
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
+        return {"ok": False, "error": f"Home Assistant request failed: {type(exc).__name__}"}
+
+
+def home_assistant_pool_control(action: str, value: Any = None) -> dict[str, Any]:
+    """Apply Pool/Spa valve presets or independently control the deck jets."""
+    if action == "set_mode":
+        mode = str(value or "").strip().lower()
+        if mode not in {"pool", "spa"}:
+            return {"ok": False, "error": "Pool mode must be pool or spa"}
+        entity_ids = [os.getenv(env_name, "").strip() for env_name in POOL_MODE_ENTITIES.values()]
+        if not all(entity_ids):
+            return {"ok": False, "error": "Pool mode switch entities are not configured"}
+        result = _home_assistant_switches(entity_ids, mode == "spa")
+        if result.get("ok"):
+            result.update({"action": action, "mode": mode})
+        return result
+    if action == "set_deck_jets":
+        entity_id = os.getenv(DECK_JETS_ENTITY, "").strip()
+        if not entity_id:
+            return {"ok": False, "error": "Deck Jets switch entity is not configured"}
+        state = str(value or "").strip().lower()
+        if state not in {"on", "off"}:
+            return {"ok": False, "error": "Deck Jets state must be on or off"}
+        result = _home_assistant_switches([entity_id], state == "on")
+        if result.get("ok"):
+            result.update({"action": action, "deck_jets": state})
+        return result
+    return {"ok": False, "error": "Unknown pool-mode action"}
+
+
+def home_assistant_door_control(action: str) -> dict[str, Any]:
+    """Lock or unlock the explicitly configured Home Assistant lock entity."""
+    action = str(action or "").strip().lower()
+    if action not in {"lock", "unlock"}:
+        return {"ok": False, "error": "Front door action must be lock or unlock"}
+    base_url = os.getenv("HOME_ASSISTANT_URL", "").strip().rstrip("/")
+    token = os.getenv("HOME_ASSISTANT_TOKEN", "").strip()
+    entity_id = os.getenv("HOME_FRONT_DOOR_ENTITY", "").strip()
+    if not base_url or not token or not entity_id:
+        return {"ok": False, "error": "Front door lock is not configured"}
+    if not entity_id.startswith("lock."):
+        return {"ok": False, "error": "Front door control must map to a Home Assistant lock entity"}
+    try:
+        _json_request(
+            f"{base_url}/api/services/lock/{action}",
+            {"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            method="POST",
             payload={"entity_id": entity_id},
         )
-        return {"ok": True, "channel": channel, "state": "on" if turn_on else "off"}
+        return {"ok": True, "action": action, "entity_id": entity_id}
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
         return {"ok": False, "error": f"Home Assistant request failed: {type(exc).__name__}"}
 
@@ -228,6 +298,22 @@ def home_controls_payload() -> dict[str, Any]:
     solar_power = _entity(states, "HOME_SOLAR_POWER_ENTITY")
     solar_today = _entity(states, "HOME_SOLAR_TODAY_ENTITY")
     enphase_solar = enphase_solar_status()
+    pool_mode_entities = {
+        name: _entity(states, env_name) for name, env_name in POOL_MODE_ENTITIES.items()
+    }
+    deck_jets = _entity(states, DECK_JETS_ENTITY)
+    pool_mode_configured = all(os.getenv(env_name, "").strip() for env_name in POOL_MODE_ENTITIES.values())
+    deck_jets_configured = bool(os.getenv(DECK_JETS_ENTITY, "").strip())
+    valve_states = [str(_state_value(entity) or "unavailable").lower() for entity in pool_mode_entities.values()]
+    pool_mode_connected = pool_mode_configured and all(entity is not None for entity in pool_mode_entities.values())
+    if pool_mode_connected and all(state == "on" for state in valve_states):
+        selected_pool_mode = "spa"
+    elif pool_mode_connected and all(state == "off" for state in valve_states):
+        selected_pool_mode = "pool"
+    elif pool_mode_connected:
+        selected_pool_mode = "mixed"
+    else:
+        selected_pool_mode = "unavailable"
 
     cars = []
     for name, battery_env, charging_env in (
@@ -264,6 +350,13 @@ def home_controls_payload() -> dict[str, Any]:
     return {
         "generated_at": _now(),
         "pool": poolsync_status(),
+        "pool_mode": {
+            "configured": pool_mode_configured and deck_jets_configured,
+            "connected": pool_mode_connected and deck_jets is not None,
+            "mode": selected_pool_mode,
+            "valves": dict(zip(POOL_MODE_ENTITIES, valve_states)),
+            "deck_jets": str(_state_value(deck_jets) or "unavailable").lower(),
+        },
         "front_door": {
             "configured": bool(os.getenv("HOME_FRONT_DOOR_ENTITY", "").strip()),
             "state": door_state,
