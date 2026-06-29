@@ -13,7 +13,7 @@ import yfinance as yf
 from scanner_config import (
     BREAKEVEN_AFTER_TARGET_10_PCT, EARNINGS_BLACKOUT_SESSIONS,
     FINAL_LOT_FALLBACK_PCT, MAX_BID_ASK_SPREAD_PCT, MAX_DAILY_PAPER_TRADES,
-    MAX_HOLDING_DAYS, MAX_OPEN_POSITIONS, MAX_PORTFOLIO_HEAT_PCT,
+    MAX_HOLDING_DAYS, MAX_PORTFOLIO_HEAT_PCT,
     MAX_POSITION_EXPOSURE_PCT, MAX_SECTOR_EXPOSURE_PCT, MAX_SECTOR_POSITIONS,
     MINIMUM_CASH_RESERVE_PCT, MIN_CONFIRMATION_SCORE_TO_BUY, PAPER_TRADES_FILE,
     RISK_PER_TRADE_PCT, SCALE_OUT_10_PCT, SCALE_OUT_20_PCT, SLIPPAGE_BPS,
@@ -173,6 +173,8 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
     eligible = confirmations[confirmations["score"] >= MIN_CONFIRMATION_SCORE_TO_BUY]
     eligible = eligible.sort_values("score", ascending=False, kind="mergesort")
     existing = set(zip(trades["trade_date"].astype(str), trades["ticker"].astype(str).str.upper()))
+    purchases_today = int(trades["trade_date"].astype(str).eq(today).sum())
+    daily_slots = max(0, MAX_DAILY_PAPER_TRADES - purchases_today)
     summary = account_summary(trades)
     available_cash = max(0.0, float(summary["cash"]))
     open_mask = pd.to_numeric(trades["remaining_shares"], errors="coerce").fillna(0).gt(0) if not trades.empty else pd.Series(dtype=bool)
@@ -195,10 +197,8 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
     heat_limit = equity * MAX_PORTFOLIO_HEAT_PCT / 100
     additions = []
     for row in eligible.itertuples(index=False):
-        if len(additions) >= MAX_DAILY_PAPER_TRADES:
-            break
-        if int(summary["open_positions"]) + len(additions) >= MAX_OPEN_POSITIONS:
-            print(f"Skipped remaining candidates: {MAX_OPEN_POSITIONS} open-position limit reached")
+        if len(additions) >= daily_slots:
+            print(f"Skipped remaining candidates: {MAX_DAILY_PAPER_TRADES} new-purchase daily limit reached")
             break
         ticker = str(row.ticker).upper()
         if (today, ticker) in existing:

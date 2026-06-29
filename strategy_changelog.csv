@@ -2,6 +2,8 @@ review_date,status,setting,old_value,new_value,training_sample,holdout_sample,ba
 2026-06-27,user_approved,risk.position_sizing,fixed_100_shares,0.5_pct_current_equity_at_stop,,,,,,,,,,,pending,"Scale positions with bankroll while keeping loss size proportional"
 2026-06-27,user_approved,risk.max_new_positions_per_day,20,1,,,,,,,,,,,pending,"Concentrate entries on the highest-ranked fully eligible candidate"
 2026-06-27,user_approved,risk.max_open_positions,unlimited,6,,,,,,,,,,,pending,"Maintain a smaller active portfolio"
+2026-06-29,user_approved,risk.max_open_positions,6,unlimited,,,,,,,,,,,pending,"Replace the total-position cap with daily entry and portfolio-risk controls"
+2026-06-29,user_approved,risk.max_new_positions_per_day,1,6,,,,,,,,,,,pending,"Allow up to six new purchases per trading day"
 2026-06-27,user_approved,risk.max_portfolio_heat_pct,6,3,,,,,,,,,,,pending,"Limit aggregate open stop risk"
 2026-06-27,user_approved,risk.max_sector_exposure_pct,25,20,,,,,,,,,,,pending,"Reduce correlated sector concentration"
 2026-06-27,user_approved,risk.max_sector_positions,unlimited,1,,,,,,,,,,,pending,"Allow only one active name per sector"

@@ -16,7 +16,7 @@ from nav_html import finalize_dashboard_html
 from scanner_config import (
     DASHBOARD_FILE, PIPELINE_STATE_FILE,
     STARTING_CAPITAL, WATCHLIST_EXPORT_DIR, MAX_DAILY_PAPER_TRADES,
-    MAX_OPEN_POSITIONS, MAX_PORTFOLIO_HEAT_PCT, MAX_SECTOR_EXPOSURE_PCT,
+    MAX_PORTFOLIO_HEAT_PCT, MAX_SECTOR_EXPOSURE_PCT,
     RISK_PER_TRADE_PCT,
     ensure_directories,
 )
@@ -698,7 +698,7 @@ a{{color:var(--blue)}}
 <section class='cards'>{cards_html}</section>
 <div class='layout'>
   <section class='panel'><div class='panel-head'><h2>Portfolio performance</h2><span class='subtle'>Equity over time</span></div>{equity_svg(history, capital_base)}</section>
-  <aside class='panel strategy'><h2>Automated controls</h2><p>Take 50% at +10% and move the balance to breakeven. Keep 25% for +20% and the final 25% for +30%, protected at +10% after target two.</p><div class='schedule'><div><b>Risk sizing</b><span>{RISK_PER_TRADE_PCT:g}% equity / trade</span></div><div><b>Entry pace</b><span>{MAX_DAILY_PAPER_TRADES} daily · {MAX_OPEN_POSITIONS} open max</span></div><div><b>Exit ladder</b><span>50% / 25% / 25%</span></div><div><b>Protective stop</b><span>−8% → breakeven at +10%</span></div><div><b>Time stop</b><span>10 sessions</span></div><div><b>Portfolio heat</b><span>{MAX_PORTFOLIO_HEAT_PCT:g}% max</span></div><div><b>Sector ceiling</b><span>{MAX_SECTOR_EXPOSURE_PCT:g}% · one position</span></div><div><b>Earnings blackout</b><span>5 sessions</span></div><div><b>Live spread cap</b><span>1%</span></div></div></aside>
+  <aside class='panel strategy'><h2>Automated controls</h2><p>Take 50% at +10% and move the balance to breakeven. Keep 25% for +20% and the final 25% for +30%, protected at +10% after target two.</p><div class='schedule'><div><b>Risk sizing</b><span>{RISK_PER_TRADE_PCT:g}% equity / trade</span></div><div><b>Entry pace</b><span>Up to {MAX_DAILY_PAPER_TRADES} new purchases daily</span></div><div><b>Open positions</b><span>Controlled by heat, cash, and sector limits</span></div><div><b>Exit ladder</b><span>50% / 25% / 25%</span></div><div><b>Protective stop</b><span>−8% → breakeven at +10%</span></div><div><b>Time stop</b><span>10 sessions</span></div><div><b>Portfolio heat</b><span>{MAX_PORTFOLIO_HEAT_PCT:g}% max</span></div><div><b>Sector ceiling</b><span>{MAX_SECTOR_EXPOSURE_PCT:g}% · one position</span></div><div><b>Earnings blackout</b><span>5 sessions</span></div><div><b>Live spread cap</b><span>1%</span></div></div></aside>
   <section class='panel full'>
     <div class='panel-head'><h2>Open positions</h2><span class='subtle'>{len(open_positions)} active</span></div>
     <p class='table-hint'>Hover over P/L %, Days, Spread, or Band headers for definitions.</p>

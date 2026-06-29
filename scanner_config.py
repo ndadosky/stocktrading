@@ -58,7 +58,6 @@ SLIPPAGE_BPS = float(STRATEGY["execution"]["slippage_bps"])
 MAX_SECTOR_EXPOSURE_PCT = float(STRATEGY["risk"]["max_sector_exposure_pct"])
 MAX_PORTFOLIO_HEAT_PCT = float(STRATEGY["risk"]["max_portfolio_heat_pct"])
 RISK_PER_TRADE_PCT = float(STRATEGY["risk"]["risk_per_trade_pct"])
-MAX_OPEN_POSITIONS = int(STRATEGY["risk"]["max_open_positions"])
 MAX_DAILY_PAPER_TRADES = int(os.getenv(
     "STOCK_MAX_DAILY_TRADES", str(STRATEGY["risk"]["max_new_positions_per_day"])
 ))
