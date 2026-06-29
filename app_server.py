@@ -26,7 +26,14 @@ from job_storage import (
     record_job_run,
     scheduled_already_ran,
 )
-from scanner_config import CANDIDATES_FILE, DASHBOARD_FILE, PIPELINE_STATE_FILE, WATCHLIST_EXPORT_DIR, ensure_directories
+from scanner_config import (
+    CANDIDATES_FILE,
+    DASHBOARD_FILE,
+    MIN_CONFIRMATION_SCORE_TO_BUY,
+    PIPELINE_STATE_FILE,
+    WATCHLIST_EXPORT_DIR,
+    ensure_directories,
+)
 from stock_storage import add_bankroll_deposit, bankroll_base, query_rows, snapshot_count, table_count, total_bankroll_deposits
 from platform_health import codex_chat, platform_health_payload
 from nav_html import finalize_page_html
@@ -1711,6 +1718,45 @@ def start_scanner_preview() -> dict:
     return {"ok": True, "started": True, "read_only": True}
 
 
+def scanner_confirmation_status(
+    columns: list[str],
+    rows: list[dict],
+    confirmations,
+) -> tuple[list[str], list[dict]]:
+    """Join morning scanner rows to their same-day 9:45 confirmation result."""
+    status_column = "Confirmation status"
+    output_columns = list(columns)
+    if status_column not in output_columns:
+        output_columns.append(status_column)
+
+    confirmation_by_ticker: dict[str, dict] = {}
+    if confirmations is not None and not confirmations.empty and "ticker" in confirmations.columns:
+        for record in confirmations.fillna("").to_dict(orient="records"):
+            ticker = str(record.get("ticker") or "").strip().upper()
+            if ticker:
+                confirmation_by_ticker[ticker] = record
+    confirmation_finished = bool(confirmation_by_ticker)
+
+    output_rows = []
+    for row in rows:
+        output = dict(row)
+        ticker = str(row.get("Ticker") or row.get("ticker") or "").strip().upper()
+        confirmation = confirmation_by_ticker.get(ticker)
+        if confirmation is None:
+            output[status_column] = "Not checked" if confirmation_finished else "Pending"
+        else:
+            try:
+                score = int(float(confirmation.get("score") or 0))
+            except (TypeError, ValueError):
+                score = 0
+            band = str(confirmation.get("confirmation_band") or "").strip()
+            detail = " · ".join(value for value in (band, str(score)) if value)
+            label = "Confirmed" if score >= MIN_CONFIRMATION_SCORE_TO_BUY else "Below threshold"
+            output[status_column] = f"{label} · {detail}" if detail else label
+        output_rows.append(output)
+    return output_columns, output_rows
+
+
 def scanner_payload() -> dict:
     with STATE.lock:
         preview_running = STATE.scanner_preview_running
@@ -1727,6 +1773,14 @@ def scanner_payload() -> dict:
         stats = None
 
     today = today_key()
+    preview_date = (
+        str(preview_source).rsplit("/", 1)[-1]
+        if str(preview_source).startswith("postgresql:") and "/" in str(preview_source)
+        else today
+    )
+    from stock_storage import read_snapshot
+    confirmations = read_snapshot("confirmations", "confirm_date", preview_date)
+    preview_columns, preview = scanner_confirmation_status(preview_columns, preview, confirmations)
     morning_html = WATCHLIST_EXPORT_DIR / f"morning_candidates_{today}.html"
     latest_html = CANDIDATES_FILE.with_suffix(".html")
     last = last_run("morning")
@@ -1736,6 +1790,7 @@ def scanner_payload() -> dict:
         "preview_running": preview_running,
         "preview_error": preview_error if not preview_running else None,
         "preview_source": preview_source,
+        "preview_date": preview_date,
         "preview_columns": preview_columns,
         "preview": preview,
         "stats": stats,
@@ -1750,8 +1805,21 @@ def scanner_payload() -> dict:
 def _render_preview_table(columns: list[str], rows: list[dict]) -> str:
     if columns and rows and "error" not in rows[0]:
         head = "".join(f"<th>{escape(str(c))}</th>" for c in columns)
+
+        def cell(column: str, value: object) -> str:
+            text = str(value)
+            if column != "Confirmation status":
+                return f"<td>{escape(text)}</td>"
+            cls = (
+                "confirmed" if text.startswith("Confirmed")
+                else "below" if text.startswith("Below threshold")
+                else "unchecked" if text.startswith("Not checked")
+                else "pending"
+            )
+            return f"<td><span class='confirmation {cls}'>{escape(text)}</span></td>"
+
         body = "".join(
-            "<tr>" + "".join(f"<td>{escape(str(row.get(c, '')))}</td>" for c in columns) + "</tr>"
+            "<tr>" + "".join(cell(c, row.get(c, "")) for c in columns) + "</tr>"
             for row in rows
         )
         return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
@@ -1788,7 +1856,7 @@ def scanner_html() -> bytes:
 
     html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Scanner</title><style>
-:root{{--bg:#f4f6f8;--panel:#fff;--text:#17202a;--muted:#687386;--line:#dce3ec;--blue:#1d4ed8;--green:#16803c;--red:#b42318}}
+:root{{--bg:#f4f6f8;--panel:#fff;--text:#17202a;--muted:#687386;--line:#dce3ec;--blue:#1d4ed8;--green:#16803c;--red:#b42318;--amber:#92400e}}
 *{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--text);font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}}
 header{{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:16px;position:sticky;top:0;z-index:2;height:52px}}
 .hdr-left h1{{font-size:15px;font-weight:700;margin:0}}
@@ -1813,6 +1881,9 @@ th{{color:var(--muted);font-size:11px;text-transform:uppercase}}
 .empty{{color:var(--muted);padding:8px 0}}
 .run-pill{{display:inline-block;background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;margin-left:8px}}
 .note{{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--muted)}}
+.confirmation{{display:inline-block;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:750;white-space:nowrap}}
+.confirmation.confirmed{{background:#dcfce7;color:var(--green)}}.confirmation.below{{background:#fffbeb;color:var(--amber)}}
+.confirmation.pending{{background:#eff6ff;color:var(--blue)}}.confirmation.unchecked{{background:#f1f5f9;color:var(--muted)}}
 a{{color:var(--blue)}}
 </style></head><body>
 <header>
@@ -1824,14 +1895,15 @@ a{{color:var(--blue)}}
   <section class="panel">
     <div class="page-title">
       <div>
-        <h2>Morning Finviz scanner</h2>
-        <p class="sub">Read-only preview — fetches and scores Finviz live. Does not write to the database, job history, or export files. The 8:45 ET schedule still runs the full save job.</p>
+        <h2>Morning scanner + confirmation</h2>
+        <p class="sub">Shows the saved 8:45 ET morning candidates alongside each ticker's 9:45 ET confirmation result. The preview button runs a fresh read-only scan without changing saved trading data.</p>
       </div>
       <button class="btn-run" id="run-scanner">Run preview scan</button>
     </div>
     <div class="meta">
       <div><small>Preview source</small><span id="preview-source">{escape(source_label)}</span></div>
       <div><small>Rows shown</small><span id="row-count">{len(preview_rows_data)}</span></div>
+      <div><small>Confirmation</small><span>9:45 status for {escape(payload.get('preview_date') or today_key())}</span></div>
       <div><small>Last scheduled save</small><span class="{last_cls}">{escape(last_label)}</span></div>
       <div><small>Saved exports</small>{exports_html}</div>
     </div>
@@ -1842,6 +1914,12 @@ a{{color:var(--blue)}}
 </main>
 <script>
 function esc(v){{return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}}
+function previewCell(column,value){{
+  const text=String(value??'');
+  if(column!=='Confirmation status')return '<td>'+esc(text)+'</td>';
+  const cls=text.startsWith('Confirmed')?'confirmed':text.startsWith('Below threshold')?'below':text.startsWith('Not checked')?'unchecked':'pending';
+  return '<td><span class="confirmation '+cls+'">'+esc(text)+'</span></td>';
+}}
 function renderPreview(data){{
   const cols=data.preview_columns||[];
   const rows=data.preview||[];
@@ -1858,7 +1936,7 @@ function renderPreview(data){{
   if(!cols.length||!rows.length){{target.innerHTML='<p class="empty">Click <strong>Run preview scan</strong> for a live read-only view.</p>';return;}}
   if(rows[0].error){{target.innerHTML='<p class="empty">'+rows[0].error+'</p>';return;}}
   const head=cols.map(c=>'<th>'+esc(c)+'</th>').join('');
-  const body=rows.map(r=>'<tr>'+cols.map(c=>'<td>'+esc(r[c])+'</td>').join('')+'</tr>').join('');
+  const body=rows.map(r=>'<tr>'+cols.map(c=>previewCell(c,r[c])).join('')+'</tr>').join('');
   target.innerHTML='<table><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table>';
 }}
 async function loadScanner(){{
