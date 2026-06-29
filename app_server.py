@@ -708,23 +708,38 @@ def latest_report_date() -> str:
     return today_key()
 
 
+def visible_live_infographic_rows(rows: list[dict], target_date: str) -> list[dict]:
+    """Keep active positions and trades that closed on the selected date."""
+    visible = []
+    for row in rows:
+        try:
+            is_open = float(row.get("remaining_shares") or 0) > 0
+        except (TypeError, ValueError):
+            is_open = str(row.get("status") or "").upper() in {"OPEN", "PARTIAL"}
+        closed_on_target = str(row.get("exit_datetime") or "")[:10] == target_date
+        if is_open or closed_on_target:
+            visible.append(row)
+    return visible
+
+
 def live_infographic_payload(target_date: str | None = None) -> dict:
     target_date = normalized_date(target_date) if target_date else latest_report_date()
-    rows = query_rows("paper_performance", "WHERE report_date = ?", (target_date,), 500)
-    if not rows and target_date != today_key():
+    account_rows = query_rows("paper_performance", "WHERE report_date = ?", (target_date,), 500)
+    if not account_rows and target_date != today_key():
         target_date = today_key()
-        rows = query_rows("paper_performance", "WHERE report_date = ?", (target_date,), 500)
+        account_rows = query_rows("paper_performance", "WHERE report_date = ?", (target_date,), 500)
+    rows = visible_live_infographic_rows(account_rows, target_date)
 
     deposits = total_bankroll_deposits()
     base = bankroll_base()
-    total_cost = sum(float(row.get("cost") or 0) for row in rows)
-    total_market_value = sum(float(row.get("market_value") or 0) for row in rows)
-    realized_proceeds = sum(float(row.get("realized_proceeds") or 0) for row in rows)
-    total_pl = sum(float(row.get("p_l") or 0) for row in rows)
+    total_cost = sum(float(row.get("cost") or 0) for row in account_rows)
+    total_market_value = sum(float(row.get("market_value") or 0) for row in account_rows)
+    realized_proceeds = sum(float(row.get("realized_proceeds") or 0) for row in account_rows)
+    total_pl = sum(float(row.get("p_l") or 0) for row in account_rows)
     cash = base - total_cost + realized_proceeds
     equity = cash + total_market_value
-    open_rows = [row for row in rows if str(row.get("status") or "").upper() == "OPEN"]
-    closed_rows = [row for row in rows if str(row.get("status") or "").upper() != "OPEN"]
+    open_rows = [row for row in rows if float(row.get("remaining_shares") or 0) > 0]
+    closed_rows = [row for row in rows if float(row.get("remaining_shares") or 0) <= 0]
     heat = (
         sum(
             float(row.get("initial_risk") or 0)
@@ -850,7 +865,7 @@ def live_infographic_html(target_date: str | None = None) -> bytes:
             bh = row_h - 6
             ym = y0 + bh / 2 + 4.5
             col = "#16803c" if pv >= 0 else "#c43d3d"
-            op = "0.85" if status == "OPEN" else "0.42"
+            op = "0.85" if float(r.get("remaining_shares") or 0) > 0 else "0.42"
             bw = (abs(pv) / total_range) * bar_area
             bx = zero_x if pv >= 0 else zero_x - bw
             if bw > 0.5:
@@ -980,6 +995,7 @@ tbody tr:hover td{{filter:brightness(.97)}}
 .ok{{color:var(--green);font-weight:700}}.bad{{color:var(--red);font-weight:700}}
 .sb{{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;letter-spacing:.02em}}
 .sb.open{{background:#f0fdf4;color:var(--green);border:1px solid #86efac}}
+.sb.partial{{background:#eff6ff;color:var(--blue);border:1px solid #93c5fd}}
 .sb.closed{{background:#f1f5f9;color:var(--muted);border:1px solid var(--line)}}
 .pct-cell{{display:flex;align-items:center;gap:7px}}
 .pbar{{display:inline-block;height:8px;border-radius:3px;flex-shrink:0;opacity:.75}}
@@ -1011,7 +1027,7 @@ tbody tr:hover td{{filter:brightness(.97)}}
         <div class="chart-label">Position P/L %</div>
         {chart_svg}
       </div>
-      <div class="note">Open positions marked to latest report prices &middot; faded bars = closed &middot; auto-refreshes every {payload['refresh_seconds']}s</div>
+      <div class="note">Open positions plus trades closed on {escape(payload['date'])} &middot; faded bars = closed today &middot; auto-refreshes every {payload['refresh_seconds']}s</div>
     </section>
     <aside class="side">
       <section class="side-card">
@@ -1031,7 +1047,7 @@ tbody tr:hover td{{filter:brightness(.97)}}
         <small>Live status</small>
         <div class="status-grid">
           <div class="status-tile"><small>Open</small><strong>{summary['open_count']}</strong></div>
-          <div class="status-tile"><small>Resolved</small><strong>{summary['closed_count']}</strong></div>
+          <div class="status-tile"><small>Resolved today</small><strong>{summary['closed_count']}</strong></div>
           <div class="status-tile"><small>Report</small><strong>{escape(str(report_message))}</strong></div>
         </div>
         <p class="muted" style="margin:12px 0 0;font-size:12px">Last report: {escape(str(report_updated))}</p>
