@@ -17,7 +17,7 @@ from scanner_config import (
     DASHBOARD_FILE, PIPELINE_STATE_FILE,
     STARTING_CAPITAL, WATCHLIST_EXPORT_DIR, MAX_DAILY_PAPER_TRADES,
     FIRST_TARGET_GAIN_PCT, MAX_PORTFOLIO_HEAT_PCT, MAX_SECTOR_EXPOSURE_PCT,
-    MAX_SHARES_PER_POSITION,
+    MAX_SECTOR_POSITIONS, MAX_SHARES_PER_POSITION,
     RUNNER_EXIT_SESSIONS, SECOND_TARGET_GAIN_PCT, STOP_LOSS_PCT,
     RISK_PER_TRADE_PCT,
     ensure_directories,
@@ -807,7 +807,7 @@ a{{color:var(--blue)}}
 <section class='cards'>{cards_html}</section>
 <div class='layout'>
   <section class='panel'><div class='panel-head'><h2>Portfolio performance</h2><span class='subtle'>Equity over time</span></div>{equity_svg(history, capital_base)}</section>
-  <aside class='panel strategy'><h2>Automated controls</h2><p>Take 50% at +{FIRST_TARGET_GAIN_PCT:g}% and move the balance to breakeven. Take another 25% at +{SECOND_TARGET_GAIN_PCT:g}%, then exit the runner {RUNNER_EXIT_SESSIONS} market sessions later.</p><div class='schedule'><div><b>Risk sizing</b><span>{RISK_PER_TRADE_PCT:g}% equity / trade · {MAX_SHARES_PER_POSITION} shares max</span></div><div><b>Entry pace</b><span>Up to {MAX_DAILY_PAPER_TRADES} new purchases daily</span></div><div><b>Open positions</b><span>Controlled by heat, cash, and sector limits</span></div><div><b>Exit ladder</b><span>50% at +{FIRST_TARGET_GAIN_PCT:g}% · 25% at +{SECOND_TARGET_GAIN_PCT:g}% · runner +{RUNNER_EXIT_SESSIONS} sessions</span></div><div><b>Protective stop</b><span>−{STOP_LOSS_PCT:g}% → breakeven at +{FIRST_TARGET_GAIN_PCT:g}%</span></div><div><b>Fallback time stop</b><span>10 sessions</span></div><div><b>Portfolio heat</b><span>{MAX_PORTFOLIO_HEAT_PCT:g}% max</span></div><div><b>Sector ceiling</b><span>{MAX_SECTOR_EXPOSURE_PCT:g}% · one position</span></div><div><b>Earnings blackout</b><span>5 sessions</span></div><div><b>Live spread cap</b><span>1%</span></div></div></aside>
+  <aside class='panel strategy'><h2>Automated controls</h2><p>Take 50% at +{FIRST_TARGET_GAIN_PCT:g}% and move the balance to breakeven. Take another 25% at +{SECOND_TARGET_GAIN_PCT:g}%, then exit the runner {RUNNER_EXIT_SESSIONS} market sessions later.</p><div class='schedule'><div><b>Risk sizing</b><span>{RISK_PER_TRADE_PCT:g}% equity / trade · {MAX_SHARES_PER_POSITION} shares max</span></div><div><b>Entry pace</b><span>Up to {MAX_DAILY_PAPER_TRADES} new purchases daily</span></div><div><b>Open positions</b><span>Controlled by heat, cash, and sector limits</span></div><div><b>Exit ladder</b><span>50% at +{FIRST_TARGET_GAIN_PCT:g}% · 25% at +{SECOND_TARGET_GAIN_PCT:g}% · runner +{RUNNER_EXIT_SESSIONS} sessions</span></div><div><b>Protective stop</b><span>−{STOP_LOSS_PCT:g}% → breakeven at +{FIRST_TARGET_GAIN_PCT:g}%</span></div><div><b>Fallback time stop</b><span>10 sessions</span></div><div><b>Portfolio heat</b><span>{MAX_PORTFOLIO_HEAT_PCT:g}% max</span></div><div><b>Sector ceiling</b><span>{MAX_SECTOR_EXPOSURE_PCT:g}% · {MAX_SECTOR_POSITIONS} positions</span></div><div><b>Earnings blackout</b><span>5 sessions</span></div><div><b>Live spread cap</b><span>1%</span></div></div></aside>
   <section class='panel full'>
     <div class='panel-head'><h2>Open positions</h2><span class='subtle'>{len(open_positions)} active</span></div>
     <p class='table-hint'>Hover over P/L %, Days, Spread, or Band headers for definitions.</p>

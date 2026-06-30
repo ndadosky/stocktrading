@@ -15,3 +15,4 @@ review_date,status,setting,old_value,new_value,training_sample,holdout_sample,ba
 2026-06-29,user_approved,risk.max_shares_per_position,unlimited,500,,,,,,,,,,,pending,"Cap each company position at 500 shares"
 2026-06-29,user_approved,risk.max_new_positions_per_day,6,15,,,,,,,,,,,pending,"Allow up to 15 new purchases per trading day"
 2026-06-29,user_approved,risk.max_open_positions,50,unlimited,,,,,,,,,,,pending,"Rely on daily entry, cash, heat, and sector controls instead of a fixed total-position cap"
+2026-06-30,user_approved,risk.max_sector_positions,1,3,,,,,,,,,,,pending,"Allow up to three simultaneously open companies in the same sector"

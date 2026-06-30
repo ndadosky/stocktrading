@@ -70,7 +70,7 @@ earnings proximity, score band, and every scoring component that fired.
 - Maximum: **15 new confirmed trades per day** with **no fixed total-position cap**
 - Share ceiling: **500 shares per company**
 - Position ceiling: **10% of current equity**
-- Sector ceiling: **20% of current equity** and **one open position per sector**
+- Sector ceiling: **20% of current equity** and **three open positions per sector**
 - Portfolio heat ceiling: **3% of current equity at the active stops**
 - Cash reserve: at least **40% of current equity**
 - Earnings blackout: **no new entry within five market sessions of earnings**

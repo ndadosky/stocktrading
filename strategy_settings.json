@@ -1,5 +1,5 @@
 {
-  "version": "selective-growth-v6",
+  "version": "selective-growth-v7",
   "baseline": "strategy_baseline.json",
   "success_definition": "Reached +5% first target before -5% stop",
   "morning_weights": {
@@ -35,7 +35,7 @@
     "max_shares_per_position": 500,
     "max_position_exposure_pct": 10,
     "minimum_cash_reserve_pct": 40,
-    "max_sector_positions": 1,
+    "max_sector_positions": 3,
     "max_sector_exposure_pct": 20,
     "max_portfolio_heat_pct": 3,
     "earnings_blackout_sessions": 5,

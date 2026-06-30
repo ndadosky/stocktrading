@@ -82,5 +82,19 @@ class DailyPurchaseLimitTests(unittest.TestCase):
 
         self.assertEqual(shares, 500)
 
+    def test_sector_limit_allows_three_positions_but_blocks_a_fourth(self) -> None:
+        existing = self.existing_positions(position_count=2)
+        existing["sector"] = "Real Estate"
+        confirmations = pd.DataFrame([
+            {"ticker": "THIRD", "sector": "Real Estate", "score": 50, "current": 10.0},
+            {"ticker": "FOURTH", "sector": "Real Estate", "score": 49, "current": 10.0},
+        ])
+
+        with patch.object(daily_report, "account_summary", return_value=self.account_summary()):
+            result = daily_report.add_new_trades(existing, confirmations, "2026-06-30")
+
+        additions = result[result["trade_date"].astype(str).eq("2026-06-30")]
+        self.assertEqual(additions["ticker"].tolist(), ["THIRD"])
+
 if __name__ == "__main__":
     unittest.main()
