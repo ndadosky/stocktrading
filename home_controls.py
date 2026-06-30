@@ -377,6 +377,7 @@ def home_controls_payload() -> dict[str, Any]:
                 }
             )
 
+    door_entity_id = os.getenv("HOME_FRONT_DOOR_ENTITY", "").strip()
     door_state = str(_state_value(door) or "unavailable").lower()
     return {
         "generated_at": _now(),
@@ -390,7 +391,9 @@ def home_controls_payload() -> dict[str, Any]:
             "pool_lights": str(_state_value(pool_lights) or "unavailable").lower(),
         },
         "front_door": {
-            "configured": bool(os.getenv("HOME_FRONT_DOOR_ENTITY", "").strip()),
+            "configured": bool(door_entity_id),
+            "connected": door is not None,
+            "entity_id": door_entity_id,
             "state": door_state,
             "locked": door_state == "locked",
         },

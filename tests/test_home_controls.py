@@ -90,6 +90,31 @@ class PoolModeTests(unittest.TestCase):
 
 
 class FrontDoorTests(unittest.TestCase):
+    def test_payload_uses_current_home_assistant_lock_state(self) -> None:
+        for state, locked in (("locked", True), ("unlocked", False)):
+            states = {
+                DOOR_ENV["HOME_FRONT_DOOR_ENTITY"]: {
+                    "state": state,
+                    "attributes": {"friendly_name": "Front Door"},
+                }
+            }
+            with self.subTest(state=state), patch.dict(
+                os.environ, DOOR_ENV, clear=True
+            ), patch(
+                "home_controls._ha_states", return_value=(states, None)
+            ), patch(
+                "home_controls.poolsync_status", return_value={"configured": False}
+            ), patch(
+                "home_controls.enphase_solar_status", return_value={"configured": False}
+            ):
+                door = home_controls.home_controls_payload()["front_door"]
+
+            self.assertTrue(door["configured"])
+            self.assertTrue(door["connected"])
+            self.assertEqual(door["entity_id"], "lock.front_front_door")
+            self.assertEqual(door["state"], state)
+            self.assertEqual(door["locked"], locked)
+
     def test_lock_calls_home_assistant_lock_service(self) -> None:
         with patch.dict(os.environ, DOOR_ENV, clear=True), patch(
             "home_controls._json_request", return_value={}

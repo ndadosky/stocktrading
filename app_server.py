@@ -1416,7 +1416,7 @@ header{padding:0 20px;background:var(--panel);border-bottom:1px solid var(--line
 const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const setPill=(id,text,kind='')=>{const el=document.getElementById(id);el.textContent=text;el.className='pill '+kind};
 const value=(v,fallback='—')=>v===null||v===undefined||v===''?fallback:v;
-let latestHome=null,pendingDoorState=null,pendingDoorUntil=0;
+let latestHome=null;
 const controlDeck=document.querySelector('.home-grid');const controlCards=[...controlDeck.querySelectorAll('.home-card')];const deckDots=[...document.querySelectorAll('.deck-dot')];
 function setDeckPage(index){deckDots.forEach((dot,i)=>dot.classList.toggle('active',i===index))}
 deckDots.forEach((dot,index)=>dot.onclick=()=>{const card=controlCards[index];controlDeck.scrollTo({left:card.offsetLeft-controlDeck.offsetLeft-2,behavior:'smooth'});setDeckPage(index)});
@@ -1433,9 +1433,10 @@ function renderSolarChart(intervals,message){
   const max=Math.max(1,...hours.flatMap(item=>[item.production,item.consumption]));chart.className='solar-chart';chart.innerHTML=hours.map(item=>{const p=Math.max(0,item.production/max*100),c=Math.max(0,item.consumption/max*100),label=item.hour%4===0?String(item.hour).padStart(2,'0')+':00':'';return '<div class="solar-hour" title="'+String(item.hour).padStart(2,'0')+':00 · Produced '+(item.production/1000).toFixed(2)+' kWh · Used '+(item.consumption/1000).toFixed(2)+' kWh"><span class="solar-bar" style="height:'+p+'%"></span><span class="solar-bar use" style="height:'+c+'%"></span>'+(label?'<small>'+label+'</small>':'')+'</div>'}).join('');
 }
 function renderDoor(door){
-  const lockButton=document.getElementById('door-lock'),unlockButton=document.getElementById('door-unlock');lockButton.classList.toggle('active',door.state==='locked');unlockButton.classList.toggle('active',door.state==='unlocked');
-  if(door.configured){const locked=door.locked;setPill('door-status',door.state,locked?'ok':'warn');document.getElementById('door-icon').textContent=locked?'●':'○';document.getElementById('door-state').textContent=door.state;document.getElementById('door-message').textContent=locked?'Secure':'Check the front door'}
-  else{setPill('door-status','Setup needed','warn');document.getElementById('door-state').textContent='Not connected';document.getElementById('door-message').textContent='Choose the Yale lock entity in .env'}
+  const state=String(door.state||'unavailable').toLowerCase(),lockButton=document.getElementById('door-lock'),unlockButton=document.getElementById('door-unlock');lockButton.classList.toggle('active',state==='locked');unlockButton.classList.toggle('active',state==='unlocked');
+  if(door.connected){const locked=state==='locked',unlocked=state==='unlocked',transitioning=state==='locking'||state==='unlocking';setPill('door-status',state,locked?'ok':transitioning?'warn':unlocked?'warn':'bad');document.getElementById('door-icon').textContent=locked?'●':unlocked?'○':'◌';document.getElementById('door-state').textContent=state;document.getElementById('door-message').textContent=locked?'Secure':unlocked?'Unlocked':transitioning?'Lock is moving':'Check the front door'}
+  else if(door.configured){setPill('door-status','Unavailable','bad');document.getElementById('door-icon').textContent='◌';document.getElementById('door-state').textContent='Unavailable';document.getElementById('door-message').textContent=(door.entity_id||'Front-door entity')+' was not returned by Home Assistant'}
+  else{setPill('door-status','Setup needed','warn');document.getElementById('door-icon').textContent='◌';document.getElementById('door-state').textContent='Not connected';document.getElementById('door-message').textContent='Choose the Yale lock entity in .env'}
 }
 function renderHome(data){
   latestHome=data;
@@ -1459,7 +1460,7 @@ function renderHome(data){
   else{document.getElementById('pool-mode-current').textContent='Setup needed';setPill('pool-mode-status','Setup needed','warn')}
   const deckOn=poolMode.deck_jets==='on';document.getElementById('deck-jets-state').textContent=deckOn?'On':poolMode.deck_jets==='off'?'Off':'Unavailable';deckButton.textContent=deckOn?'Turn off':'Turn on';deckButton.className='control-btn '+(deckOn?'danger':'primary');
   const lightsOn=poolMode.pool_lights==='on';document.getElementById('pool-lights-state').textContent=lightsOn?'On':poolMode.pool_lights==='off'?'Off':'Unavailable';lightsButton.textContent=lightsOn?'Turn off':'Turn on';lightsButton.className='control-btn '+(lightsOn?'danger':'primary');
-  const reportedDoor=data.front_door||{};if(pendingDoorState&&Date.now()<pendingDoorUntil&&reportedDoor.state!==pendingDoorState)renderDoor({...reportedDoor,state:pendingDoorState,locked:pendingDoorState==='locked'});else{if(reportedDoor.state===pendingDoorState||Date.now()>=pendingDoorUntil)pendingDoorState=null;renderDoor(reportedDoor)}
+  renderDoor(data.front_door||{});
   const solar=data.solar||{};
   const solarAuth=document.getElementById('solar-auth');solarAuth.style.display=solar.authorization_required?'inline-flex':'none';
   document.getElementById('solar-source').textContent=solar.source||'—';
@@ -1469,7 +1470,7 @@ function renderHome(data){
   else{setPill('solar-status','Setup needed','warn');document.getElementById('solar-power').innerHTML='—<small> kW</small>';document.getElementById('solar-today').textContent='Add Enphase credentials in .env'}
   document.getElementById('cars-grid').innerHTML=(data.cars||[]).map(car=>{const charge=car.charge==null?0:Math.max(0,Math.min(100,car.charge));const charging=['on','charging','true'].includes(String(car.charging||'').toLowerCase());const status=car.configured?(charging?'Charging':'Connected'):'Setup needed';const range=car.range==null?'—':esc(car.range),lockState=car.lock_state==='locked'?'locked':car.lock_state==='unlocked'?'unlocked':'unavailable',lockIcon=lockState==='locked'?'🔒':lockState==='unlocked'?'🔓':'–',lockLabel=lockState==='locked'?'Locked':lockState==='unlocked'?'Unlocked':'Lock unavailable';return '<article class="car"><div class="car-top"><h4>'+esc(car.name)+'</h4><div class="vehicle-badges"><span class="pill '+(car.configured?'ok':'warn')+'">'+esc(status)+'</span><span class="vehicle-lock '+lockState+'" role="img" aria-label="'+lockLabel+'" title="'+lockLabel+'">'+lockIcon+'</span></div></div><img class="car-image" src="'+esc(car.image)+'" alt="'+esc(car.name)+'"><div class="car-metrics"><div class="car-metric"><small>Charge</small><strong>'+(car.charge==null?'—':esc(car.charge)+'%')+'</strong></div><div class="car-metric"><small>Range</small><strong>'+range+' <span>'+esc(car.range_unit||'mi')+'</span></strong></div></div><div class="battery"><span style="width:'+charge+'%"></span></div></article>'}).join('');
 }
-async function refreshHome(){try{const response=await fetch('/api/home/status',{cache:'no-store'});renderHome(await response.json())}catch(error){setPill('ha-status','Home status unavailable','bad')}}
+async function refreshHome(){try{const response=await fetch('/api/home/status',{cache:'no-store'});const data=await response.json();renderHome(data);return data}catch(error){setPill('ha-status','Home status unavailable','bad');return null}}
 async function sendControl(url,payload,messageId){
   const message=document.getElementById(messageId);message.className='action-message';message.textContent='Applying…';document.querySelectorAll('.control-btn').forEach(button=>button.disabled=true);
   try{const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const result=await response.json();if(!result.ok)throw new Error(result.error||'Control request failed');message.textContent='Updated';await refreshHome()}
@@ -1477,8 +1478,8 @@ async function sendControl(url,payload,messageId){
   finally{document.querySelectorAll('.control-btn').forEach(button=>button.disabled=false)}
 }
 async function sendDoorControl(action){
-  const message=document.getElementById('door-action-message'),previous={...(latestHome?.front_door||{})};message.className='action-message';message.textContent='Updating…';setPill('door-status','Updating','warn');document.querySelectorAll('.control-btn').forEach(button=>button.disabled=true);
-  try{const response=await fetch('/api/home/front-door',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});const result=await response.json();if(!result.ok)throw new Error(result.error||'Door control request failed');const state=action==='lock'?'locked':'unlocked';pendingDoorState=state;pendingDoorUntil=Date.now()+30000;latestHome={...(latestHome||{}),front_door:{...previous,configured:true,state,locked:state==='locked'}};renderDoor(latestHome.front_door);message.textContent='Updated'}
+  const message=document.getElementById('door-action-message'),previous={...(latestHome?.front_door||{})},target=action==='lock'?'locked':'unlocked';message.className='action-message';message.textContent='Updating…';setPill('door-status','Updating','warn');document.querySelectorAll('.control-btn').forEach(button=>button.disabled=true);
+  try{const response=await fetch('/api/home/front-door',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});const result=await response.json();if(!result.ok)throw new Error(result.error||'Door control request failed');for(let attempt=0;attempt<20;attempt++){await new Promise(resolve=>setTimeout(resolve,750));const data=await refreshHome();if(data?.front_door?.state===target){message.textContent='Updated';return}}message.className='action-message bad';message.textContent='Command sent, but Home Assistant has not confirmed '+target}
   catch(error){message.className='action-message bad';message.textContent=error.message;renderDoor(previous)}
   finally{document.querySelectorAll('.control-btn').forEach(button=>button.disabled=false)}
 }
