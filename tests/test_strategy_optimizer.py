@@ -25,6 +25,13 @@ def resolved_rows(version: str, count: int, return_pct: float) -> pd.DataFrame:
 
 
 class StrategyOptimizerTests(unittest.TestCase):
+    def test_exit_lever_catalog_includes_trailing_and_regime_controls(self) -> None:
+        keys = {lever["key"] for lever in strategy_optimizer.LEVER_CATALOG}
+        self.assertIn("risk.scale_out.trailing_stop_pct", keys)
+        self.assertIn("risk.scale_out.runner_exit_sessions_after_second_target", keys)
+        self.assertIn("risk.scale_out.risk_on_target_multiplier", keys)
+        self.assertIn("risk.scale_out.risk_off_target_multiplier", keys)
+
     def test_metrics_include_recency_cost_and_segments(self) -> None:
         frame = pd.DataFrame([
             {

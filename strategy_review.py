@@ -89,6 +89,8 @@ def current_data_suggestions() -> dict:
         losses = pnl[pnl.lt(0)]
         profit_factor = float(wins.sum() / abs(losses.sum())) if not losses.empty else None
         expectancy = float(returns.mean()) if not returns.empty else 0.0
+        winning_returns = returns[returns.gt(0)]
+        average_winner = float(winning_returns.mean()) if not winning_returns.empty else 0.0
         hit = pd.to_numeric(
             cohort.get("shares_sold_10", pd.Series(0, index=cohort.index)), errors="coerce"
         ).fillna(0).gt(0).mean() * 100
@@ -108,6 +110,15 @@ def current_data_suggestions() -> dict:
                 "title": "Keep the core exit and risk rules for now",
                 "evidence": f"Current-cohort expectancy is {expectancy:+.2f}% with {pf_text}; {hit:.1f}% reached the first target across {count} trades.",
                 "change": "Continue collecting trades; use score-band evidence for the next entry-rule experiment.",
+            })
+
+        target_average_winner = float(policy.get("goals", {}).get("average_winner_pct", 5))
+        if average_winner < target_average_winner:
+            suggestions.append({
+                "confidence": confidence,
+                "title": "Test greater upside capture on winning trades",
+                "evidence": f"The current cohort's average winner is {average_winner:+.2f}% versus the {target_average_winner:.1f}% goal.",
+                "change": "Let champion/challenger experiments test tranche sizes, runner duration, trailing protection, and regime-specific targets one at a time; promote only changes that also improve overall expectancy and pass drawdown guards.",
             })
 
         if "confirmation_band" in cohort:

@@ -63,6 +63,62 @@ LEVER_CATALOG = [
         "bounds": "10–15% · step 1",
         "reason": "Tests whether the second tranche should demand slightly more upside.",
     },
+    {
+        "key": "risk.scale_out.first_target_initial_shares_pct",
+        "label": "First target tranche",
+        "area": "Exit",
+        "bounds": "30–60% · step 10",
+        "reason": "Tests taking less early profit so more shares participate in larger winners.",
+    },
+    {
+        "key": "risk.scale_out.second_target_initial_shares_pct",
+        "label": "Second target tranche",
+        "area": "Exit",
+        "bounds": "15–35% · step 5",
+        "reason": "Tests the balance between banking the second target and preserving the runner.",
+    },
+    {
+        "key": "risk.scale_out.runner_exit_sessions_after_second_target",
+        "label": "Runner duration",
+        "area": "Exit",
+        "bounds": "1–5 sessions · step 1",
+        "reason": "Tests whether giving successful runners more time improves realized returns.",
+    },
+    {
+        "key": "risk.scale_out.breakeven_after_first_target_pct",
+        "label": "Post-target protection",
+        "area": "Exit",
+        "bounds": "0–2% · step 0.5",
+        "reason": "Tests how aggressively to protect the remainder after the first scale-out.",
+    },
+    {
+        "key": "risk.scale_out.runner_stop_gain_pct",
+        "label": "Runner protection",
+        "area": "Exit",
+        "bounds": "6–10% · step 1",
+        "reason": "Tests how much room the runner receives after reaching the second target.",
+    },
+    {
+        "key": "risk.scale_out.trailing_stop_pct",
+        "label": "Trailing stop",
+        "area": "Exit",
+        "bounds": "Off or 2–5% · step 0.5",
+        "reason": "Tests a high-water trailing exit after the first target instead of a fixed floor alone.",
+    },
+    {
+        "key": "risk.scale_out.risk_on_target_multiplier",
+        "label": "Risk-on target multiplier",
+        "area": "Regime exit",
+        "bounds": "1.0–1.25 · step 0.05",
+        "reason": "Tests larger targets when the broad market trend is favorable.",
+    },
+    {
+        "key": "risk.scale_out.risk_off_target_multiplier",
+        "label": "Risk-off target multiplier",
+        "area": "Regime exit",
+        "bounds": "0.75–1.0 · step 0.05",
+        "reason": "Tests faster profit-taking when the broad market trend is unfavorable.",
+    },
 ]
 
 
@@ -106,12 +162,27 @@ def _save_database_value(key: str, payload: dict) -> bool:
         return False
 
 
+def _with_default_settings(settings: dict) -> dict:
+    defaults = json.loads(STRATEGY_SETTINGS_FILE.read_text(encoding="utf-8"))
+
+    def merge(target: dict, source: dict) -> None:
+        for key, value in source.items():
+            if key not in target:
+                target[key] = copy.deepcopy(value)
+            elif isinstance(value, dict) and isinstance(target[key], dict):
+                merge(target[key], value)
+
+    normalized = copy.deepcopy(settings)
+    merge(normalized, defaults)
+    return normalized
+
+
 def load_active_settings() -> dict:
     database_settings = _database_value("active_settings")
     if database_settings:
-        return database_settings
+        return _with_default_settings(database_settings)
     source = RUNTIME_STRATEGY_SETTINGS_FILE if RUNTIME_STRATEGY_SETTINGS_FILE.exists() else STRATEGY_SETTINGS_FILE
-    return json.loads(source.read_text(encoding="utf-8"))
+    return _with_default_settings(json.loads(source.read_text(encoding="utf-8")))
 
 
 def _atomic_json(path: Path, payload: dict) -> None:
@@ -150,11 +221,11 @@ def strategy_assignment(ticker: str, trade_date: str, context: dict | None = Non
     if challenger:
         return {
             "arm": "challenger", "version": str(state["candidate_version"]),
-            "settings": copy.deepcopy(state["candidate_settings"]),
+            "settings": _with_default_settings(state["candidate_settings"]),
         }
     return {
         "arm": "champion", "version": str(state["baseline_version"]),
-        "settings": copy.deepcopy(state["baseline_settings"]),
+        "settings": _with_default_settings(state["baseline_settings"]),
     }
 
 
@@ -297,6 +368,24 @@ def _candidate_change(settings: dict, index: int, metrics: dict) -> tuple[dict, 
         new = max(5, int(old) - 1)
     elif key.endswith("morning_candidate_min_score"):
         new = min(45, int(old) + 2)
+    elif key.endswith("first_target_initial_shares_pct"):
+        second_pct = int(settings["risk"]["scale_out"]["second_target_initial_shares_pct"])
+        new = max(30, int(old) - 10) if metrics.get("average_winner_pct", 0) < 5 else min(60, 90 - second_pct, int(old) + 10)
+    elif key.endswith("second_target_initial_shares_pct"):
+        first_pct = int(settings["risk"]["scale_out"]["first_target_initial_shares_pct"])
+        new = max(15, int(old) - 5) if metrics.get("average_winner_pct", 0) < 5 else min(35, 90 - first_pct, int(old) + 5)
+    elif key.endswith("runner_exit_sessions_after_second_target"):
+        new = min(5, int(old) + 1) if metrics.get("average_winner_pct", 0) < 5 else max(1, int(old) - 1)
+    elif key.endswith("breakeven_after_first_target_pct"):
+        new = min(2, round(float(old) + 0.5, 1))
+    elif key.endswith("runner_stop_gain_pct"):
+        new = max(6, float(old) - 1) if metrics.get("average_winner_pct", 0) < 5 else min(10, float(old) + 1)
+    elif key.endswith("trailing_stop_pct"):
+        new = 3.0 if float(old) <= 0 else max(2, round(float(old) - 0.5, 1))
+    elif key.endswith("risk_on_target_multiplier"):
+        new = min(1.25, round(float(old) + 0.05, 2))
+    elif key.endswith("risk_off_target_multiplier"):
+        new = max(0.75, round(float(old) - 0.05, 2))
     else:
         new = min(15, float(old) + 1)
     _set_value(candidate, key, new)

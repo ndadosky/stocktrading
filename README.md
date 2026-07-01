@@ -155,10 +155,12 @@ The 10:30 AM strategy-review job also advances the continuous optimizer:
 - Shows baseline and experiment progress, active versions, every keep/revert, and
   the complete lever catalog on `/strategy-review`.
 
-Automatic levers currently include the morning-candidate threshold, confirmation
-threshold, first and second profit targets, protective stop, and maximum holding
-period. Capital reserve, portfolio heat, slippage, position sizing, daily purchase
-limits, and concentration limits remain human-controlled safeguards.
+Automatic levers include the morning-candidate and confirmation thresholds;
+first and second profit targets; tranche percentages; runner duration; breakeven,
+runner, and trailing protection; risk-on and risk-off target multipliers; protective
+stop; and maximum holding period. Capital reserve, portfolio heat, slippage,
+position sizing, daily purchase limits, and concentration limits remain
+human-controlled safeguards.
 
 The goal panel tracks an 80% win rate, at least 5% on the average winning trade,
 1% average return across all trades, 1.75 profit factor, no more than 8% drawdown,

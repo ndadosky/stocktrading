@@ -11,6 +11,39 @@ from daily_report import runner_exit_due
 
 
 class ExitStrategyTests(unittest.TestCase):
+    def test_trailing_stop_ratchets_after_first_target(self) -> None:
+        trade = {column: pd.NA for column in daily_report.TRADE_COLUMNS}
+        trade.update({
+            "trade_id": "trail-test", "ticker": "TEST", "entry_price": 10.0,
+            "entry_datetime": "2026-06-29T09:30:00-04:00", "shares": 100,
+            "remaining_shares": 100, "status": "OPEN", "current_price": 10.0,
+            "target_10": 10.5, "target_20": 11.0, "stop_8": 9.5, "active_stop": 9.5,
+            "realized_proceeds": 0.0, "realized_p_l": 0.0, "shares_sold_10": 0,
+            "shares_sold_20": 0, "shares_sold_30": 0, "shares_sold_protect": 0,
+            "shares_sold_stop": 0, "shares_sold_time": 0, "last_evaluated_at": pd.NA,
+            "entry_strategy_version": "trail-test", "active_strategy_version": "trail-test",
+            "strategy_first_target_pct": 5, "strategy_second_target_pct": 10,
+            "strategy_stop_loss_pct": 5, "strategy_max_holding_days": 10,
+            "strategy_runner_exit_sessions": 2, "strategy_scale_first_pct": 50,
+            "strategy_scale_second_pct": 25, "strategy_breakeven_pct": 0,
+            "strategy_runner_stop_pct": 10, "strategy_trailing_stop_pct": 3,
+            "strategy_slippage_bps": 0, "highest_price_since_entry": 10.0,
+        })
+        bars = pd.DataFrame(
+            {
+                "Open": [10.0, 10.3], "High": [10.6, 10.35],
+                "Low": [9.9, 10.2], "Close": [10.55, 10.25],
+            },
+            index=pd.DatetimeIndex(["2026-06-29T10:00:00-04:00", "2026-06-29T10:05:00-04:00"]),
+        )
+
+        with patch.object(daily_report, "intraday_history", return_value=bars):
+            result = daily_report.update_trade_lifecycle(pd.DataFrame([trade]))
+
+        self.assertEqual(float(result.iloc[0]["remaining_shares"]), 0)
+        self.assertAlmostEqual(float(result.iloc[0]["exit_price"]), 10.282, places=3)
+        self.assertIn("PROTECT", str(result.iloc[0]["exit_reason"]))
+
     def test_existing_open_position_receives_new_targets_and_stop(self) -> None:
         legacy = pd.DataFrame([
             {

@@ -53,7 +53,10 @@
       "second_target_initial_shares_pct": 25,
       "breakeven_after_first_target_pct": 0,
       "runner_stop_gain_pct": 10,
-      "runner_exit_sessions_after_second_target": 2
+      "runner_exit_sessions_after_second_target": 2,
+      "trailing_stop_pct": 0,
+      "risk_on_target_multiplier": 1.0,
+      "risk_off_target_multiplier": 1.0
     }
   },
   "execution": {

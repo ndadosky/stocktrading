@@ -43,7 +43,8 @@ TRADE_COLUMNS = [
     "optimizer_arm", "strategy_first_target_pct", "strategy_second_target_pct",
     "strategy_stop_loss_pct", "strategy_max_holding_days", "strategy_runner_exit_sessions",
     "strategy_scale_first_pct", "strategy_scale_second_pct", "strategy_breakeven_pct",
-    "strategy_runner_stop_pct", "strategy_slippage_bps",
+    "strategy_runner_stop_pct", "strategy_trailing_stop_pct", "highest_price_since_entry",
+    "strategy_slippage_bps",
     "last_updated",
 ]
 OPEN_STATUS = "OPEN"
@@ -301,6 +302,14 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
             continue
         raw_components = [getattr(row, "morning_components", ""), getattr(row, "notes", "")]
         components = " | ".join(str(value) for value in raw_components if not pd.isna(value) and str(value).strip())
+        regime = str(getattr(row, "market_regime", "UNKNOWN") or "UNKNOWN").upper()
+        target_multiplier = (
+            float(scale.get("risk_on_target_multiplier", 1.0)) if regime == "RISK ON"
+            else float(scale.get("risk_off_target_multiplier", 1.0)) if regime == "RISK OFF"
+            else 1.0
+        )
+        first_target_pct = float(scale["first_target_gain_pct"]) * target_multiplier
+        second_target_pct = float(scale["second_target_gain_pct"]) * target_multiplier
         additions.append({
             "trade_id": f"{today}-{ticker}", "trade_date": today,
             "entry_datetime": _entry_datetime(row, today), "ticker": ticker,
@@ -321,8 +330,8 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
             "initial_cost": trade_cost, "initial_risk": initial_risk,
             "shares": shares, "remaining_shares": shares,
             "status": OPEN_STATUS, "current_price": execution,
-            "target_10": execution * (1 + float(scale["first_target_gain_pct"]) / 100),
-            "target_20": execution * (1 + float(scale["second_target_gain_pct"]) / 100), "target_30": pd.NA,
+            "target_10": execution * (1 + first_target_pct / 100),
+            "target_20": execution * (1 + second_target_pct / 100), "target_30": pd.NA,
             "stop_8": execution * (1 - trade_stop_pct / 100),
             "active_stop": execution * (1 - trade_stop_pct / 100),
             "exit_datetime": pd.NA, "exit_price": pd.NA, "exit_reason": pd.NA,
@@ -339,8 +348,8 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
             "strategy_changed_mid_trade": False,
             "strategy_changed_at": pd.NA,
             "optimizer_arm": assignment["arm"],
-            "strategy_first_target_pct": float(scale["first_target_gain_pct"]),
-            "strategy_second_target_pct": float(scale["second_target_gain_pct"]),
+            "strategy_first_target_pct": first_target_pct,
+            "strategy_second_target_pct": second_target_pct,
             "strategy_stop_loss_pct": trade_stop_pct,
             "strategy_max_holding_days": int(risk["max_holding_days"]),
             "strategy_runner_exit_sessions": int(scale["runner_exit_sessions_after_second_target"]),
@@ -348,6 +357,8 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
             "strategy_scale_second_pct": float(scale["second_target_initial_shares_pct"]),
             "strategy_breakeven_pct": float(scale["breakeven_after_first_target_pct"]),
             "strategy_runner_stop_pct": float(scale["runner_stop_gain_pct"]),
+            "strategy_trailing_stop_pct": float(scale.get("trailing_stop_pct", 0)),
+            "highest_price_since_entry": execution,
             "strategy_slippage_bps": trade_slippage_bps,
             "last_updated": datetime.now().astimezone().isoformat(timespec="seconds"),
         })
@@ -485,7 +496,10 @@ def update_trade_lifecycle(trades: pd.DataFrame) -> pd.DataFrame:
             scale_second_pct = strategy_value("strategy_scale_second_pct", SCALE_OUT_SECOND_PCT)
             breakeven_pct = strategy_value("strategy_breakeven_pct", BREAKEVEN_AFTER_FIRST_TARGET_PCT)
             runner_stop_pct = strategy_value("strategy_runner_stop_pct", RUNNER_STOP_GAIN_PCT)
+            trailing_stop_pct = strategy_value("strategy_trailing_stop_pct", 0)
             trade_slippage_bps = strategy_value("strategy_slippage_bps", SLIPPAGE_BPS)
+            highest_value = pd.to_numeric(row.get("highest_price_since_entry"), errors="coerce")
+            highest_price = float(highest_value) if pd.notna(highest_value) else float(row["entry_price"])
             bars = intraday_history(ticker)
             if bars.empty:
                 prior_failures = pd.to_numeric(result.at[idx, "data_failure_count"], errors="coerce")
@@ -554,6 +568,11 @@ def update_trade_lifecycle(trades: pd.DataFrame) -> pd.DataFrame:
                     _sell_lot(result, idx, quantity, float(row["target_20"]), f"SCALE +{second_target_pct:g}%", timestamp, "shares_sold_20", trade_slippage_bps)
                     result.at[idx, "target_20_hit_at"] = timestamp.isoformat()
                     result.at[idx, "active_stop"] = max(float(result.at[idx, "active_stop"]), protect_floor)
+                highest_price = max(highest_price, high)
+                result.at[idx, "highest_price_since_entry"] = highest_price
+                if trailing_stop_pct > 0 and float(result.at[idx, "shares_sold_10"]) > 0:
+                    trailing_floor = highest_price * (1 - trailing_stop_pct / 100)
+                    result.at[idx, "active_stop"] = max(float(result.at[idx, "active_stop"]), trailing_floor)
             remaining = float(result.at[idx, "remaining_shares"])
             if remaining > 0 and days >= max_holding_days:
                 timestamp = after.index[-1] if not after.empty else bars.index[-1]
