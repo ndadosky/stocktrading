@@ -1,5 +1,6 @@
 {
   "minimum_resolved_trades": 60,
+  "minimum_catalyst_observations": 50,
   "chronological_holdout_pct": 20,
   "minimum_holdout_trades": 12,
   "experiment_resolved_trades": 25,

@@ -43,6 +43,7 @@ from strategy_review import current_data_suggestions, load_latest_review_rows, r
 from best_case_analysis import compute_best_case
 from strategy_optimizer import load_active_settings, optimizer_control
 from morning_candidates import build_morning_candidates, preview_rows
+from catalyst_intelligence import configured as catalyst_configured
 from home_controls import (
     home_assistant_door_control,
     home_assistant_pool_control,
@@ -1817,6 +1818,14 @@ def scanner_payload() -> dict:
         "preview_columns": preview_columns,
         "preview": preview,
         "stats": stats,
+        "catalyst": {
+            "configured": catalyst_configured(), "mode": "SHADOW",
+            "observations": sum(
+                1 for row in preview
+                if str(row.get("catalyst_configured", "")).lower() in {"1", "true", "yes"}
+            ),
+            "challenger_gate": 60,
+        },
         "files": {
             "morning_html": file_info(morning_html if morning_html.exists() else latest_html),
             "today_html": file_info(morning_html),
@@ -1866,12 +1875,18 @@ def scanner_html() -> bytes:
     preview_rows_data = payload.get("preview") or []
     preview_table = _render_preview_table(preview_cols, preview_rows_data)
     stats = payload.get("stats") or {}
+    catalyst = payload.get("catalyst") or {}
     stats_text = ""
     if stats:
         stats_text = (
             f"Live preview · {stats.get('scored_count', 0)} scored from {stats.get('raw_count', 0)} Finviz rows "
             f"({stats.get('coverage_pct', 0)}% coverage)"
         )
+    catalyst_text = (
+        f"Catalyst intelligence · SHADOW · {catalyst.get('observations', 0)} visible observations"
+        if catalyst.get("configured") else
+        "Catalyst intelligence · setup needed (ALPACA_API_KEY_ID / ALPACA_API_SECRET_KEY)"
+    )
     source_label = "Live preview" if payload.get("preview_source") == "live" else (
         "PostgreSQL" if str(payload.get("preview_source", "")).startswith("postgresql:") else "No data"
     )
@@ -1932,6 +1947,7 @@ a{{color:var(--blue)}}
     </div>
     <div id="run-indicator" class="sub" style="{running_style}"><span class="run-pill">RUNNING</span> Fetching Finviz and scoring candidates… (may take a few minutes)</div>
     <div id="preview-stats" class="note" style="{'display:block' if stats_text else 'display:none'}">{escape(stats_text)}</div>
+    <div class="note">{escape(catalyst_text)} · Automatically eligible as catalyst-v1 after 60 clean baseline trades and 50 configured observations.</div>
     <div id="preview">{preview_table}</div>
   </section>
 </main>

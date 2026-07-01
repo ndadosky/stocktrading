@@ -171,6 +171,20 @@ stop; and maximum holding period. Capital reserve, portfolio heat, slippage,
 position sizing, daily purchase limits, and concentration limits remain
 human-controlled safeguards.
 
+### Catalyst intelligence
+
+The morning scanner collects Alpaca News data in `SHADOW` mode when
+`ALPACA_API_KEY_ID` and `ALPACA_API_SECRET_KEY` are configured. It stores
+72-hour headline counts, deterministic positive/risk classifications, the latest
+headline and source URL, and a bounded shadow score in both `morning_candidates`
+and `catalyst_observations`. Shadow fields are visible on `/scanner` but do not
+change purchases during baseline collection.
+
+After 60 clean baseline trades and at least 50 configured catalyst observations,
+the optimizer makes `catalyst-v1` its first eligible challenger. Only that
+challenger may use catalyst risk gates; the champion remains unchanged, and the
+normal confidence, return, drawdown, cost, and data-quality promotion guards apply.
+
 The goal panel tracks an 80% win rate, at least 5% on the average winning trade,
 1% average return across all trades, 1.75 profit factor, no more than 8% drawdown,
 and an average holding period of five sessions or less. These targets guide

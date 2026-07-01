@@ -25,6 +25,7 @@ from scanner_config import (
 from market_calendar import sessions_until
 from pipeline_health import market_gate, record_stage
 from stock_storage import append_snapshot
+from catalyst_intelligence import enrich_candidates
 
 FINVIZ_FILTERS = {
     "Price": "Under $20",
@@ -237,6 +238,7 @@ def build_morning_candidates(*, include_earnings: bool = True) -> tuple[pd.DataF
             context = earnings_context(str(row["Ticker"]), as_of)
             for key, value in context.items():
                 candidates.at[index, key] = value
+    candidates = enrich_candidates(candidates)
 
     blocked = int(candidates["earnings_blocked"].fillna(False).astype(bool).sum())
     coverage = len(candidates) / len(raw) if len(raw) else 0.0
@@ -260,6 +262,10 @@ PREVIEW_COLUMNS = (
     "rsi_14",
     "week_move_%",
     "earnings_status",
+    "catalyst_mode",
+    "news_count_72h",
+    "catalyst_shadow_score",
+    "catalyst_flags",
 )
 
 
@@ -277,6 +283,17 @@ def persist_morning_candidates(raw: pd.DataFrame, candidates: pd.DataFrame, stat
     raw_html.write_text(html_document(raw, f"Finviz raw candidates — {today}"), encoding="utf-8")
 
     append_snapshot("morning_candidates", candidates, "scan_date", today)
+    catalyst_columns = [
+        "Ticker", "catalyst_mode", "catalyst_configured", "news_count_72h",
+        "catalyst_positive_count", "catalyst_risk_count", "catalyst_shadow_score",
+        "catalyst_flags", "latest_news_at", "latest_headline", "latest_news_url",
+        "catalyst_source",
+    ]
+    append_snapshot(
+        "catalyst_observations",
+        candidates[[column for column in catalyst_columns if column in candidates]],
+        "observation_date", today,
+    )
     CANDIDATES_FILE.with_suffix(".html").write_text(
         html_document(candidates, f"Latest scored candidates — {today}"), encoding="utf-8"
     )

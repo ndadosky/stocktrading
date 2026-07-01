@@ -31,6 +31,8 @@ TRADE_COLUMNS = [
     "trade_id", "trade_date", "entry_datetime", "ticker", "sector", "market_regime",
     "rsi_14", "morning_score", "confirmation_score", "confirmation_band", "earnings_date",
     "sessions_to_earnings", "earnings_status", "confirmation_components", "entry_volume", "bid", "ask",
+    "catalyst_mode", "catalyst_configured", "news_count_72h", "catalyst_positive_count",
+    "catalyst_risk_count", "catalyst_shadow_score", "catalyst_flags", "latest_headline", "latest_news_url",
     "bid_ask_spread_pct", "quote_source", "spread_proxy_pct", "quoted_entry_price",
     "entry_price", "initial_cost", "initial_risk", "shares", "remaining_shares", "status", "current_price", "target_10", "target_20",
     "target_30", "stop_8", "active_stop", "exit_datetime", "exit_price", "exit_reason",
@@ -258,6 +260,15 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
             continue
         if pd.notna(morning_score) and float(morning_score) < morning_minimum:
             continue
+        catalyst = assigned_settings.get("catalyst", {})
+        if catalyst.get("use_for_selection", False):
+            risk_value = pd.to_numeric(getattr(row, "catalyst_risk_count", 0), errors="coerce")
+            score_value = pd.to_numeric(getattr(row, "catalyst_shadow_score", 0), errors="coerce")
+            risk_count = int(risk_value) if pd.notna(risk_value) else 0
+            shadow_score = float(score_value) if pd.notna(score_value) else 0.0
+            if risk_count > 0 or shadow_score < float(catalyst.get("minimum_shadow_score", 0)):
+                print(f"Skipped {ticker}: catalyst-v1 risk gate")
+                continue
         if (today, ticker) in existing:
             continue
         if ticker in open_tickers:
@@ -322,6 +333,15 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
             "earnings_status": getattr(row, "earnings_status", "UNKNOWN"),
             "confirmation_components": components,
             "entry_volume": getattr(row, "confirmation_volume", pd.NA),
+            "catalyst_mode": getattr(row, "catalyst_mode", "SHADOW"),
+            "catalyst_configured": getattr(row, "catalyst_configured", False),
+            "news_count_72h": getattr(row, "news_count_72h", 0),
+            "catalyst_positive_count": getattr(row, "catalyst_positive_count", 0),
+            "catalyst_risk_count": getattr(row, "catalyst_risk_count", 0),
+            "catalyst_shadow_score": getattr(row, "catalyst_shadow_score", 0),
+            "catalyst_flags": getattr(row, "catalyst_flags", ""),
+            "latest_headline": getattr(row, "latest_headline", ""),
+            "latest_news_url": getattr(row, "latest_news_url", ""),
             "bid": getattr(row, "bid", pd.NA), "ask": getattr(row, "ask", pd.NA),
             "bid_ask_spread_pct": getattr(row, "bid_ask_spread_pct", pd.NA),
             "quote_source": getattr(row, "quote_source", "5M RANGE PROXY"),

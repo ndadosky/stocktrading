@@ -8,6 +8,11 @@
     "morning_buy_min_score": 42,
     "confirmation_buy_min_score": 40
   },
+  "catalyst": {
+    "use_for_selection": false,
+    "minimum_shadow_score": 0,
+    "hard_block_risk_headlines": true
+  },
   "morning_weights": {
     "early_weekly_momentum": 8,
     "controlled_daily_move": 6,

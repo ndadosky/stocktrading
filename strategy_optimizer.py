@@ -22,6 +22,13 @@ LEDGER_FILE = STATE_DIR / "change_ledger.jsonl"
 
 LEVER_CATALOG = [
     {
+        "key": "catalyst.use_for_selection",
+        "label": "Catalyst-informed selection",
+        "area": "Catalyst",
+        "bounds": "Shadow off → challenger on",
+        "reason": "Tests whether blocking verified risk headlines while retaining neutral or positive news improves returns.",
+    },
+    {
         "key": "selection.confirmation_buy_min_score",
         "label": "Confirmation threshold",
         "area": "Entry",
@@ -421,6 +428,8 @@ def _candidate_change(settings: dict, index: int, metrics: dict) -> tuple[dict, 
     key = lever["key"]
     if key.endswith("confirmation_buy_min_score"):
         new = min(50, int(old) + 5)
+    elif key == "catalyst.use_for_selection":
+        new = True
     elif key.endswith("first_target_gain_pct"):
         needs_larger_winners = float(metrics.get("average_winner_pct", 0)) < 5
         new = max(3, min(8, float(old) + (1 if needs_larger_winners or metrics["win_rate_pct"] >= 60 else -1)))
@@ -452,6 +461,16 @@ def _candidate_change(settings: dict, index: int, metrics: dict) -> tuple[dict, 
         new = min(15, float(old) + 1)
     _set_value(candidate, key, new)
     return candidate, {**lever, "old_value": old, "new_value": new}
+
+
+def _lever_ready(lever: dict, policy: dict) -> bool:
+    if lever["key"] != "catalyst.use_for_selection":
+        return True
+    observations = read_table("catalyst_observations")
+    if observations.empty or "catalyst_configured" not in observations:
+        return False
+    configured = observations["catalyst_configured"].astype(str).str.lower().isin({"1", "true", "yes"})
+    return int(configured.sum()) >= int(policy["minimum_catalyst_observations"])
 
 
 def _bootstrap_confidence(baseline: dict, candidate: dict, iterations: int) -> float:
@@ -580,6 +599,8 @@ def _start_experiment(state: dict, settings: dict, baseline_metrics: dict, polic
     }
     for offset in range(len(LEVER_CATALOG)):
         index = (start_index + offset) % len(LEVER_CATALOG)
+        if not _lever_ready(LEVER_CATALOG[index], policy):
+            continue
         candidate, change = _candidate_change(settings, index, baseline_metrics)
         if (
             change["new_value"] != change["old_value"]
@@ -592,7 +613,10 @@ def _start_experiment(state: dict, settings: dict, baseline_metrics: dict, polic
         state["last_result_reason"] = "Every automatic lever has reached its configured safety bound."
         return state
     cycle = int(state.get("cycle", 0)) + 1
-    candidate_version = f"auto-{cycle:03d}-{change['key'].split('.')[-1].replace('_', '-')}"
+    candidate_version = (
+        "catalyst-v1" if change["key"] == "catalyst.use_for_selection"
+        else f"auto-{cycle:03d}-{change['key'].split('.')[-1].replace('_', '-')}"
+    )
     candidate["version"] = candidate_version
     state.update({
         "phase": "experiment_running",
