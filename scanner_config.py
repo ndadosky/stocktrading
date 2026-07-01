@@ -42,7 +42,21 @@ RUNTIME_STRATEGY_SETTINGS_FILE = Path(
 
 
 def load_strategy_settings() -> dict:
-    """Load active, versioned strategy controls without mutating the baseline."""
+    """Load database-backed active controls, with the persisted file as fallback."""
+    try:
+        from db import connect
+
+        with connect() as (_, cursor):
+            cursor.execute(
+                "SELECT payload FROM strategy_optimizer_state WHERE state_key = %s",
+                ("active_settings",),
+            )
+            row = cursor.fetchone()
+        if row and isinstance(row.get("payload"), dict):
+            return row["payload"]
+    except Exception:
+        # Startup must still work before PostgreSQL and its schema are ready.
+        pass
     source = RUNTIME_STRATEGY_SETTINGS_FILE if RUNTIME_STRATEGY_SETTINGS_FILE.exists() else STRATEGY_SETTINGS_FILE
     with source.open(encoding="utf-8") as handle:
         return json.load(handle)

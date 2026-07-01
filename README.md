@@ -137,9 +137,10 @@ The 10:30 AM strategy-review job also advances the continuous optimizer:
 - Adopts at most one evidence-backed setting change per day.
 - Never weakens capital, slippage, stop, concentration, or sample safeguards to
   inflate the hit rate.
-- Stores active automatic settings, rollback snapshots, state, and an append-only
-  JSONL change ledger under `logs/strategy_optimizer/`. This directory is mounted
-  from the Pi host, so experiments survive container rebuilds without dirtying git.
+- Stores active automatic settings and rollback state in PostgreSQL table
+  `strategy_optimizer_state`, with every start/keep/revert appended to
+  `strategy_optimizer_events`. Recovery copies under `logs/strategy_optimizer/`
+  allow startup during a temporary database outage.
 - Shows baseline and experiment progress, active versions, every keep/revert, and
   the complete lever catalog on `/strategy-review`.
 
@@ -147,6 +148,20 @@ Automatic levers currently include the morning-candidate threshold, confirmation
 threshold, first and second profit targets, protective stop, and maximum holding
 period. Capital reserve, portfolio heat, slippage, position sizing, daily purchase
 limits, and concentration limits remain human-controlled safeguards.
+
+The optimizer database state is initialized automatically on app startup. Useful
+inspection queries are:
+
+```sql
+SELECT state_key, updated_at, payload->>'version' AS version
+FROM strategy_optimizer_state
+ORDER BY state_key;
+
+SELECT recorded_at, cycle, status, area, lever,
+       payload->>'rationale' AS rationale
+FROM strategy_optimizer_events
+ORDER BY id DESC;
+```
 
 The Friday review is read-only and reports whether each change should be kept,
 reverted, or watched. It does not edit the strategy.

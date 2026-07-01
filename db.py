@@ -138,6 +138,34 @@ def init_schema() -> None:
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS strategy_optimizer_state (
+                state_key TEXT PRIMARY KEY,
+                payload JSONB NOT NULL,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS strategy_optimizer_events (
+                id BIGSERIAL PRIMARY KEY,
+                recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                cycle INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                area TEXT,
+                lever TEXT,
+                payload JSONB NOT NULL
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_strategy_optimizer_events_recorded
+            ON strategy_optimizer_events (recorded_at DESC)
+            """
+        )
 
 
 def wait_for_database(timeout_seconds: int = 60) -> None:

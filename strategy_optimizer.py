@@ -62,7 +62,46 @@ def _now() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
+def _database_value(key: str) -> dict | None:
+    try:
+        from db import connect, init_schema
+
+        init_schema()
+        with connect() as (_, cursor):
+            cursor.execute(
+                "SELECT payload FROM strategy_optimizer_state WHERE state_key = %s",
+                (key,),
+            )
+            row = cursor.fetchone()
+        return row.get("payload") if row and isinstance(row.get("payload"), dict) else None
+    except Exception:
+        return None
+
+
+def _save_database_value(key: str, payload: dict) -> bool:
+    try:
+        from db import connect, init_schema
+
+        init_schema()
+        with connect(dict_rows=False) as (_, cursor):
+            cursor.execute(
+                """
+                INSERT INTO strategy_optimizer_state (state_key, payload, updated_at)
+                VALUES (%s, %s::jsonb, NOW())
+                ON CONFLICT (state_key) DO UPDATE
+                SET payload = EXCLUDED.payload, updated_at = NOW()
+                """,
+                (key, json.dumps(payload)),
+            )
+        return True
+    except Exception:
+        return False
+
+
 def load_active_settings() -> dict:
+    database_settings = _database_value("active_settings")
+    if database_settings:
+        return database_settings
     source = RUNTIME_STRATEGY_SETTINGS_FILE if RUNTIME_STRATEGY_SETTINGS_FILE.exists() else STRATEGY_SETTINGS_FILE
     return json.loads(source.read_text(encoding="utf-8"))
 
@@ -74,11 +113,20 @@ def _atomic_json(path: Path, payload: dict) -> None:
     temporary.replace(path)
 
 
+def _save_state(state: dict) -> None:
+    _save_database_value("optimizer_state", state)
+    _atomic_json(STATE_FILE, state)
+
+
 def _write_settings(settings: dict) -> None:
+    _save_database_value("active_settings", settings)
     _atomic_json(RUNTIME_STRATEGY_SETTINGS_FILE, settings)
 
 
 def load_optimizer_state() -> dict:
+    database_state = _database_value("optimizer_state")
+    if database_state:
+        return database_state
     if STATE_FILE.exists():
         try:
             return json.loads(STATE_FILE.read_text(encoding="utf-8"))
@@ -199,6 +247,26 @@ def _record(state: dict, event: dict) -> None:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with LEDGER_FILE.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(event, separators=(",", ":")) + "\n")
+    try:
+        from db import connect, init_schema
+
+        init_schema()
+        with connect(dict_rows=False) as (_, cursor):
+            cursor.execute(
+                """
+                INSERT INTO strategy_optimizer_events
+                    (recorded_at, cycle, status, area, lever, payload)
+                VALUES (%s, %s, %s, %s, %s, %s::jsonb)
+                """,
+                (
+                    event["recorded_at"], int(event.get("cycle", 0)),
+                    str(event.get("status", "")), str(event.get("area", "")),
+                    str(event.get("lever", "")), json.dumps(event),
+                ),
+            )
+    except Exception:
+        # State history and JSONL provide a recovery copy during DB outages.
+        pass
 
 
 def _start_experiment(state: dict, settings: dict, baseline_metrics: dict, policy: dict) -> dict:
@@ -244,6 +312,8 @@ def run_optimizer_cycle() -> dict:
     policy_path = Path(__file__).resolve().parent / "optimizer_policy.json"
     policy = json.loads(policy_path.read_text(encoding="utf-8"))
     settings = load_active_settings()
+    # Migrates an existing file-backed active strategy on the first DB-backed run.
+    _save_database_value("active_settings", settings)
     state = load_optimizer_state()
     trades = read_table("paper_trades")
     today = datetime.now().astimezone().date().isoformat()
@@ -299,7 +369,7 @@ def run_optimizer_cycle() -> dict:
                 strategy_metrics(baseline_rows.tail(int(policy["minimum_resolved_trades"]))), policy,
             )
 
-    _atomic_json(STATE_FILE, state)
+    _save_state(state)
     return optimizer_status(state, trades, policy)
 
 
