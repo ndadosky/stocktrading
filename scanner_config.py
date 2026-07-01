@@ -86,6 +86,10 @@ MAX_SHARES_PER_POSITION = int(os.getenv(
 ))
 MAX_POSITION_EXPOSURE_PCT = float(STRATEGY["risk"]["max_position_exposure_pct"])
 MINIMUM_CASH_RESERVE_PCT = float(STRATEGY["risk"]["minimum_cash_reserve_pct"])
+CONVICTION_SIZING = STRATEGY["risk"].get("conviction_sizing", {
+    "enabled": False, "min_multiplier": 1.0, "max_multiplier": 1.0,
+    "score_floor": 0, "reference_score": 1,
+})
 MAX_SECTOR_POSITIONS = int(STRATEGY["risk"]["max_sector_positions"])
 EARNINGS_BLACKOUT_SESSIONS = int(STRATEGY["risk"]["earnings_blackout_sessions"])
 MAX_BID_ASK_SPREAD_PCT = float(STRATEGY["risk"]["max_bid_ask_spread_pct"])
@@ -98,6 +102,26 @@ RUNNER_STOP_GAIN_PCT = float(STRATEGY["risk"]["scale_out"]["runner_stop_gain_pct
 RUNNER_EXIT_SESSIONS = int(
     STRATEGY["risk"]["scale_out"]["runner_exit_sessions_after_second_target"]
 )
+
+
+def conviction_multiplier(score: float | None, sizing: dict | None = None) -> float:
+    """Scale position risk by setup conviction: higher score -> larger risk budget.
+
+    Linear interpolation between min_multiplier (at score_floor) and
+    max_multiplier (at reference_score); clamped outside that range.
+    """
+    sizing = sizing or CONVICTION_SIZING
+    if not sizing.get("enabled") or score is None:
+        return 1.0
+    floor = float(sizing.get("score_floor", 0))
+    reference = float(sizing.get("reference_score", 1))
+    min_mult = float(sizing.get("min_multiplier", 1.0))
+    max_mult = float(sizing.get("max_multiplier", 1.0))
+    if reference <= floor:
+        return max_mult
+    fraction = (float(score) - floor) / (reference - floor)
+    fraction = max(0.0, min(1.0, fraction))
+    return min_mult + (max_mult - min_mult) * fraction
 
 
 def ensure_directories() -> None:

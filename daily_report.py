@@ -20,7 +20,7 @@ from scanner_config import (
     RISK_PER_TRADE_PCT, RUNNER_EXIT_SESSIONS, RUNNER_STOP_GAIN_PCT,
     SCALE_OUT_FIRST_PCT, SCALE_OUT_SECOND_PCT, SECOND_TARGET_GAIN_PCT,
     SLIPPAGE_BPS, STARTING_CAPITAL, STOP_LOSS_PCT, STRATEGY_VERSION,
-    WATCHLIST_EXPORT_DIR, ensure_directories,
+    WATCHLIST_EXPORT_DIR, conviction_multiplier, ensure_directories,
 )
 from market_calendar import sessions_until
 from pipeline_health import market_gate, record_stage, require_today_snapshot
@@ -141,14 +141,19 @@ def effective_stops(trades: pd.DataFrame) -> pd.Series:
 def calculate_position_size(
     equity: float, available_cash: float, entry_price: float,
     stop_loss_pct: float = STOP_LOSS_PCT, slippage_bps: float = SLIPPAGE_BPS,
+    conviction_score: float | None = None,
 ) -> int:
-    """Size a trade from stop risk while preserving exposure and cash limits."""
+    """Size a trade from stop risk while preserving exposure and cash limits.
+
+    When conviction_score is provided, the risk budget is scaled by
+    conviction_multiplier() so stronger setups receive more capital.
+    """
     if equity <= 0 or available_cash <= 0 or entry_price <= 0:
         return 0
     stop_reference = entry_price * (1 - stop_loss_pct / 100)
     stop_fill = stop_reference * (1 - slippage_bps / 10_000)
     risk_per_share = entry_price - stop_fill
-    risk_budget = equity * RISK_PER_TRADE_PCT / 100
+    risk_budget = equity * RISK_PER_TRADE_PCT / 100 * conviction_multiplier(conviction_score)
     exposure_budget = equity * MAX_POSITION_EXPOSURE_PCT / 100
     reserve = equity * MINIMUM_CASH_RESERVE_PCT / 100
     deployable_cash = max(0.0, available_cash - reserve)
@@ -289,7 +294,8 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
         trade_stop_pct = float(risk.get("stop_loss_pct", STOP_LOSS_PCT))
         execution = execution_reference * (1 + trade_slippage_bps / 10_000)
         shares = calculate_position_size(
-            equity, available_cash, execution, trade_stop_pct, trade_slippage_bps
+            equity, available_cash, execution, trade_stop_pct, trade_slippage_bps,
+            conviction_score=float(row.score),
         )
         if shares < 1:
             print(f"Skipped {ticker}: risk sizing, exposure, or cash reserve permits no shares")

@@ -13,7 +13,7 @@ import pandas as pd
 import numpy as np
 
 from scanner_config import LOGS_DIR, STRATEGY_SETTINGS_FILE, RUNTIME_STRATEGY_SETTINGS_FILE
-from stock_storage import read_table
+from stock_storage import read_latest_snapshot, read_table
 
 
 STATE_DIR = LOGS_DIR / "strategy_optimizer"
@@ -125,6 +125,48 @@ LEVER_CATALOG = [
         "area": "Regime exit",
         "bounds": "0.75–1.0 · step 0.05",
         "reason": "Tests faster profit-taking when the broad market trend is unfavorable.",
+    },
+    {
+        "key": "confirmation_weights.above_open",
+        "label": "Above-open weight",
+        "area": "Confirmation weighting",
+        "bounds": "5–15 · step 2",
+        "reason": "Reweights this confirmation signal toward its observed component win-rate.",
+    },
+    {
+        "key": "confirmation_weights.above_prior_close",
+        "label": "Above-prior-close weight",
+        "area": "Confirmation weighting",
+        "bounds": "5–15 · step 2",
+        "reason": "Reweights this confirmation signal toward its observed component win-rate.",
+    },
+    {
+        "key": "confirmation_weights.above_vwap",
+        "label": "Above-VWAP weight",
+        "area": "Confirmation weighting",
+        "bounds": "5–15 · step 2",
+        "reason": "Reweights this confirmation signal toward its observed component win-rate.",
+    },
+    {
+        "key": "confirmation_weights.first_15m_breakout",
+        "label": "First-15m breakout weight",
+        "area": "Confirmation weighting",
+        "bounds": "5–15 · step 2",
+        "reason": "Reweights this confirmation signal toward its observed component win-rate.",
+    },
+    {
+        "key": "confirmation_weights.not_overextended",
+        "label": "Not-overextended weight",
+        "area": "Confirmation weighting",
+        "bounds": "5–15 · step 2",
+        "reason": "Reweights this confirmation signal toward its observed component win-rate.",
+    },
+    {
+        "key": "confirmation_weights.too_extended_penalty",
+        "label": "Too-extended penalty",
+        "area": "Confirmation weighting",
+        "bounds": "-20 to -8 · step 2",
+        "reason": "Reweights this confirmation penalty toward its observed component win-rate.",
     },
 ]
 
@@ -494,20 +536,110 @@ def _candidate_change(settings: dict, index: int, metrics: dict,
         new = _pick(round(float(old) + 0.05, 2), round(float(old) - 0.05, 2), 1.0, 1.25)
     elif key.endswith("risk_off_target_multiplier"):
         new = _pick(round(float(old) - 0.05, 2), round(float(old) + 0.05, 2), 0.75, 1.0)
+    elif key.startswith("confirmation_weights."):
+        bias = _component_bias(key, minimum_observations=0)  # readiness already checked by _lever_ready
+        step = 2
+        if key.endswith("too_extended_penalty"):
+            # Penalty is negative: "up" bias (outperforming) should make it less negative.
+            forward = float(old) + step if bias >= 0 else float(old) - step
+            new = _pick(forward, float(old) - step if forward == float(old) + step else float(old) + step, -20, -8)
+        else:
+            forward = float(old) + step if bias >= 0 else float(old) - step
+            new = _pick(forward, float(old) - step if forward == float(old) + step else float(old) + step, 5, 15)
     else:
         new = _pick(min(15, float(old) + 1), max(0, float(old) - 1), 0, 15)
     _set_value(candidate, key, new)
     return candidate, {**lever, "old_value": old, "new_value": new}
 
 
-def _lever_ready(lever: dict, policy: dict) -> bool:
-    if lever["key"] != "catalyst.use_for_selection":
-        return True
+COMPONENT_LABEL_TO_WEIGHT_KEY = {
+    "above open": "above_open",
+    "above prior close": "above_prior_close",
+    "above VWAP": "above_vwap",
+    "broke first 15m high": "first_15m_breakout",
+    "not overextended": "not_overextended",
+    "too extended": "too_extended_penalty",
+}
+
+
+def _component_performance() -> pd.DataFrame:
+    """Latest per-component win-rate snapshot, keyed by confirmation_weights.* key (improvement #2)."""
+    _, frame = read_latest_snapshot("component_performance", "report_date")
+    if frame.empty or "component" not in frame:
+        return frame
+    frame = frame.copy()
+    frame["weight_key"] = frame["component"].map(COMPONENT_LABEL_TO_WEIGHT_KEY)
+    return frame[frame["weight_key"].notna()]
+
+
+def _component_bias(key: str, minimum_observations: int) -> int:
+    """Return +1/-1/0 nudge direction for a confirmation_weights.* lever based on its win-rate
+    relative to the average across all tracked components."""
+    weight_key = key.split(".", 1)[-1]
+    performance = _component_performance()
+    if performance.empty or "resolved" not in performance:
+        return 0
+    row = performance[performance["weight_key"].eq(weight_key)]
+    if row.empty or int(row["resolved"].iloc[0]) < minimum_observations:
+        return 0
+    success_rate = float(row["success_rate_%"].iloc[0])
+    baseline = float(performance["success_rate_%"].mean())
+    if success_rate > baseline + 1.0:
+        return 1
+    if success_rate < baseline - 1.0:
+        return -1
+    return 0
+
+
+def _catalyst_efficacy_ok(policy: dict) -> bool:
+    """Sanity-check that catalyst flags correlate with outcomes before letting the
+    catalyst.use_for_selection lever run (improvement #3 — graduate out of shadow mode)."""
     observations = read_table("catalyst_observations")
-    if observations.empty or "catalyst_configured" not in observations:
-        return False
-    configured = observations["catalyst_configured"].astype(str).str.lower().isin({"1", "true", "yes"})
-    return int(configured.sum()) >= int(policy["minimum_catalyst_observations"])
+    trades = read_table("paper_trades")
+    required = {"Ticker", "observation_date", "catalyst_shadow_score"}
+    if observations.empty or not required.issubset(observations.columns) or trades.empty:
+        return True  # insufficient data to evaluate; count gate in _lever_ready still applies
+    if not {"ticker", "trade_date", "realized_p_l", "initial_cost"}.issubset(trades.columns):
+        return True
+    merged = trades.assign(
+        _ticker=trades["ticker"].astype(str).str.upper(), _date=trades["trade_date"].astype(str),
+    ).merge(
+        observations.assign(
+            _ticker=observations["Ticker"].astype(str).str.upper(),
+            _date=observations["observation_date"].astype(str),
+        ),
+        on=["_ticker", "_date"], how="inner",
+    )
+    if len(merged) < int(policy.get("minimum_catalyst_efficacy_trades", 20)):
+        return True  # not enough joined evidence yet; don't block on a weak signal
+    cost = pd.to_numeric(merged["initial_cost"], errors="coerce").replace(0, pd.NA)
+    returns = pd.to_numeric(merged["realized_p_l"], errors="coerce") / cost * 100
+    shadow_score = pd.to_numeric(merged["catalyst_shadow_score"], errors="coerce").fillna(0)
+    positive_returns = returns[shadow_score.gt(0)]
+    negative_returns = returns[shadow_score.lt(0)]
+    if positive_returns.empty or negative_returns.empty:
+        return True
+    return float(positive_returns.mean()) >= float(negative_returns.mean())
+
+
+def _lever_ready(lever: dict, policy: dict) -> bool:
+    if lever["key"] == "catalyst.use_for_selection":
+        observations = read_table("catalyst_observations")
+        if observations.empty or "catalyst_configured" not in observations:
+            return False
+        configured = observations["catalyst_configured"].astype(str).str.lower().isin({"1", "true", "yes"})
+        if int(configured.sum()) < int(policy["minimum_catalyst_observations"]):
+            return False
+        return _catalyst_efficacy_ok(policy)
+    if lever["key"].startswith("confirmation_weights."):
+        weight_key = lever["key"].split(".", 1)[-1]
+        performance = _component_performance()
+        if performance.empty:
+            return False
+        row = performance[performance["weight_key"].eq(weight_key)]
+        minimum = int(policy.get("minimum_component_observations", 15))
+        return not row.empty and int(row["resolved"].iloc[0]) >= minimum
+    return True
 
 
 def _bootstrap_confidence(baseline: dict, candidate: dict, iterations: int) -> float:

@@ -25,7 +25,7 @@ from scanner_config import (
     MINIMUM_CASH_RESERVE_PCT, RISK_PER_TRADE_PCT, RUNNER_EXIT_SESSIONS,
     RUNNER_STOP_GAIN_PCT, SCALE_OUT_FIRST_PCT, SCALE_OUT_SECOND_PCT,
     SECOND_TARGET_GAIN_PCT, SLIPPAGE_BPS, STARTING_CAPITAL, STOP_LOSS_PCT,
-    WATCHLIST_EXPORT_DIR, ensure_directories,
+    WATCHLIST_EXPORT_DIR, conviction_multiplier, ensure_directories,
 )
 from market_calendar import sessions_until
 
@@ -305,9 +305,12 @@ def main() -> int:
         stop_fill = entry * (1 - STOP_LOSS_PCT / 100) * (1 - SLIPPAGE_BPS / 10_000)
         risk_per_share = entry - stop_fill
         deployable_cash = max(0.0, cash - STARTING_CAPITAL * MINIMUM_CASH_RESERVE_PCT / 100)
+        risk_budget = STARTING_CAPITAL * RISK_PER_TRADE_PCT / 100 * conviction_multiplier(
+            float(row["confirmation_score"])
+        )
         shares = max(0, min(
             MAX_SHARES_PER_POSITION,
-            floor((STARTING_CAPITAL * RISK_PER_TRADE_PCT / 100) / risk_per_share),
+            floor(risk_budget / risk_per_share),
             floor((STARTING_CAPITAL * MAX_POSITION_EXPOSURE_PCT / 100) / entry),
             floor(deployable_cash / entry),
         )) if risk_per_share > 0 else 0
