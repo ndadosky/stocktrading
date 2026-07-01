@@ -14,17 +14,43 @@ import strategy_optimizer
 def resolved_rows(version: str, count: int, return_pct: float) -> pd.DataFrame:
     return pd.DataFrame([
         {
+            "trade_id": f"{version}-{index}",
             "remaining_shares": 0,
             "entry_strategy_version": version,
             "strategy_changed_mid_trade": False,
+            "entry_price": 10.0,
+            "exit_price": 10.0 * (1 + return_pct / 100),
             "initial_cost": 1000,
             "realized_p_l": 1000 * return_pct / 100,
         }
-        for _ in range(count)
+        for index in range(count)
     ])
 
 
 class StrategyOptimizerTests(unittest.TestCase):
+    def test_data_quality_blocks_missing_exit_price(self) -> None:
+        frame = resolved_rows("quality-test", 3, 2.0)
+        frame.loc[1, "exit_price"] = pd.NA
+
+        quality = strategy_optimizer._data_quality(frame)
+
+        self.assertFalse(quality["passed"])
+        self.assertIn("1 missing exit_price", quality["issues"])
+
+    def test_matched_champion_prefers_same_regime_band_and_sector(self) -> None:
+        challenger = pd.DataFrame([{
+            "market_regime": "RISK ON", "confirmation_band": "A", "sector": "Tech",
+            "entry_datetime": "2026-07-01T10:00:00-04:00",
+        }])
+        champion = pd.DataFrame([
+            {"ticker": "WRONG", "market_regime": "RISK OFF", "confirmation_band": "B", "sector": "Energy", "entry_datetime": "2026-07-01T10:00:00-04:00"},
+            {"ticker": "MATCH", "market_regime": "RISK ON", "confirmation_band": "A", "sector": "Tech", "entry_datetime": "2026-06-30T10:00:00-04:00"},
+        ])
+
+        matched = strategy_optimizer._matched_champion_rows(champion, challenger)
+
+        self.assertEqual(matched.iloc[0]["ticker"], "MATCH")
+
     def test_exit_lever_catalog_includes_trailing_and_regime_controls(self) -> None:
         keys = {lever["key"] for lever in strategy_optimizer.LEVER_CATALOG}
         self.assertIn("risk.scale_out.trailing_stop_pct", keys)

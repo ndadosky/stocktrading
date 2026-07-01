@@ -37,6 +37,9 @@ class StrategyCohortReviewTests(unittest.TestCase):
         self.assertIn("10 resolved trades", html)
         self.assertIn("Optimizer change ledger", html)
         self.assertIn("Documented optimization levers", html)
+        self.assertIn("Champion vs challenger settings", html)
+        self.assertIn("Pause optimizer", html)
+        self.assertIn("Open experiment positions", html)
 
     def test_analyze_now_suggests_entry_review_from_current_losses(self) -> None:
         current_version = json.loads(

@@ -327,6 +327,51 @@ def render_strategy_review_html(rows: list[dict], review_date: str, csv_filename
         f"<span>Target {'≥' if goal['direction'] == 'higher' else '≤'} {escape(str(goal['target']))}</span></div>"
         for goal in optimizer.get("goals", [])
     )
+    diff_rows = "".join(
+        f"<tr><td><code>{escape(str(item['setting']))}</code></td>"
+        f"<td>{escape(str(item.get('champion')))}</td><td>{escape(str(item.get('challenger')))}</td></tr>"
+        for item in optimizer.get("settings_diff", [])
+    ) or "<tr><td colspan='3'>No active challenger settings difference.</td></tr>"
+    unresolved_rows = "".join(
+        f"<tr><td>{escape(str(item['arm']))}</td><td><b>{escape(str(item['ticker']))}</b></td>"
+        f"<td>{escape(str(item.get('entry_price')))}</td><td>{escape(str(item.get('current_price')))}</td>"
+        f"<td>{escape(str(item.get('remaining_shares')))}</td><td>{escape(str(item.get('holding_days')))}</td></tr>"
+        for item in optimizer.get("unresolved", [])
+    ) or "<tr><td colspan='6'>No unresolved experiment positions.</td></tr>"
+    guards = (optimizer.get("promotion_preview") or {}).get("guards") or (
+        optimizer.get("last_guard_results") or {}
+    ).get("guards", {})
+    guard_html = "".join(
+        f"<span class='guard {'pass' if passed else 'fail'}'>{escape(str(name).replace('_', ' '))}</span>"
+        for name, passed in guards.items()
+    ) or "<span class='sub'>Waiting for enough challenger evidence.</span>"
+    eta = optimizer.get("eta") or {}
+    eta_text = (
+        f"Estimated completion {eta.get('estimated_date')} ({eta.get('estimated_days')} days)"
+        if eta.get("estimated_date") else "ETA available after the first challenger exits"
+    )
+    quality = optimizer.get("data_quality") or {"passed": True, "issues": []}
+    quality_text = "Data quality passed" if quality.get("passed") else "Blocked: " + "; ".join(quality.get("issues", []))
+    champion_curve = optimizer.get("champion_curve", [])
+    challenger_curve = optimizer.get("challenger_curve", [])
+    all_curve = [0.0, *champion_curve, *challenger_curve]
+    curve_min, curve_max = min(all_curve), max(all_curve)
+    curve_span = max(1.0, curve_max - curve_min)
+    curve_count = max(2, len(champion_curve), len(challenger_curve))
+
+    def curve_points(values: list[float]) -> str:
+        return " ".join(
+            f"{20 + index * 760 / (curve_count - 1):.1f},{170 - (value - curve_min) * 140 / curve_span:.1f}"
+            for index, value in enumerate(values)
+        )
+
+    chart_html = (
+        f"<svg class='comparison-chart' viewBox='0 0 800 190' role='img' aria-label='Cumulative return comparison'>"
+        f"<line x1='20' y1='{170 - (0 - curve_min) * 140 / curve_span:.1f}' x2='780' y2='{170 - (0 - curve_min) * 140 / curve_span:.1f}' stroke='#cbd5e1'/>"
+        f"<polyline points='{curve_points(champion_curve)}' fill='none' stroke='#64748b' stroke-width='3'/>"
+        f"<polyline points='{curve_points(challenger_curve)}' fill='none' stroke='#2563eb' stroke-width='3'/></svg>"
+        if champion_curve or challenger_curve else "<div class='empty'>The comparison chart appears after resolved experiment trades.</div>"
+    )
 
     return f"""<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
 <title>Strategy review · {escape(review_date)}</title><style>
@@ -393,6 +438,14 @@ main{{max-width:1280px;margin:0 auto;padding:28px 20px 64px}}
 .goal small,.goal span{{display:block;color:var(--muted);font-size:11px}}.goal strong{{display:block;font-size:19px;margin:5px 0}}
 .goal.met{{border-color:#86efac;background:#f0fdf4}}.goal.met strong{{color:var(--green)}}
 .guardrail{{margin-top:14px;padding:10px 12px;border-radius:9px;background:#fff7ed;color:#9a3412;font-size:12px;line-height:1.45}}
+.controls{{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}}.control-btn{{border:1px solid var(--line);background:white;border-radius:8px;padding:8px 11px;font-weight:700;cursor:pointer}}
+.control-btn.danger{{color:var(--red);border-color:#fecaca}}.control-btn:hover{{background:#f8fafc}}
+.guard-list{{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}}.guard{{padding:5px 8px;border-radius:999px;font-size:11px;font-weight:750;text-transform:capitalize}}
+.guard.pass{{background:#dcfce7;color:#166534}}.guard.fail{{background:#fee2e2;color:#991b1b}}
+.comparison-chart{{display:block;width:100%;height:auto;min-height:180px;background:#fbfcfe;border-radius:10px}}
+.legend{{display:flex;gap:16px;font-size:12px;color:var(--muted)}}.dot{{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}}
+.learning{{padding:14px;border-left:4px solid var(--blue);background:#eff6ff;border-radius:8px;line-height:1.5;margin-bottom:14px}}
+.quality.pass{{color:var(--green)}}.quality.fail{{color:var(--red)}}
 .empty{{color:var(--muted);padding:12px 0}}
 .hidden{{display:none}}
 table{{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}}
@@ -432,7 +485,28 @@ a{{color:var(--blue)}}
     </div>
     <div class='goal-grid'>{goal_rows}</div>
     <div class='guardrail'>Challenger allocation: {optimizer.get('challenger_allocation_pct', 20)}% · Promotion confidence: {optimizer.get('confidence_required_pct', 90)}% · Cost stress: {optimizer.get('stress_slippage_bps', 25)} bps per side · Emergency rollback: {optimizer.get('emergency_loss_streak', 5)} consecutive losses or {optimizer.get('emergency_drawdown_pct', 8)}% drawdown.</div>
+    <div class='guard-list'>{guard_html}</div>
+    <div class='controls'>
+      <button class='control-btn' data-action='{'resume' if optimizer.get('paused') else 'pause'}'>{'Resume optimizer' if optimizer.get('paused') else 'Pause optimizer'}</button>
+      <button class='control-btn danger' data-action='reject'>Reject challenger</button>
+      <button class='control-btn danger' data-action='rollback'>Restore previous champion</button>
+    </div>
     {_note(str(optimizer.get('last_result_reason') or active_change.get('reason') or 'The first experiment begins after 60 clean resolved trades.'))}
+  </div>
+  <div class='panel'>
+    <div class='panel-head'><h3>What the optimizer is learning</h3><span class='sub'>{escape(eta_text)}</span></div>
+    <div class='learning'>{escape(str(optimizer.get('learning_summary') or 'Waiting for evidence.'))}</div>
+    <div class='panel-head'><div class='legend'><span><i class='dot' style='background:#64748b'></i>Matched champion</span><span><i class='dot' style='background:#2563eb'></i>Challenger</span></div><span class='quality {'pass' if quality.get('passed') else 'fail'}'>{escape(quality_text)}</span></div>
+    {chart_html}
+  </div>
+  <div class='panel'>
+    <div class='panel-head'><h3>Champion vs challenger settings</h3><span class='sub'>Promotion preview: {escape('promote' if (optimizer.get('promotion_preview') or {}).get('would_promote') else 'hold / reject')}</span></div>
+    <table><thead><tr><th>Setting</th><th>Champion</th><th>Challenger</th></tr></thead><tbody>{diff_rows}</tbody></table>
+    {_note(str((optimizer.get('promotion_preview') or {}).get('reason') or 'Preview appears as challenger trades resolve.'))}
+  </div>
+  <div class='panel'>
+    <div class='panel-head'><h3>Open experiment positions</h3><span class='sub'>{optimizer.get('open_champion', 0)} champion · {optimizer.get('open_challenger', 0)} challenger — excluded from completed evidence</span></div>
+    <table><thead><tr><th>Arm</th><th>Ticker</th><th>Entry</th><th>Current</th><th>Shares remaining</th><th>Holding days</th></tr></thead><tbody>{unresolved_rows}</tbody></table>
   </div>
   <section class='cards'>{cards_html}</section>
   <div id='best-case-panel' class='panel hidden'>
@@ -458,6 +532,17 @@ a{{color:var(--blue)}}
 function money(v){{const n=Number(v);return Number.isFinite(n)?(n<0?'-':'')+'$'+Math.abs(n).toLocaleString(undefined,{{maximumFractionDigits:0}}):'—'}}
 function pct(v){{const n=Number(v);return Number.isFinite(n)?n.toFixed(2)+'%':'—'}}
 function plClass(v){{return Number(v)>=0?'pos':'neg'}}
+document.querySelectorAll('.control-btn').forEach(btn=>btn.onclick=async()=>{{
+  const action=btn.dataset.action;
+  if((action==='reject'||action==='rollback')&&!confirm(`Confirm ${{action.replace('_',' ')}}?`))return;
+  btn.disabled=true;
+  try{{
+    const response=await fetch('/api/strategy/control',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{action}})}});
+    const result=await response.json();
+    if(!result.ok)throw new Error(result.error||'Control failed');
+    location.reload();
+  }}catch(error){{alert(error.message);btn.disabled=false;}}
+}});
 document.getElementById('analyze-now').onclick=async()=>{{
   const btn=document.getElementById('analyze-now');
   const panel=document.getElementById('best-case-panel');

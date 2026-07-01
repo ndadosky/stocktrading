@@ -41,7 +41,7 @@ from platform_health import codex_chat, platform_health_payload
 from nav_html import finalize_page_html
 from strategy_review import current_data_suggestions, load_latest_review_rows, render_strategy_review_html
 from best_case_analysis import compute_best_case
-from strategy_optimizer import load_active_settings
+from strategy_optimizer import load_active_settings, optimizer_control
 from morning_candidates import build_morning_candidates, preview_rows
 from home_controls import (
     home_assistant_door_control,
@@ -2170,6 +2170,17 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
         path = unquote(parsed.path)
+        if path == "/api/strategy/control":
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            raw = self.rfile.read(length) if length else b"{}"
+            try:
+                payload = json.loads(raw.decode("utf-8")) if raw else {}
+            except json.JSONDecodeError:
+                self.send_json({"ok": False, "error": "Invalid JSON body"}, HTTPStatus.BAD_REQUEST)
+                return
+            result = optimizer_control(str(payload.get("action") or ""))
+            self.send_json(result, HTTPStatus.OK if result.get("ok") else HTTPStatus.CONFLICT)
+            return
         if path in {"/api/home/pool", "/api/home/pool-mode", "/api/home/front-door", "/api/home/ewelink"}:
             length = int(self.headers.get("Content-Length", "0") or "0")
             raw = self.rfile.read(length) if length else b"{}"

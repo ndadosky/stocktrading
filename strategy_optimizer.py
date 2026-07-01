@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -217,7 +217,11 @@ def strategy_assignment(ticker: str, trade_date: str, context: dict | None = Non
         return {"arm": "champion", "version": str(active["version"]), "settings": active}
     policy = context["policy"]
     digest = hashlib.sha256(f"{trade_date}:{ticker.upper()}".encode()).hexdigest()
-    challenger = int(digest[:8], 16) % 100 < int(policy["challenger_allocation_pct"])
+    allocation = min(
+        int(policy.get("challenger_allocation_max_pct", 40)),
+        int(state.get("challenger_allocation_pct", policy["challenger_allocation_pct"])),
+    )
+    challenger = int(digest[:8], 16) % 100 < allocation
     if challenger:
         return {
             "arm": "challenger", "version": str(state["candidate_version"]),
@@ -275,6 +279,64 @@ def _resolved_for_version(trades: pd.DataFrame, version: str) -> pd.DataFrame:
         "strategy_changed_mid_trade", pd.Series(False, index=trades.index)
     ).astype(str).str.lower().isin({"1", "true", "yes"})
     return trades[remaining.le(0) & entry_version.eq(version) & ~changed].copy()
+
+
+def _arm_rows(trades: pd.DataFrame, version: str, arm: str, resolved: bool) -> pd.DataFrame:
+    if trades.empty:
+        return trades.copy()
+    remaining = pd.to_numeric(
+        trades.get("remaining_shares", pd.Series(0, index=trades.index)), errors="coerce"
+    ).fillna(0)
+    versions = trades.get(
+        "entry_strategy_version", pd.Series("", index=trades.index)
+    ).fillna("").astype(str)
+    arms = trades.get("optimizer_arm", pd.Series("", index=trades.index)).fillna("").astype(str)
+    state_mask = remaining.le(0) if resolved else remaining.gt(0)
+    return trades[state_mask & versions.eq(version) & arms.eq(arm)].copy()
+
+
+def _matched_champion_rows(champion: pd.DataFrame, challenger: pd.DataFrame) -> pd.DataFrame:
+    """Select contemporaneous champion trades with similar observable entry context."""
+    if champion.empty or challenger.empty:
+        return champion.tail(len(challenger)).copy()
+    available = champion.copy()
+    matches = []
+    for _, candidate in challenger.iterrows():
+        pool = available
+        for column in ("market_regime", "confirmation_band", "sector"):
+            if column in pool and column in challenger and pd.notna(candidate.get(column)):
+                exact = pool[pool[column].fillna("").astype(str).eq(str(candidate.get(column)))]
+                if not exact.empty:
+                    pool = exact
+        if pool.empty:
+            pool = available
+        if "entry_datetime" in pool and pd.notna(candidate.get("entry_datetime")):
+            candidate_time = pd.to_datetime(candidate.get("entry_datetime"), errors="coerce", utc=True)
+            times = pd.to_datetime(pool["entry_datetime"], errors="coerce", utc=True)
+            chosen_index = (times - candidate_time).abs().sort_values().index[0]
+        else:
+            chosen_index = pool.index[0]
+        matches.append(available.loc[chosen_index])
+        available = available.drop(index=chosen_index)
+        if available.empty:
+            break
+    return pd.DataFrame(matches)
+
+
+def _data_quality(frame: pd.DataFrame) -> dict:
+    required = ("entry_price", "initial_cost", "realized_p_l", "exit_price", "entry_strategy_version")
+    issues = []
+    for column in required:
+        if column not in frame:
+            issues.append(f"missing column {column}")
+            continue
+        missing = int(frame[column].isna().sum())
+        if missing:
+            issues.append(f"{missing} missing {column}")
+    duplicates = int(frame.get("trade_id", pd.Series(dtype=str)).duplicated().sum()) if "trade_id" in frame else 0
+    if duplicates:
+        issues.append(f"{duplicates} duplicate trade IDs")
+    return {"passed": not issues, "issues": issues, "checked": int(len(frame))}
 
 
 def strategy_metrics(frame: pd.DataFrame, policy: dict | None = None) -> dict:
@@ -411,7 +473,7 @@ def _dominant_regime(metrics: dict) -> str | None:
     return max(regimes, key=lambda name: regimes[name]["resolved"]) if regimes else None
 
 
-def _accepted(baseline: dict, candidate: dict, policy: dict) -> tuple[bool, str]:
+def _promotion_evaluation(baseline: dict, candidate: dict, policy: dict) -> tuple[bool, str, dict]:
     expectancy_gain = candidate["weighted_expectancy_pct"] - baseline["weighted_expectancy_pct"]
     pf_base = baseline["profit_factor"]
     pf_candidate = candidate["profit_factor"]
@@ -428,7 +490,13 @@ def _accepted(baseline: dict, candidate: dict, policy: dict) -> tuple[bool, str]
     ))
     drawdown_ok = candidate["max_drawdown_pct"] <= allowed_drawdown
     confidence = _bootstrap_confidence(baseline, candidate, int(policy["bootstrap_iterations"]))
-    confidence_ok = confidence >= float(policy["minimum_promotion_confidence_pct"])
+    base_confidence = float(policy["minimum_promotion_confidence_pct"])
+    cycle = max(1, int(policy.get("current_cycle", 1)))
+    required_confidence = min(
+        float(policy.get("multiple_test_confidence_cap_pct", 99)),
+        base_confidence + max(0, cycle - 1),
+    )
+    confidence_ok = confidence >= required_confidence
     stress_ok = candidate["stressed_expectancy_pct"] > baseline["stressed_expectancy_pct"]
     objective_ok = candidate["objective_score"] > baseline["objective_score"]
     segment_ok = True
@@ -443,16 +511,31 @@ def _accepted(baseline: dict, candidate: dict, policy: dict) -> tuple[bool, str]
         if candidate_segment["expectancy_pct"] < baseline_segment["expectancy_pct"] - 0.5:
             segment_ok = False
             weak_segments.append(name)
-    accepted = all((
-        expectancy_gain >= float(policy["minimum_expectancy_improvement_pct"]),
-        pf_ok, drawdown_ok, confidence_ok, stress_ok, objective_ok, segment_ok,
-    ))
+    guards = {
+        "expectancy": expectancy_gain >= float(policy["minimum_expectancy_improvement_pct"]),
+        "profit_factor": pf_ok, "drawdown": drawdown_ok,
+        "confidence": confidence_ok, "cost_stress": stress_ok,
+        "objective": objective_ok, "segments": segment_ok,
+    }
+    accepted = all(guards.values())
     reason = (
-        f"Recency-weighted expectancy {expectancy_gain:+.3f} points; promotion confidence {confidence:.1f}%; "
+        f"Recency-weighted expectancy {expectancy_gain:+.3f} points; promotion confidence {confidence:.1f}% "
+        f"(required {required_confidence:.1f}% after {cycle} tests); "
         f"cost stress {'passed' if stress_ok else 'failed'}; objective {'improved' if objective_ok else 'declined'}; "
         f"profit-factor guard {'passed' if pf_ok else 'failed'}; drawdown guard {'passed' if drawdown_ok else 'failed'}; "
         f"segment guard {'passed' if segment_ok else 'failed for ' + ', '.join(weak_segments)}."
     )
+    details = {
+        "guards": guards, "confidence_pct": confidence,
+        "required_confidence_pct": required_confidence,
+        "expectancy_change_pct": round(expectancy_gain, 3),
+        "weak_segments": weak_segments,
+    }
+    return accepted, reason, details
+
+
+def _accepted(baseline: dict, candidate: dict, policy: dict) -> tuple[bool, str]:
+    accepted, reason, _ = _promotion_evaluation(baseline, candidate, policy)
     return accepted, reason
 
 
@@ -557,6 +640,10 @@ def run_optimizer_cycle() -> dict:
     trades = read_table("paper_trades")
     today = datetime.now().astimezone().date().isoformat()
 
+    if state.get("paused"):
+        _save_state(state)
+        return optimizer_status(state, trades, policy)
+
     if state.get("last_action_date") == today:
         return optimizer_status(state, trades, policy)
 
@@ -589,6 +676,15 @@ def run_optimizer_cycle() -> dict:
                 or candidate_metrics["max_drawdown_pct"] >= float(policy["emergency_drawdown_pct"])
             )
         )
+        if (
+            len(candidate_rows) >= int(policy["emergency_minimum_trades"])
+            and not emergency and candidate_metrics["weighted_expectancy_pct"] > 0
+            and candidate_metrics["maximum_consecutive_losses"] < int(policy["emergency_consecutive_losses"])
+        ):
+            state["challenger_allocation_pct"] = min(
+                int(policy["challenger_allocation_passed_safety_pct"]),
+                int(policy["challenger_allocation_max_pct"]),
+            )
         if emergency:
             final_settings = state["baseline_settings"]
             reason = (
@@ -613,9 +709,10 @@ def run_optimizer_cycle() -> dict:
             })
         elif len(candidate_rows) >= target:
             candidate_metrics = strategy_metrics(candidate_rows.tail(target), policy)
+            matched_champion = _matched_champion_rows(champion_rows, candidate_rows.tail(target))
             baseline_metrics = (
-                strategy_metrics(champion_rows.tail(max(target, int(policy["minimum_segment_trades"]))), policy)
-                if len(champion_rows) >= int(policy["minimum_segment_trades"])
+                strategy_metrics(matched_champion, policy)
+                if len(matched_champion) >= int(policy["minimum_segment_trades"])
                 else state["baseline_metrics"]
             )
             if "weighted_expectancy_pct" not in baseline_metrics:
@@ -634,8 +731,23 @@ def run_optimizer_cycle() -> dict:
                     "baseline_metrics": baseline_metrics,
                 })
                 state["baseline_regime"] = current_regime
-            keep, reason = _accepted(baseline_metrics, candidate_metrics, policy)
+            evaluation_policy = {**policy, "current_cycle": int(state.get("cycle", 1))}
+            keep, reason, evaluation = _promotion_evaluation(
+                baseline_metrics, candidate_metrics, evaluation_policy
+            )
+            quality = _data_quality(candidate_rows.tail(target))
+            if not quality["passed"]:
+                keep = False
+                evaluation["guards"]["data_quality"] = False
+                reason += " Data-quality gate failed: " + "; ".join(quality["issues"]) + "."
+            else:
+                evaluation["guards"]["data_quality"] = True
+            evaluation["matched_champion_trades"] = int(len(matched_champion))
+            state["last_guard_results"] = evaluation
+            state["last_data_quality"] = quality
             if keep:
+                state["previous_champion_settings"] = state["baseline_settings"]
+                state["previous_champion_version"] = state["baseline_version"]
                 final_settings = state["candidate_settings"]
                 status = "kept"
                 next_baseline_version = state["candidate_version"]
@@ -653,6 +765,7 @@ def run_optimizer_cycle() -> dict:
                 "old_value": state["active_change"]["old_value"],
                 "new_value": state["active_change"]["new_value"], "rationale": reason,
                 "baseline_metrics": baseline_metrics, "candidate_metrics": candidate_metrics,
+                "evaluation": evaluation, "data_quality": quality,
             })
             state.update({
                 "phase": "ready_for_next_experiment",
@@ -695,6 +808,66 @@ def run_optimizer_cycle() -> dict:
     return optimizer_status(state, trades, policy)
 
 
+def optimizer_control(action: str) -> dict:
+    """Apply an explicit, audited operator control to the optimizer."""
+    state = load_optimizer_state()
+    action = str(action or "").strip().lower()
+    if action in {"pause", "resume"}:
+        state["paused"] = action == "pause"
+        reason = "Optimizer paused by operator." if state["paused"] else "Optimizer resumed by operator."
+    elif action == "reject":
+        if state.get("phase") != "experiment_running":
+            return {"ok": False, "error": "No running challenger to reject."}
+        _write_settings(state["baseline_settings"])
+        state["phase"] = "ready_for_next_experiment"
+        state["last_result"] = "operator_rejected"
+        reason = "Running challenger rejected by operator; champion restored."
+    elif action == "rollback":
+        previous = state.get("previous_champion_settings")
+        if not previous:
+            return {"ok": False, "error": "No previous champion snapshot is available."}
+        current_settings = load_active_settings()
+        _write_settings(previous)
+        state["baseline_settings"] = previous
+        state["baseline_version"] = state.get("previous_champion_version", previous.get("version"))
+        state["previous_champion_settings"] = current_settings
+        state["previous_champion_version"] = current_settings.get("version")
+        state["phase"] = "ready_for_next_experiment"
+        state["last_result"] = "operator_rollback"
+        reason = "Previous champion restored by operator."
+    else:
+        return {"ok": False, "error": "Unknown optimizer action."}
+    state["last_result_reason"] = reason
+    state["last_action_date"] = datetime.now().astimezone().date().isoformat()
+    _record(state, {
+        "cycle": int(state.get("cycle", 0)), "status": action,
+        "strategy_version": state.get("baseline_version", ""), "lever": "optimizer.control",
+        "area": "Operator", "old_value": "", "new_value": action, "rationale": reason,
+    })
+    _save_state(state)
+    return {"ok": True, "action": action, "status": optimizer_status(state)}
+
+
+def _settings_diff(baseline: dict, challenger: dict, prefix: str = "") -> list[dict]:
+    rows = []
+    for key in sorted(set(baseline) | set(challenger)):
+        path = f"{prefix}.{key}" if prefix else key
+        left, right = baseline.get(key), challenger.get(key)
+        if isinstance(left, dict) and isinstance(right, dict):
+            rows.extend(_settings_diff(left, right, path))
+        elif left != right and key != "version":
+            rows.append({"setting": path, "champion": left, "challenger": right})
+    return rows
+
+
+def _equity_curve(frame: pd.DataFrame) -> list[float]:
+    if frame.empty:
+        return []
+    cost = pd.to_numeric(frame.get("initial_cost"), errors="coerce").replace(0, pd.NA)
+    pnl = pd.to_numeric(frame.get("realized_p_l"), errors="coerce").fillna(0)
+    return [round(float(value), 3) for value in (pnl / cost * 100).fillna(0).cumsum().tolist()]
+
+
 def optimizer_status(state: dict | None = None, trades: pd.DataFrame | None = None,
                      policy: dict | None = None) -> dict:
     state = state or load_optimizer_state()
@@ -704,10 +877,16 @@ def optimizer_status(state: dict | None = None, trades: pd.DataFrame | None = No
         trades = read_table("paper_trades")
     settings = load_active_settings()
     phase = state.get("phase", "collecting_baseline")
+    champion_rows = pd.DataFrame()
+    challenger_rows = pd.DataFrame()
+    open_champion = pd.DataFrame()
+    open_challenger = pd.DataFrame()
     if phase == "experiment_running":
-        progress_rows = _resolved_for_version(trades, str(state.get("candidate_version", "")))
-        if "optimizer_arm" in progress_rows:
-            progress_rows = progress_rows[progress_rows["optimizer_arm"].fillna("").eq("challenger")]
+        challenger_rows = _arm_rows(trades, str(state.get("candidate_version", "")), "challenger", True)
+        champion_rows = _arm_rows(trades, str(state.get("baseline_version", "")), "champion", True)
+        open_challenger = _arm_rows(trades, str(state.get("candidate_version", "")), "challenger", False)
+        open_champion = _arm_rows(trades, str(state.get("baseline_version", "")), "champion", False)
+        progress_rows = challenger_rows
         completed = len(progress_rows)
         target = int(policy["experiment_resolved_trades"])
         step = 3
@@ -723,6 +902,58 @@ def optimizer_status(state: dict | None = None, trades: pd.DataFrame | None = No
     if phase != "experiment_running":
         progress_rows = _resolved_for_version(trades, str(state.get("baseline_version", settings.get("version", ""))))
     current_metrics = strategy_metrics(progress_rows.tail(max(target, 1)), policy)
+    challenger_metrics = strategy_metrics(challenger_rows, policy) if not challenger_rows.empty else None
+    matched_champion = _matched_champion_rows(champion_rows, challenger_rows)
+    champion_metrics = strategy_metrics(matched_champion, policy) if not matched_champion.empty else None
+    settings_diff = _settings_diff(
+        state.get("baseline_settings", settings), state.get("candidate_settings", settings)
+    ) if phase == "experiment_running" else []
+    eta = None
+    if phase == "experiment_running":
+        started = pd.Timestamp(state.get("experiment_started_at"))
+        started = (
+            started.tz_localize("America/New_York") if started.tzinfo is None
+            else started.tz_convert("America/New_York")
+        )
+        elapsed_days = max(1.0, (pd.Timestamp.now(tz="America/New_York") - started).total_seconds() / 86400)
+        rate = len(challenger_rows) / elapsed_days
+        remaining = max(0, target - len(challenger_rows))
+        estimated_days = int(np.ceil(remaining / rate)) if rate > 0 else None
+        eta = {
+            "resolved_per_day": round(rate, 2), "remaining": remaining,
+            "estimated_days": estimated_days,
+            "estimated_date": (
+                (datetime.now().astimezone() + timedelta(days=estimated_days)).date().isoformat()
+                if estimated_days is not None else None
+            ),
+            "estimated_total_resolved_needed": int(np.ceil(target / max(0.01, int(state.get("challenger_allocation_pct", 20)) / 100))),
+        }
+    preview = None
+    if challenger_metrics and champion_metrics:
+        preview_policy = {**policy, "current_cycle": int(state.get("cycle", 1))}
+        would_keep, preview_reason, preview_details = _promotion_evaluation(
+            champion_metrics, challenger_metrics, preview_policy
+        )
+        preview = {"would_promote": would_keep, "reason": preview_reason, **preview_details}
+    quality = _data_quality(challenger_rows) if not challenger_rows.empty else {"passed": True, "issues": [], "checked": 0}
+    unresolved = []
+    for arm, frame in (("Champion", open_champion), ("Challenger", open_challenger)):
+        for _, row in frame.head(20).iterrows():
+            unresolved.append({
+                "arm": arm, "ticker": str(row.get("ticker", "")),
+                "entry_price": row.get("entry_price"), "current_price": row.get("current_price"),
+                "remaining_shares": row.get("remaining_shares"), "holding_days": row.get("holding_days"),
+            })
+    learning_summary = "Collecting enough clean evidence to begin optimization."
+    if challenger_metrics and champion_metrics:
+        winner_delta = challenger_metrics["average_winner_pct"] - champion_metrics["average_winner_pct"]
+        win_delta = challenger_metrics["win_rate_pct"] - champion_metrics["win_rate_pct"]
+        return_delta = challenger_metrics["weighted_expectancy_pct"] - champion_metrics["weighted_expectancy_pct"]
+        learning_summary = (
+            f"The challenger changed average winners by {winner_delta:+.2f} points, win rate by "
+            f"{win_delta:+.1f} points, and weighted return by {return_delta:+.2f} points versus "
+            f"{len(matched_champion)} matched champion trades."
+        )
     goals = []
     goal_mapping = (
         ("Win rate", "win_rate_pct", "higher"),
@@ -755,11 +986,23 @@ def optimizer_status(state: dict | None = None, trades: pd.DataFrame | None = No
         "history": list(reversed(state.get("history", [])))[0:20], "levers": LEVER_CATALOG,
         "experiment_size": int(policy["experiment_resolved_trades"]),
         "baseline_size": int(policy["minimum_resolved_trades"]),
-        "challenger_allocation_pct": int(policy["challenger_allocation_pct"]),
-        "confidence_required_pct": float(policy["minimum_promotion_confidence_pct"]),
+        "challenger_allocation_pct": int(state.get("challenger_allocation_pct", policy["challenger_allocation_pct"])),
+        "confidence_required_pct": (
+            min(float(policy.get("multiple_test_confidence_cap_pct", 99)),
+                float(policy["minimum_promotion_confidence_pct"]) + max(0, int(state.get("cycle", 1)) - 1))
+        ),
         "stress_slippage_bps": float(policy["stress_slippage_bps"]),
         "emergency_loss_streak": int(policy["emergency_consecutive_losses"]),
         "emergency_drawdown_pct": float(policy["emergency_drawdown_pct"]),
         "current_metrics": current_metrics, "goals": goals,
         "last_rebaseline_at": state.get("last_rebaseline_at"),
+        "paused": bool(state.get("paused")), "eta": eta,
+        "settings_diff": settings_diff, "promotion_preview": preview,
+        "data_quality": quality, "last_guard_results": state.get("last_guard_results"),
+        "unresolved": unresolved,
+        "open_champion": int(len(open_champion)), "open_challenger": int(len(open_challenger)),
+        "champion_metrics": champion_metrics, "challenger_metrics": challenger_metrics,
+        "champion_curve": _equity_curve(matched_champion),
+        "challenger_curve": _equity_curve(challenger_rows),
+        "learning_summary": learning_summary,
     }

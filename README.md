@@ -154,6 +154,15 @@ The 10:30 AM strategy-review job also advances the continuous optimizer:
   allow startup during a temporary database outage.
 - Shows baseline and experiment progress, active versions, every keep/revert, and
   the complete lever catalog on `/strategy-review`.
+- Shows a matched champion/challenger cumulative-return chart, unresolved positions,
+  estimated completion date, exact settings diff, live promotion preview, data-quality
+  status, and a guard-by-guard explanation of every promotion or rejection.
+- Starts challengers at 20% allocation and raises them to 35% only after the early
+  safety sample remains profitable without triggering loss-streak protection.
+- Corrects the required promotion confidence upward as more experiments are tested,
+  reducing the chance that repeated trials eventually promote a lucky result.
+- Provides audited pause/resume, reject-challenger, and restore-previous-champion
+  controls. Open positions retain their entry-time strategy regardless of controls.
 
 Automatic levers include the morning-candidate and confirmation thresholds;
 first and second profit targets; tranche percentages; runner duration; breakeven,
