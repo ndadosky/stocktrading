@@ -77,7 +77,7 @@ class Job:
 JOBS: dict[str, Job] = {
     "morning": Job("morning", [PYTHON, "morning_candidates.py"], day_time(8, 45), "Fetch and score the Finviz universe."),
     "confirmation": Job("confirmation", [PYTHON, "confirm_945.py"], day_time(9, 50), "Run 9:45 confirmation and live quote checks."),
-    "report": Job("report", [PYTHON, "daily_report.py"], day_time(10, 10), "Update paper trades, analytics, and dashboard."),
+    "report": Job("report", [PYTHON, "daily_report.py"], day_time(10, 7), "Update paper trades, analytics, and dashboard."),
     "strategy_review": Job("strategy_review", [PYTHON, "strategy_review.py"], day_time(10, 30), "Review database and strategy evidence for safe improvements."),
     "pnl_flashcard": Job("pnl_flashcard", [IMAGE_PYTHON, "pnl_flashcard.py"], day_time(16, 15), "Generate the post-market P/L flash-card infographic."),
     "health": Job("health", [PYTHON, "system_health.py"], None, "Write the latest pipeline health snapshot."),

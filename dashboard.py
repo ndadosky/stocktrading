@@ -360,11 +360,15 @@ def trade_table(frame: pd.DataFrame, is_open: bool = True) -> str:
         num = pd.to_numeric(frame.loc[display.index, "bid_ask_spread_pct"], errors="coerce")
         display["bid_ask_spread_pct"] = num.map(lambda x: f"{x:.3f}%" if pd.notna(x) else "")
 
-    # Escape remaining object columns
+    # Escape remaining text columns. Check each dtype explicitly so this works
+    # with both legacy object strings and Pandas' dedicated string dtype.
     already_fmt = {"p_l", "p_l_%", "earnings_date", "entry_price", "current_price",
                    "exit_price", "bid_ask_spread_pct"}
-    for col in display.select_dtypes(include=["object"]).columns:
-        if col not in already_fmt:
+    for col in display.columns:
+        dtype = display[col].dtype
+        if col not in already_fmt and (
+            pd.api.types.is_object_dtype(dtype) or pd.api.types.is_string_dtype(dtype)
+        ):
             display[col] = display[col].map(lambda v: escape(str(v)) if pd.notna(v) else "")
 
     # Rename to display-friendly headers

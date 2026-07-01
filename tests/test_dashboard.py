@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+import warnings
 
 import pandas as pd
 
@@ -25,7 +26,9 @@ class DashboardOpenPositionTests(unittest.TestCase):
             }
         ])
 
-        html = trade_table(frame, is_open=True)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            html = trade_table(frame, is_open=True)
 
         self.assertIn(">Shares</th>", html)
         self.assertIn(">50</td>", html)

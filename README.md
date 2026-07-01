@@ -18,7 +18,7 @@ Friday and can also be run independently.
 |---|---|---|
 | 8:45 AM | `morning_candidates.py` | Raw and scored stock universe |
 | 9:50 AM | `confirm_945.py` | Completed-bar VWAP, trend, breakout, and live quote check |
-| 10:10 AM | `daily_report.py` | Entries, exits, health audit, account report, and dashboard |
+| 10:07 AM | `daily_report.py` | Entries, exits, health audit, account report, and dashboard |
 | 10:25 AM | Strategy optimizer | Holdout-tested, guarded parameter review |
 | 10:45 AM | Daily infographic | Visual summary posted in Codex |
 | Friday 4:10 PM | Human review | Read-only audit of every evaluated strategy change |
@@ -289,7 +289,7 @@ the app API:
 |-------|-----------|-----|
 | `stocktrading-job-morning.timer` | 8:45 Mon–Fri | morning scan |
 | `stocktrading-job-confirmation.timer` | 9:50 | 9:45 confirmation |
-| `stocktrading-job-report.timer` | 10:10 | daily report |
+| `stocktrading-job-report.timer` | 10:07 | daily report |
 | `stocktrading-job-strategy_review.timer` | 10:30 | strategy review |
 | `stocktrading-job-pnl_flashcard.timer` | 16:15 | P/L flashcard |
 | `stocktrading-live-update.timer` | every 5 min | live report/dashboard |
