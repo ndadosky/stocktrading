@@ -538,14 +538,15 @@ def _candidate_change(settings: dict, index: int, metrics: dict,
         new = _pick(round(float(old) - 0.05, 2), round(float(old) + 0.05, 2), 0.75, 1.0)
     elif key.startswith("confirmation_weights."):
         bias = _component_bias(key, minimum_observations=0)  # readiness already checked by _lever_ready
-        step = 2
-        if key.endswith("too_extended_penalty"):
-            # Penalty is negative: "up" bias (outperforming) should make it less negative.
-            forward = float(old) + step if bias >= 0 else float(old) - step
-            new = _pick(forward, float(old) - step if forward == float(old) + step else float(old) + step, -20, -8)
+        if bias == 0:
+            new = old  # no clear win-rate signal yet; leave the weight untouched
+        elif key.endswith("too_extended_penalty"):
+            # Penalty is negative: outperforming ("up") bias should make it less negative.
+            step = 2 if bias > 0 else -2
+            new = _pick(float(old) + step, float(old) - step, -20, -8)
         else:
-            forward = float(old) + step if bias >= 0 else float(old) - step
-            new = _pick(forward, float(old) - step if forward == float(old) + step else float(old) + step, 5, 15)
+            step = 2 if bias > 0 else -2
+            new = _pick(float(old) + step, float(old) - step, 5, 15)
     else:
         new = _pick(min(15, float(old) + 1), max(0, float(old) - 1), 0, 15)
     _set_value(candidate, key, new)
