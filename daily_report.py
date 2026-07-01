@@ -25,6 +25,7 @@ from scanner_config import (
 from market_calendar import sessions_until
 from pipeline_health import market_gate, record_stage, require_today_snapshot
 from stock_storage import append_snapshot, bankroll_base, load_paper_trades, save_paper_trades, total_bankroll_deposits
+from strategy_optimizer import strategy_assignment, strategy_routing_context
 
 TRADE_COLUMNS = [
     "trade_id", "trade_date", "entry_datetime", "ticker", "sector", "market_regime",
@@ -39,6 +40,10 @@ TRADE_COLUMNS = [
     "corporate_action_factor", "last_corporate_action_at", "data_failure_count", "review_flag",
     "holding_days", "entry_strategy_version", "active_strategy_version",
     "exit_strategy_version", "strategy_changed_mid_trade", "strategy_changed_at",
+    "optimizer_arm", "strategy_first_target_pct", "strategy_second_target_pct",
+    "strategy_stop_loss_pct", "strategy_max_holding_days", "strategy_runner_exit_sessions",
+    "strategy_scale_first_pct", "strategy_scale_second_pct", "strategy_breakeven_pct",
+    "strategy_runner_stop_pct", "strategy_slippage_bps",
     "last_updated",
 ]
 OPEN_STATUS = "OPEN"
@@ -88,7 +93,8 @@ def load_trades() -> pd.DataFrame:
         missing_active = trades["active_strategy_version"].isna() | trades["active_strategy_version"].astype(str).str.strip().eq("")
         trades.loc[missing_active & ~active, "active_strategy_version"] = trades.loc[missing_active & ~active, "entry_strategy_version"]
         trades.loc[missing_active & active, "active_strategy_version"] = STRATEGY_VERSION
-        strategy_change = active & trades["active_strategy_version"].astype(str).ne(STRATEGY_VERSION)
+        routed = trades["optimizer_arm"].fillna("").astype(str).isin({"champion", "challenger"})
+        strategy_change = active & ~routed & trades["active_strategy_version"].astype(str).ne(STRATEGY_VERSION)
         trades.loc[strategy_change, "active_strategy_version"] = STRATEGY_VERSION
         entry_differs = active & trades["entry_strategy_version"].astype(str).ne(trades["active_strategy_version"].astype(str))
         trades["strategy_changed_mid_trade"] = (
@@ -100,10 +106,11 @@ def load_trades() -> pd.DataFrame:
         trades.loc[~active & missing_exit, "exit_strategy_version"] = trades.loc[~active & missing_exit, "active_strategy_version"]
         # Apply the active strategy to positions still carrying shares. Database
         # column names remain legacy names for compatibility with existing Pi data.
-        trades.loc[active, "target_10"] = entry[active] * (1 + FIRST_TARGET_GAIN_PCT / 100)
-        trades.loc[active, "target_20"] = entry[active] * (1 + SECOND_TARGET_GAIN_PCT / 100)
-        trades.loc[active, "target_30"] = pd.NA
-        trades.loc[active, "stop_8"] = entry[active] * (1 - STOP_LOSS_PCT / 100)
+        legacy_active = active & ~routed
+        trades.loc[legacy_active, "target_10"] = entry[legacy_active] * (1 + FIRST_TARGET_GAIN_PCT / 100)
+        trades.loc[legacy_active, "target_20"] = entry[legacy_active] * (1 + SECOND_TARGET_GAIN_PCT / 100)
+        trades.loc[legacy_active, "target_30"] = pd.NA
+        trades.loc[legacy_active, "stop_8"] = entry[legacy_active] * (1 - STOP_LOSS_PCT / 100)
         trades["active_stop"] = effective_stops(trades)
     return trades[TRADE_COLUMNS]
 
@@ -128,12 +135,15 @@ def effective_stops(trades: pd.DataFrame) -> pd.Series:
     return pd.concat([original, stored, calculated], axis=1).max(axis=1)
 
 
-def calculate_position_size(equity: float, available_cash: float, entry_price: float) -> int:
+def calculate_position_size(
+    equity: float, available_cash: float, entry_price: float,
+    stop_loss_pct: float = STOP_LOSS_PCT, slippage_bps: float = SLIPPAGE_BPS,
+) -> int:
     """Size a trade from stop risk while preserving exposure and cash limits."""
     if equity <= 0 or available_cash <= 0 or entry_price <= 0:
         return 0
-    stop_reference = entry_price * (1 - STOP_LOSS_PCT / 100)
-    stop_fill = stop_reference * (1 - SLIPPAGE_BPS / 10_000)
+    stop_reference = entry_price * (1 - stop_loss_pct / 100)
+    stop_fill = stop_reference * (1 - slippage_bps / 10_000)
     risk_per_share = entry_price - stop_fill
     risk_budget = equity * RISK_PER_TRADE_PCT / 100
     exposure_budget = equity * MAX_POSITION_EXPOSURE_PCT / 100
@@ -203,8 +213,7 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
     """Add score-ranked entries while enforcing cash and sector concentration."""
     if confirmations.empty:
         return trades
-    eligible = confirmations[confirmations["score"] >= MIN_CONFIRMATION_SCORE_TO_BUY]
-    eligible = eligible.sort_values("score", ascending=False, kind="mergesort")
+    eligible = confirmations.sort_values("score", ascending=False, kind="mergesort")
     existing = set(zip(trades["trade_date"].astype(str), trades["ticker"].astype(str).str.upper()))
     purchases_today = int(trades["trade_date"].astype(str).eq(today).sum())
     daily_slots = max(0, MAX_DAILY_PAPER_TRADES - purchases_today)
@@ -229,11 +238,25 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
     ) * pd.to_numeric(trades.loc[open_mask, "remaining_shares"], errors="coerce").fillna(0)).sum()) if not trades.empty else 0.0
     heat_limit = equity * MAX_PORTFOLIO_HEAT_PCT / 100
     additions = []
+    routing_context = strategy_routing_context()
     for row in eligible.itertuples(index=False):
         if len(additions) >= daily_slots:
             print(f"Skipped remaining candidates: {MAX_DAILY_PAPER_TRADES} new-purchase daily limit reached")
             break
         ticker = str(row.ticker).upper()
+        assignment = strategy_assignment(ticker, today, routing_context)
+        assigned_settings = assignment["settings"]
+        selection = assigned_settings.get("selection", {})
+        risk = assigned_settings["risk"]
+        scale = risk["scale_out"]
+        execution_settings = assigned_settings["execution"]
+        confirmation_minimum = int(selection.get("confirmation_buy_min_score", MIN_CONFIRMATION_SCORE_TO_BUY))
+        morning_minimum = int(selection.get("morning_candidate_min_score", 35))
+        morning_score = pd.to_numeric(getattr(row, "morning_score", pd.NA), errors="coerce")
+        if int(row.score) < confirmation_minimum:
+            continue
+        if pd.notna(morning_score) and float(morning_score) < morning_minimum:
+            continue
         if (today, ticker) in existing:
             continue
         if ticker in open_tickers:
@@ -250,14 +273,18 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
         quoted = float(row.current)
         ask = pd.to_numeric(getattr(row, "ask", pd.NA), errors="coerce")
         execution_reference = float(ask) if pd.notna(ask) and float(ask) > 0 else quoted
-        execution = execution_reference * (1 + SLIPPAGE_BPS / 10_000)
-        shares = calculate_position_size(equity, available_cash, execution)
+        trade_slippage_bps = float(execution_settings.get("slippage_bps", SLIPPAGE_BPS))
+        trade_stop_pct = float(risk.get("stop_loss_pct", STOP_LOSS_PCT))
+        execution = execution_reference * (1 + trade_slippage_bps / 10_000)
+        shares = calculate_position_size(
+            equity, available_cash, execution, trade_stop_pct, trade_slippage_bps
+        )
         if shares < 1:
             print(f"Skipped {ticker}: risk sizing, exposure, or cash reserve permits no shares")
             continue
-        stop_reference = execution * (1 - STOP_LOSS_PCT / 100)
+        stop_reference = execution * (1 - trade_stop_pct / 100)
         trade_cost = execution * shares
-        initial_risk = (execution - stop_reference * (1 - SLIPPAGE_BPS / 10_000)) * shares
+        initial_risk = (execution - stop_reference * (1 - trade_slippage_bps / 10_000)) * shares
         sector_value = getattr(row, "sector", "Unknown")
         sector = "Unknown" if pd.isna(sector_value) or not str(sector_value).strip() else str(sector_value)
         if trade_cost > available_cash + 0.005:
@@ -294,10 +321,10 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
             "initial_cost": trade_cost, "initial_risk": initial_risk,
             "shares": shares, "remaining_shares": shares,
             "status": OPEN_STATUS, "current_price": execution,
-            "target_10": execution * (1 + FIRST_TARGET_GAIN_PCT / 100),
-            "target_20": execution * (1 + SECOND_TARGET_GAIN_PCT / 100), "target_30": pd.NA,
-            "stop_8": execution * (1 - STOP_LOSS_PCT / 100),
-            "active_stop": execution * (1 - STOP_LOSS_PCT / 100),
+            "target_10": execution * (1 + float(scale["first_target_gain_pct"]) / 100),
+            "target_20": execution * (1 + float(scale["second_target_gain_pct"]) / 100), "target_30": pd.NA,
+            "stop_8": execution * (1 - trade_stop_pct / 100),
+            "active_stop": execution * (1 - trade_stop_pct / 100),
             "exit_datetime": pd.NA, "exit_price": pd.NA, "exit_reason": pd.NA,
             "realized_proceeds": 0.0, "realized_p_l": 0.0,
             "shares_sold_10": 0, "shares_sold_20": 0, "shares_sold_30": 0,
@@ -306,11 +333,22 @@ def add_new_trades(trades: pd.DataFrame, confirmations: pd.DataFrame, today: str
             "last_evaluated_at": _entry_datetime(row, today), "holding_days": 1,
             "corporate_action_factor": 1.0, "last_corporate_action_at": pd.NA,
             "data_failure_count": 0, "review_flag": "",
-            "entry_strategy_version": STRATEGY_VERSION,
-            "active_strategy_version": STRATEGY_VERSION,
+            "entry_strategy_version": assignment["version"],
+            "active_strategy_version": assignment["version"],
             "exit_strategy_version": pd.NA,
             "strategy_changed_mid_trade": False,
             "strategy_changed_at": pd.NA,
+            "optimizer_arm": assignment["arm"],
+            "strategy_first_target_pct": float(scale["first_target_gain_pct"]),
+            "strategy_second_target_pct": float(scale["second_target_gain_pct"]),
+            "strategy_stop_loss_pct": trade_stop_pct,
+            "strategy_max_holding_days": int(risk["max_holding_days"]),
+            "strategy_runner_exit_sessions": int(scale["runner_exit_sessions_after_second_target"]),
+            "strategy_scale_first_pct": float(scale["first_target_initial_shares_pct"]),
+            "strategy_scale_second_pct": float(scale["second_target_initial_shares_pct"]),
+            "strategy_breakeven_pct": float(scale["breakeven_after_first_target_pct"]),
+            "strategy_runner_stop_pct": float(scale["runner_stop_gain_pct"]),
+            "strategy_slippage_bps": trade_slippage_bps,
             "last_updated": datetime.now().astimezone().isoformat(timespec="seconds"),
         })
         available_cash -= trade_cost
@@ -328,7 +366,10 @@ def _holding_days(entry: pd.Timestamp, current: pd.Timestamp) -> int:
     return max(1, sessions_until(entry.date(), current.date()) + 1)
 
 
-def runner_exit_due(second_target_hit_at: object, current: pd.Timestamp) -> bool:
+def runner_exit_due(
+    second_target_hit_at: object, current: pd.Timestamp,
+    sessions: int = RUNNER_EXIT_SESSIONS,
+) -> bool:
     """Return true after the configured sessions following the second target."""
     if second_target_hit_at is None or pd.isna(second_target_hit_at):
         return False
@@ -341,7 +382,7 @@ def runner_exit_due(second_target_hit_at: object, current: pd.Timestamp) -> bool
         current = current.tz_localize("America/New_York")
     else:
         current = current.tz_convert("America/New_York")
-    return sessions_until(hit.date(), current.date()) >= RUNNER_EXIT_SESSIONS
+    return sessions_until(hit.date(), current.date()) >= sessions
 
 
 def apply_corporate_actions(trades: pd.DataFrame) -> pd.DataFrame:
@@ -389,13 +430,14 @@ def apply_corporate_actions(trades: pd.DataFrame) -> pd.DataFrame:
 def _sell_lot(
     frame: pd.DataFrame, idx, shares_to_sell: float, reference_price: float,
     reason: str, timestamp: pd.Timestamp, bucket: str,
+    slippage_bps: float = SLIPPAGE_BPS,
 ) -> None:
     """Book one partial exit with adverse exit slippage."""
     remaining = float(frame.at[idx, "remaining_shares"])
     quantity = min(remaining, max(0.0, float(shares_to_sell)))
     if quantity <= 0:
         return
-    fill = reference_price * (1 - SLIPPAGE_BPS / 10_000)
+    fill = reference_price * (1 - slippage_bps / 10_000)
     entry = float(frame.at[idx, "entry_price"])
     frame.at[idx, "remaining_shares"] = remaining - quantity
     frame.at[idx, "realized_proceeds"] = float(pd.to_numeric(frame.at[idx, "realized_proceeds"], errors="coerce") or 0) + fill * quantity
@@ -430,6 +472,20 @@ def update_trade_lifecycle(trades: pd.DataFrame) -> pd.DataFrame:
     for idx, row in result[active].iterrows():
         ticker = str(row["ticker"])
         try:
+            def strategy_value(column: str, fallback: float) -> float:
+                value = pd.to_numeric(row.get(column), errors="coerce")
+                return float(value) if pd.notna(value) else float(fallback)
+
+            first_target_pct = strategy_value("strategy_first_target_pct", FIRST_TARGET_GAIN_PCT)
+            second_target_pct = strategy_value("strategy_second_target_pct", SECOND_TARGET_GAIN_PCT)
+            stop_loss_pct = strategy_value("strategy_stop_loss_pct", STOP_LOSS_PCT)
+            max_holding_days = int(strategy_value("strategy_max_holding_days", MAX_HOLDING_DAYS))
+            runner_sessions = int(strategy_value("strategy_runner_exit_sessions", RUNNER_EXIT_SESSIONS))
+            scale_first_pct = strategy_value("strategy_scale_first_pct", SCALE_OUT_FIRST_PCT)
+            scale_second_pct = strategy_value("strategy_scale_second_pct", SCALE_OUT_SECOND_PCT)
+            breakeven_pct = strategy_value("strategy_breakeven_pct", BREAKEVEN_AFTER_FIRST_TARGET_PCT)
+            runner_stop_pct = strategy_value("strategy_runner_stop_pct", RUNNER_STOP_GAIN_PCT)
+            trade_slippage_bps = strategy_value("strategy_slippage_bps", SLIPPAGE_BPS)
             bars = intraday_history(ticker)
             if bars.empty:
                 prior_failures = pd.to_numeric(result.at[idx, "data_failure_count"], errors="coerce")
@@ -461,8 +517,8 @@ def update_trade_lifecycle(trades: pd.DataFrame) -> pd.DataFrame:
             result.at[idx, "holding_days"] = days
             first_target = float(row["target_10"])
             entry = float(row["entry_price"])
-            breakeven_floor = entry * (1 + BREAKEVEN_AFTER_FIRST_TARGET_PCT / 100)
-            protect_floor = entry * (1 + RUNNER_STOP_GAIN_PCT / 100)
+            breakeven_floor = entry * (1 + breakeven_pct / 100)
+            protect_floor = entry * (1 + runner_stop_pct / 100)
             for timestamp, bar in after.iterrows():
                 remaining = float(result.at[idx, "remaining_shares"])
                 if remaining <= 0:
@@ -476,32 +532,32 @@ def update_trade_lifecycle(trades: pd.DataFrame) -> pd.DataFrame:
                 if low <= active_stop:
                     gap_aware_stop = min(active_stop, float(bar["Open"]))
                     if target20_already_active:
-                        reason, bucket = f"PROTECT +{RUNNER_STOP_GAIN_PCT:g}%", "shares_sold_protect"
+                        reason, bucket = f"PROTECT +{runner_stop_pct:g}%", "shares_sold_protect"
                     elif target10_already_active:
                         reason, bucket = "PROTECT BREAKEVEN", "shares_sold_protect"
                     else:
-                        reason, bucket = f"STOP -{STOP_LOSS_PCT:g}%", "shares_sold_stop"
-                    _sell_lot(result, idx, remaining, gap_aware_stop, reason, timestamp, bucket)
+                        reason, bucket = f"STOP -{stop_loss_pct:g}%", "shares_sold_stop"
+                    _sell_lot(result, idx, remaining, gap_aware_stop, reason, timestamp, bucket, trade_slippage_bps)
                     break
-                if target20_already_active and runner_exit_due(result.at[idx, "target_20_hit_at"], timestamp):
-                    reason = f"RUNNER EXIT {RUNNER_EXIT_SESSIONS}D AFTER +{SECOND_TARGET_GAIN_PCT:g}%"
-                    _sell_lot(result, idx, remaining, float(bar["Open"]), reason, timestamp, "shares_sold_time")
+                if target20_already_active and runner_exit_due(result.at[idx, "target_20_hit_at"], timestamp, runner_sessions):
+                    reason = f"RUNNER EXIT {runner_sessions}D AFTER +{second_target_pct:g}%"
+                    _sell_lot(result, idx, remaining, float(bar["Open"]), reason, timestamp, "shares_sold_time", trade_slippage_bps)
                     break
                 initial = float(result.at[idx, "shares"])
                 if float(result.at[idx, "shares_sold_10"]) <= 0 and high >= first_target:
-                    quantity = max(1, round(initial * SCALE_OUT_FIRST_PCT / 100))
-                    _sell_lot(result, idx, quantity, first_target, f"SCALE +{FIRST_TARGET_GAIN_PCT:g}%", timestamp, "shares_sold_10")
+                    quantity = max(1, round(initial * scale_first_pct / 100))
+                    _sell_lot(result, idx, quantity, first_target, f"SCALE +{first_target_pct:g}%", timestamp, "shares_sold_10", trade_slippage_bps)
                     result.at[idx, "target_10_hit_at"] = timestamp.isoformat()
                     result.at[idx, "active_stop"] = max(float(result.at[idx, "active_stop"]), breakeven_floor)
                 if float(result.at[idx, "remaining_shares"]) > 0 and float(result.at[idx, "shares_sold_20"]) <= 0 and high >= float(row["target_20"]):
-                    quantity = max(1, round(initial * SCALE_OUT_SECOND_PCT / 100))
-                    _sell_lot(result, idx, quantity, float(row["target_20"]), f"SCALE +{SECOND_TARGET_GAIN_PCT:g}%", timestamp, "shares_sold_20")
+                    quantity = max(1, round(initial * scale_second_pct / 100))
+                    _sell_lot(result, idx, quantity, float(row["target_20"]), f"SCALE +{second_target_pct:g}%", timestamp, "shares_sold_20", trade_slippage_bps)
                     result.at[idx, "target_20_hit_at"] = timestamp.isoformat()
                     result.at[idx, "active_stop"] = max(float(result.at[idx, "active_stop"]), protect_floor)
             remaining = float(result.at[idx, "remaining_shares"])
-            if remaining > 0 and days >= MAX_HOLDING_DAYS:
+            if remaining > 0 and days >= max_holding_days:
                 timestamp = after.index[-1] if not after.empty else bars.index[-1]
-                _sell_lot(result, idx, remaining, current, f"TIME EXIT {MAX_HOLDING_DAYS}D", timestamp, "shares_sold_time")
+                _sell_lot(result, idx, remaining, current, f"TIME EXIT {max_holding_days}D", timestamp, "shares_sold_time", trade_slippage_bps)
         except Exception as exc:
             print(f"Kept {ticker} open: {exc}")
     result["last_updated"] = datetime.now().astimezone().isoformat(timespec="seconds")

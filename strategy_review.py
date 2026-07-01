@@ -305,8 +305,16 @@ def render_strategy_review_html(rows: list[dict], review_date: str, csv_filename
     ) or "<tr><td colspan='7'>No automatic experiments have started.</td></tr>"
     lever_rows = "".join(
         f"<tr><td>{escape(str(item['area']))}</td><td><b>{escape(str(item['label']))}</b></td>"
-        f"<td><code>{escape(str(item['key']))}</code></td><td class='wrap'>{escape(str(item['reason']))}</td></tr>"
+        f"<td><code>{escape(str(item['key']))}</code></td><td>{escape(str(item.get('bounds', '—')))}</td>"
+        f"<td class='wrap'>{escape(str(item['reason']))}</td></tr>"
         for item in optimizer.get("levers", [])
+    )
+    goal_rows = "".join(
+        f"<div class='goal {'met' if goal.get('met') else ''}'>"
+        f"<small>{escape(str(goal['label']))}</small>"
+        f"<strong>{escape(str(goal.get('current') if goal.get('current') is not None else '—'))}</strong>"
+        f"<span>Target {'≥' if goal['direction'] == 'higher' else '≤'} {escape(str(goal['target']))}</span></div>"
+        for goal in optimizer.get("goals", [])
     )
 
     return f"""<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
@@ -369,6 +377,11 @@ main{{max-width:1280px;margin:0 auto;padding:28px 20px 64px}}
 .opt-meta{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}}
 .opt-meta div{{background:#f7f9fc;border-radius:9px;padding:11px}}.opt-meta small{{display:block;color:var(--muted);margin-bottom:4px}}
 .wrap{{white-space:normal;min-width:220px;line-height:1.4}}code{{font-size:11px}}
+.goal-grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:16px}}
+.goal{{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}}
+.goal small,.goal span{{display:block;color:var(--muted);font-size:11px}}.goal strong{{display:block;font-size:19px;margin:5px 0}}
+.goal.met{{border-color:#86efac;background:#f0fdf4}}.goal.met strong{{color:var(--green)}}
+.guardrail{{margin-top:14px;padding:10px 12px;border-radius:9px;background:#fff7ed;color:#9a3412;font-size:12px;line-height:1.45}}
 .empty{{color:var(--muted);padding:12px 0}}
 .hidden{{display:none}}
 table{{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}}
@@ -376,8 +389,8 @@ th,td{{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vert
 th{{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}}
 tbody tr:last-child td{{border-bottom:0}}
 a{{color:var(--blue)}}
-@media(max-width:900px){{.cards,.bc-grid{{grid-template-columns:repeat(2,1fr)}}.opt-steps{{grid-template-columns:1fr 1fr}}}}
-@media(max-width:560px){{.cards,.bc-grid,.opt-meta{{grid-template-columns:1fr}}main{{padding:16px}}.opt-steps{{grid-template-columns:1fr}}}}
+@media(max-width:900px){{.cards,.bc-grid{{grid-template-columns:repeat(2,1fr)}}.opt-steps{{grid-template-columns:1fr 1fr}}.goal-grid{{grid-template-columns:repeat(2,1fr)}}}}
+@media(max-width:560px){{.cards,.bc-grid,.opt-meta,.goal-grid{{grid-template-columns:1fr}}main{{padding:16px}}.opt-steps{{grid-template-columns:1fr}}}}
 </style></head><body>
 <header>
   <div class='hdr-left'><h1>Stock Strategy App</h1></div>
@@ -406,6 +419,8 @@ a{{color:var(--blue)}}
       <div><small>Baseline</small><b>{escape(str(optimizer.get('baseline_version') or '—'))}</b></div>
       <div><small>Latest result</small><b>{escape(str(optimizer.get('last_result') or 'Waiting'))}</b></div>
     </div>
+    <div class='goal-grid'>{goal_rows}</div>
+    <div class='guardrail'>Challenger allocation: {optimizer.get('challenger_allocation_pct', 20)}% · Promotion confidence: {optimizer.get('confidence_required_pct', 90)}% · Cost stress: {optimizer.get('stress_slippage_bps', 25)} bps per side · Emergency rollback: {optimizer.get('emergency_loss_streak', 5)} consecutive losses or {optimizer.get('emergency_drawdown_pct', 8)}% drawdown.</div>
     {_note(str(optimizer.get('last_result_reason') or active_change.get('reason') or 'The first experiment begins after 60 clean resolved trades.'))}
   </div>
   <section class='cards'>{cards_html}</section>
@@ -421,7 +436,7 @@ a{{color:var(--blue)}}
   </div>
   <div class='panel'>
     <div class='panel-head'><h3>Documented optimization levers</h3><span class='sub'>Only one lever changes per experiment</span></div>
-    <table><thead><tr><th>Area</th><th>Lever</th><th>Settings path</th><th>What it tests</th></tr></thead><tbody>{lever_rows}</tbody></table>
+    <table><thead><tr><th>Area</th><th>Lever</th><th>Settings path</th><th>Bounds</th><th>What it tests</th></tr></thead><tbody>{lever_rows}</tbody></table>
   </div>
   <div class='panel'>
     <div class='panel-head'><h3>Full review data</h3><span class='sub'>{csv_link}</span></div>

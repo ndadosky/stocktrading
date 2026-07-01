@@ -25,23 +25,47 @@ def resolved_rows(version: str, count: int, return_pct: float) -> pd.DataFrame:
 
 
 class StrategyOptimizerTests(unittest.TestCase):
+    def test_metrics_include_recency_cost_and_segments(self) -> None:
+        frame = pd.DataFrame([
+            {
+                "initial_cost": 1000, "realized_p_l": pnl, "holding_days": days,
+                "market_regime": regime, "confirmation_band": band, "sector": "Tech",
+            }
+            for pnl, days, regime, band in (
+                (-50, 4, "RISK OFF", "B"),
+                (20, 3, "RISK ON", "A"),
+                (40, 2, "RISK ON", "A"),
+            )
+        ])
+
+        metrics = strategy_optimizer.strategy_metrics(frame)
+
+        self.assertIn("weighted_expectancy_pct", metrics)
+        self.assertLess(metrics["stressed_expectancy_pct"], metrics["weighted_expectancy_pct"])
+        self.assertEqual(metrics["segments"]["market_regime:RISK ON"]["resolved"], 2)
+        self.assertEqual(metrics["segments"]["sector:Tech"]["resolved"], 3)
+
     def test_rejects_higher_win_rate_when_expectancy_does_not_improve(self) -> None:
         policy = json.loads(
             (Path(__file__).resolve().parents[1] / "optimizer_policy.json").read_text(encoding="utf-8")
         )
         baseline = {
-            "win_rate_pct": 60, "expectancy_pct": 1.0,
+            "win_rate_pct": 60, "expectancy_pct": 1.0, "weighted_expectancy_pct": 1.0,
+            "stressed_expectancy_pct": 0.5, "objective_score": 1.8,
             "profit_factor": 2.0, "max_drawdown_pct": 4.0,
+            "returns": [1.0] * 20, "segments": {},
         }
         candidate = {
-            "win_rate_pct": 80, "expectancy_pct": 0.8,
+            "win_rate_pct": 80, "expectancy_pct": 0.8, "weighted_expectancy_pct": 0.8,
+            "stressed_expectancy_pct": 0.3, "objective_score": 1.7,
             "profit_factor": 2.2, "max_drawdown_pct": 3.0,
+            "returns": [0.8] * 20, "segments": {},
         }
 
         accepted, reason = strategy_optimizer._accepted(baseline, candidate, policy)
 
         self.assertFalse(accepted)
-        self.assertIn("Expectancy change -0.200", reason)
+        self.assertIn("expectancy -0.200", reason)
 
     def test_starts_one_experiment_at_sixty_then_keeps_better_candidate(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -78,7 +102,14 @@ class StrategyOptimizerTests(unittest.TestCase):
             candidate_version = started["candidate_version"]
             active = json.loads(runtime.read_text(encoding="utf-8"))
             self.assertEqual(active["version"], candidate_version)
-            self.assertEqual(active["selection"]["confirmation_buy_min_score"], 45)
+            # Acquisition remains permissive enough for both arms; the challenger
+            # threshold itself is stored in optimizer state.
+            self.assertEqual(active["selection"]["confirmation_buy_min_score"], 40)
+            self.assertEqual(
+                json.loads(state_file.read_text(encoding="utf-8"))["candidate_settings"]
+                ["selection"]["confirmation_buy_min_score"],
+                45,
+            )
 
             state = json.loads(state_file.read_text(encoding="utf-8"))
             state["last_action_date"] = "2000-01-01"

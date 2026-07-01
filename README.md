@@ -128,12 +128,23 @@ The 10:30 AM strategy-review job also advances the continuous optimizer:
 - Waits for at least 60 resolved trades before tuning.
 - Freezes the first 60 clean current-version trades as its baseline, then changes
   exactly one documented lever for a 25-resolved-trade paper experiment.
+- Routes 80% of eligible paper entries to the champion and 20% to the challenger
+  deterministically. Each trade stores its own targets, stop, scale percentages,
+  holding limit, runner timing, and slippage assumption so both arms can coexist.
 - Compares expectancy first, with profit-factor and drawdown guards. It keeps a
   candidate only when expectancy improves by the configured minimum without
   violating either guard; otherwise it automatically restores the baseline.
 - Repeats with the next screener, entry, exit, or risk lever after each evaluation.
 - Records win rate and ranks candidates by realized expectancy while enforcing
   profit-factor and maximum-drawdown guardrails.
+- Uses recency-weighted returns, 1,000 bootstrap samples, 90% promotion confidence,
+  and a 25-bps-per-side cost stress before promoting a challenger.
+- Requires at least eight observations before using a market-regime, score-band,
+  or sector segment as a veto; a materially weaker established segment blocks promotion.
+- Remembers tested values, enforces a two-cycle lever cooldown, and automatically
+  re-baselines after 200 promoted trades or a detected dominant-regime change.
+- Reverts a challenger early after five consecutive losses or an 8% cumulative
+  return drawdown rather than waiting for all 25 resolved challenger trades.
 - Adopts at most one evidence-backed setting change per day.
 - Never weakens capital, slippage, stop, concentration, or sample safeguards to
   inflate the hit rate.
@@ -148,6 +159,10 @@ Automatic levers currently include the morning-candidate threshold, confirmation
 threshold, first and second profit targets, protective stop, and maximum holding
 period. Capital reserve, portfolio heat, slippage, position sizing, daily purchase
 limits, and concentration limits remain human-controlled safeguards.
+
+The goal panel tracks an 80% win rate, 1% average return per trade, 1.75 profit
+factor, no more than 8% drawdown, and an average holding period of five sessions
+or less. These targets guide experiments; they never bypass promotion safeguards.
 
 The optimizer database state is initialized automatically on app startup. Useful
 inspection queries are:

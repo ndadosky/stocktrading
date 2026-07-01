@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+import copy
 from unittest.mock import patch
 
 import pandas as pd
@@ -95,6 +96,34 @@ class DailyPurchaseLimitTests(unittest.TestCase):
 
         additions = result[result["trade_date"].astype(str).eq("2026-06-30")]
         self.assertEqual(additions["ticker"].tolist(), ["THIRD"])
+
+    def test_challenger_trade_keeps_its_own_exit_parameters(self) -> None:
+        settings = copy.deepcopy(daily_report.strategy_assignment("TEST", "2026-06-30")["settings"])
+        settings["version"] = "challenger-test"
+        settings["risk"]["stop_loss_pct"] = 4
+        settings["risk"]["max_holding_days"] = 7
+        settings["risk"]["scale_out"]["first_target_gain_pct"] = 6
+        assignment = {"arm": "challenger", "version": "challenger-test", "settings": settings}
+        confirmations = pd.DataFrame([{
+            "ticker": "TEST", "sector": "Technology", "score": 50,
+            "morning_score": 50, "current": 10.0,
+        }])
+
+        with (
+            patch.object(daily_report, "account_summary", return_value=self.account_summary()),
+            patch.object(daily_report, "strategy_assignment", return_value=assignment),
+        ):
+            result = daily_report.add_new_trades(
+                self.existing_positions(position_count=1), confirmations, "2026-06-30"
+            )
+
+        trade = result[result["ticker"].eq("TEST")].iloc[0]
+        self.assertEqual(trade["optimizer_arm"], "challenger")
+        self.assertEqual(trade["entry_strategy_version"], "challenger-test")
+        self.assertAlmostEqual(float(trade["strategy_stop_loss_pct"]), 4)
+        self.assertAlmostEqual(float(trade["strategy_first_target_pct"]), 6)
+        self.assertEqual(int(trade["strategy_max_holding_days"]), 7)
+        self.assertAlmostEqual(float(trade["target_10"]), float(trade["entry_price"]) * 1.06)
 
 if __name__ == "__main__":
     unittest.main()
