@@ -1960,7 +1960,7 @@ function renderPreview(data){{
   target.innerHTML='<table><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table>';
 }}
 async function loadScanner(){{
-  const res=await fetch('/api/scanner');
+  const res=await fetch('/api/scanner',{{cache:'no-store'}});
   return res.json();
 }}
 let previewErrorShown=false;
@@ -1988,6 +1988,7 @@ document.getElementById('run-scanner').onclick=async()=>{{
     refreshScanner();
   }}catch(err){{alert('Request failed: '+err);btn.disabled=false;btn.textContent='Run preview scan';document.getElementById('run-indicator').style.display='none';}}
 }};
+refreshScanner();
 setInterval(refreshScanner,3000);
 </script></body></html>"""
     return finalize_page_html(html, "/scanner")
@@ -2006,6 +2007,8 @@ class Handler(SimpleHTTPRequestHandler):
         body = json.dumps(payload, indent=2).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store, max-age=0")
+        self.send_header("Pragma", "no-cache")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
