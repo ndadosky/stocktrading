@@ -21,6 +21,7 @@
   "target_success_rate_pct": 80,
   "goals": {
     "win_rate_pct": 80,
+    "average_winner_pct": 5,
     "expectancy_pct": 1.0,
     "profit_factor": 1.75,
     "maximum_drawdown_pct": 8,

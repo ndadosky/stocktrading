@@ -41,6 +41,7 @@ class StrategyOptimizerTests(unittest.TestCase):
         metrics = strategy_optimizer.strategy_metrics(frame)
 
         self.assertIn("weighted_expectancy_pct", metrics)
+        self.assertAlmostEqual(metrics["average_winner_pct"], 3.0)
         self.assertLess(metrics["stressed_expectancy_pct"], metrics["weighted_expectancy_pct"])
         self.assertEqual(metrics["segments"]["market_regime:RISK ON"]["resolved"], 2)
         self.assertEqual(metrics["segments"]["sector:Tech"]["resolved"], 3)

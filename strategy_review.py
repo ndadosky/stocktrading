@@ -377,7 +377,7 @@ main{{max-width:1280px;margin:0 auto;padding:28px 20px 64px}}
 .opt-meta{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}}
 .opt-meta div{{background:#f7f9fc;border-radius:9px;padding:11px}}.opt-meta small{{display:block;color:var(--muted);margin-bottom:4px}}
 .wrap{{white-space:normal;min-width:220px;line-height:1.4}}code{{font-size:11px}}
-.goal-grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:16px}}
+.goal-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:16px}}
 .goal{{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}}
 .goal small,.goal span{{display:block;color:var(--muted);font-size:11px}}.goal strong{{display:block;font-size:19px;margin:5px 0}}
 .goal.met{{border-color:#86efac;background:#f0fdf4}}.goal.met strong{{color:var(--green)}}

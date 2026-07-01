@@ -213,6 +213,7 @@ def strategy_metrics(frame: pd.DataFrame, policy: dict | None = None) -> dict:
     if frame.empty:
         return {"resolved": 0, "win_rate_pct": 0.0, "expectancy_pct": 0.0,
                 "weighted_expectancy_pct": 0.0, "stressed_expectancy_pct": 0.0,
+                "average_winner_pct": 0.0, "average_loser_pct": 0.0,
                 "profit_factor": None, "max_drawdown_pct": 0.0,
                 "average_holding_days": 0.0, "maximum_consecutive_losses": 0,
                 "returns": [], "segments": {}}
@@ -253,8 +254,13 @@ def strategy_metrics(frame: pd.DataFrame, policy: dict | None = None) -> dict:
             }
     pf_for_score = min(5.0, profit_factor if profit_factor is not None else 5.0)
     avg_holding = float(holding.mean()) if holding.notna().any() else 0.0
+    winning_returns = returns[returns.gt(0)]
+    losing_returns = returns[returns.lt(0)]
+    average_winner = float(winning_returns.mean()) if not winning_returns.empty else 0.0
+    average_loser = float(losing_returns.mean()) if not losing_returns.empty else 0.0
     objective_score = (
         weighted_expectancy + float(pnl.gt(0).mean()) + 0.15 * pf_for_score
+        + 0.10 * average_winner
         - 0.10 * abs(float(drawdown.min())) - 0.02 * avg_holding
     )
     return {
@@ -263,6 +269,8 @@ def strategy_metrics(frame: pd.DataFrame, policy: dict | None = None) -> dict:
         "expectancy_pct": round(float(returns.mean()), 3),
         "weighted_expectancy_pct": round(weighted_expectancy, 3),
         "stressed_expectancy_pct": round(stressed_expectancy, 3),
+        "average_winner_pct": round(average_winner, 3),
+        "average_loser_pct": round(average_loser, 3),
         "profit_factor": profit_factor,
         "max_drawdown_pct": round(abs(float(drawdown.min())), 3),
         "average_holding_days": round(avg_holding, 2),
@@ -281,7 +289,8 @@ def _candidate_change(settings: dict, index: int, metrics: dict) -> tuple[dict, 
     if key.endswith("confirmation_buy_min_score"):
         new = min(50, int(old) + 5)
     elif key.endswith("first_target_gain_pct"):
-        new = max(3, min(8, float(old) + (1 if metrics["win_rate_pct"] >= 60 else -1)))
+        needs_larger_winners = float(metrics.get("average_winner_pct", 0)) < 5
+        new = max(3, min(8, float(old) + (1 if needs_larger_winners or metrics["win_rate_pct"] >= 60 else -1)))
     elif key.endswith("stop_loss_pct"):
         new = max(3, round(float(old) - 0.5, 1))
     elif key.endswith("max_holding_days"):
@@ -628,6 +637,7 @@ def optimizer_status(state: dict | None = None, trades: pd.DataFrame | None = No
     goals = []
     goal_mapping = (
         ("Win rate", "win_rate_pct", "higher"),
+        ("Average winner", "average_winner_pct", "higher"),
         ("Average return", "weighted_expectancy_pct", "higher"),
         ("Profit factor", "profit_factor", "higher"),
         ("Maximum drawdown", "max_drawdown_pct", "lower"),

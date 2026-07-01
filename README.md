@@ -160,9 +160,10 @@ threshold, first and second profit targets, protective stop, and maximum holding
 period. Capital reserve, portfolio heat, slippage, position sizing, daily purchase
 limits, and concentration limits remain human-controlled safeguards.
 
-The goal panel tracks an 80% win rate, 1% average return per trade, 1.75 profit
-factor, no more than 8% drawdown, and an average holding period of five sessions
-or less. These targets guide experiments; they never bypass promotion safeguards.
+The goal panel tracks an 80% win rate, at least 5% on the average winning trade,
+1% average return across all trades, 1.75 profit factor, no more than 8% drawdown,
+and an average holding period of five sessions or less. These targets guide
+experiments; they never bypass promotion safeguards.
 
 The optimizer database state is initialized automatically on app startup. Useful
 inspection queries are:
