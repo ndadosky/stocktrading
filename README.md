@@ -118,29 +118,35 @@ marked `DEGRADED` instead of being hidden.
 
 ## 5. Continuous improvement
 
-`strategy_baseline.json` is immutable baseline v1. Active, reversible settings
-live in `strategy_settings.json`, experiment safeguards live in
-`optimizer_policy.json`, and every evaluated change belongs in
-`strategy_changelog.csv`.
+`strategy_baseline.json` is immutable baseline v1. Checked-in defaults live in
+`strategy_settings.json`, experiment safeguards live in `optimizer_policy.json`,
+and user-approved structural changes belong in `strategy_changelog.csv`.
 
-The 10:00 AM optimizer:
+The 10:30 AM strategy-review job also advances the continuous optimizer:
 
 - Defines success as reaching the +5% scale-out before the −5% stop.
 - Waits for at least 60 resolved trades before tuning.
-- Reserves the newest 20% as a frozen chronological holdout with at least 12
-  trades; it is never used to select parameters.
-- Uses chronological walk-forward testing on the remaining history.
-- Evaluates hit rate, expectancy, profit factor, drawdown, regime, sector,
-  spread, score band, and signal components.
-- Ranks strategy quality by realized expectancy, profit factor, maximum
-  drawdown, +5% hit rate, and time required to reach +5%, in that order.
+- Freezes the first 60 clean current-version trades as its baseline, then changes
+  exactly one documented lever for a 25-resolved-trade paper experiment.
+- Compares expectancy first, with profit-factor and drawdown guards. It keeps a
+  candidate only when expectancy improves by the configured minimum without
+  violating either guard; otherwise it automatically restores the baseline.
+- Repeats with the next screener, entry, exit, or risk lever after each evaluation.
+- Records win rate and ranks candidates by realized expectancy while enforcing
+  profit-factor and maximum-drawdown guardrails.
 - Adopts at most one evidence-backed setting change per day.
 - Never weakens capital, slippage, stop, concentration, or sample safeguards to
   inflate the hit rate.
-- Stops tuning after at least 80% success over the latest 50 resolved trades,
-  while continuing to monitor performance.
-- Refuses adoption on a dirty worktree and creates a local git rollback commit
-  for every adopted settings change; it never pushes automatically.
+- Stores active automatic settings, rollback snapshots, state, and an append-only
+  JSONL change ledger under `logs/strategy_optimizer/`. This directory is mounted
+  from the Pi host, so experiments survive container rebuilds without dirtying git.
+- Shows baseline and experiment progress, active versions, every keep/revert, and
+  the complete lever catalog on `/strategy-review`.
+
+Automatic levers currently include the morning-candidate threshold, confirmation
+threshold, first and second profit targets, protective stop, and maximum holding
+period. Capital reserve, portfolio heat, slippage, position sizing, daily purchase
+limits, and concentration limits remain human-controlled safeguards.
 
 The Friday review is read-only and reports whether each change should be kept,
 reverted, or watched. It does not edit the strategy.

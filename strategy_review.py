@@ -13,6 +13,7 @@ from nav_html import finalize_page_html
 from scanner_config import WATCHLIST_EXPORT_DIR, ensure_directories
 from job_storage import job_health
 from stock_storage import append_snapshot, read_latest_snapshot, read_table
+from strategy_optimizer import load_active_settings, optimizer_status, run_optimizer_cycle
 
 
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -39,7 +40,7 @@ def latest_file(pattern: str) -> Path | None:
 def current_data_suggestions() -> dict:
     """Return cautious, evidence-backed ideas without bypassing tuning gates."""
     policy = json.loads(POLICY_FILE.read_text(encoding="utf-8"))
-    settings = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+    settings = load_active_settings()
     trades = read_table("paper_trades")
     current_version = str(settings.get("version") or "unknown")
     minimum = int(policy["minimum_resolved_trades"])
@@ -149,7 +150,7 @@ def current_data_suggestions() -> dict:
 def build_review_rows(review_date: str | None = None) -> list[dict]:
     today = review_date or datetime.now().astimezone().date().isoformat()
     policy = json.loads(POLICY_FILE.read_text(encoding="utf-8"))
-    settings = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+    settings = load_active_settings()
     trades = read_table("paper_trades")
     health = app_job_health()
 
@@ -275,6 +276,38 @@ def render_strategy_review_html(rows: list[dict], review_date: str, csv_filename
     table_html = review.to_html(index=False, escape=True, border=0) if not review.empty else "<p class='empty'>No review rows yet.</p>"
     generated_at = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
     csv_link = f"<a href='/exports/{escape(csv_filename)}'>Download CSV</a>" if csv_filename else "—"
+    optimizer = optimizer_status()
+    phase_labels = {
+        "collecting_baseline": "Collecting baseline",
+        "experiment_running": "Running experiment",
+        "ready_for_next_experiment": "Experiment evaluated",
+    }
+    phase_label = phase_labels.get(str(optimizer["phase"]), str(optimizer["phase"]).replace("_", " ").title())
+    active_change = optimizer.get("active_change") or {}
+    change_summary = (
+        f"{active_change.get('label')}: {active_change.get('old_value')} → {active_change.get('new_value')}"
+        if active_change else "No lever is changing yet"
+    )
+    steps = ["60-trade baseline", "Select one lever", "25-trade experiment", "Keep or revert", "Repeat"]
+    current_step = int(optimizer.get("step", 1))
+    steps_html = "".join(
+        f"<div class='opt-step {'done' if number < current_step else 'active' if number == current_step else ''}'>"
+        f"<span>{number}</span><small>{escape(label)}</small></div>"
+        for number, label in enumerate(steps, 1)
+    )
+    history_rows = "".join(
+        f"<tr><td>{escape(str(item.get('recorded_at', '')))}</td>"
+        f"<td>{escape(str(item.get('cycle', '')))}</td><td>{escape(str(item.get('status', '')))}</td>"
+        f"<td>{escape(str(item.get('area', '')))}</td><td>{escape(str(item.get('lever', '')))}</td>"
+        f"<td>{escape(str(item.get('old_value', '')))} → {escape(str(item.get('new_value', '')))}</td>"
+        f"<td class='wrap'>{escape(str(item.get('rationale', '')))}</td></tr>"
+        for item in optimizer.get("history", [])
+    ) or "<tr><td colspan='7'>No automatic experiments have started.</td></tr>"
+    lever_rows = "".join(
+        f"<tr><td>{escape(str(item['area']))}</td><td><b>{escape(str(item['label']))}</b></td>"
+        f"<td><code>{escape(str(item['key']))}</code></td><td class='wrap'>{escape(str(item['reason']))}</td></tr>"
+        for item in optimizer.get("levers", [])
+    )
 
     return f"""<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
 <title>Strategy review · {escape(review_date)}</title><style>
@@ -323,6 +356,19 @@ main{{max-width:1280px;margin:0 auto;padding:28px 20px 64px}}
 .suggestion-head{{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:7px}}
 .suggestion-head strong{{font-size:14px}}.confidence{{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--blue);background:#eff6ff;padding:4px 7px;border-radius:999px}}
 .suggestion p{{margin:4px 0;color:var(--muted);line-height:1.45}}.suggestion .change{{color:var(--text)}}
+.optimizer-head{{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}}
+.optimizer-head h3{{margin:0 0 4px}}.optimizer-head .state{{font-size:18px;font-weight:750;color:var(--blue)}}
+.progress-track{{height:12px;border-radius:999px;background:#e8edf4;overflow:hidden;margin:18px 0 8px}}
+.progress-fill{{height:100%;border-radius:inherit;background:linear-gradient(90deg,#2563eb,#16a34a);transition:width .3s}}
+.progress-caption{{display:flex;justify-content:space-between;color:var(--muted);font-size:12px}}
+.opt-steps{{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:20px 0}}
+.opt-step{{display:flex;align-items:center;gap:8px;padding:9px;border:1px solid var(--line);border-radius:9px;color:var(--muted)}}
+.opt-step span{{display:grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#e8edf4;font-size:11px;font-weight:800;flex:none}}
+.opt-step.active{{border-color:#93b4ea;background:#f4f8ff;color:var(--blue)}}.opt-step.active span{{background:var(--blue);color:white}}
+.opt-step.done{{color:var(--green);background:#f4fbf6}}.opt-step.done span{{background:var(--green);color:white}}
+.opt-meta{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}}
+.opt-meta div{{background:#f7f9fc;border-radius:9px;padding:11px}}.opt-meta small{{display:block;color:var(--muted);margin-bottom:4px}}
+.wrap{{white-space:normal;min-width:220px;line-height:1.4}}code{{font-size:11px}}
 .empty{{color:var(--muted);padding:12px 0}}
 .hidden{{display:none}}
 table{{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}}
@@ -330,8 +376,8 @@ th,td{{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vert
 th{{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}}
 tbody tr:last-child td{{border-bottom:0}}
 a{{color:var(--blue)}}
-@media(max-width:900px){{.cards,.bc-grid{{grid-template-columns:repeat(2,1fr)}}}}
-@media(max-width:560px){{.cards,.bc-grid{{grid-template-columns:1fr}}main{{padding:16px}}}}
+@media(max-width:900px){{.cards,.bc-grid{{grid-template-columns:repeat(2,1fr)}}.opt-steps{{grid-template-columns:1fr 1fr}}}}
+@media(max-width:560px){{.cards,.bc-grid,.opt-meta{{grid-template-columns:1fr}}main{{padding:16px}}.opt-steps{{grid-template-columns:1fr}}}}
 </style></head><body>
 <header>
   <div class='hdr-left'><h1>Stock Strategy App</h1></div>
@@ -347,12 +393,35 @@ a{{color:var(--blue)}}
     <button class='btn-analyze' id='analyze-now' type='button'>Analyze now</button>
   </div>
   <div class='decision {decision_status}'><span class='decision-dot'></span>{decision_value}</div>
+  <div class='panel'>
+    <div class='optimizer-head'>
+      <div><h3>Continuous optimization · cycle {optimizer['cycle']}</h3><div class='state'>{escape(phase_label)}</div></div>
+      <div class='sub'>{escape(change_summary)}</div>
+    </div>
+    <div class='progress-track'><div class='progress-fill' style='width:{optimizer['progress_pct']}%'></div></div>
+    <div class='progress-caption'><span>{optimizer['completed']} resolved trades</span><b>{optimizer['progress_pct']}%</b><span>Target {optimizer['target']}</span></div>
+    <div class='opt-steps'>{steps_html}</div>
+    <div class='opt-meta'>
+      <div><small>Active strategy</small><b>{escape(str(optimizer.get('active_version') or '—'))}</b></div>
+      <div><small>Baseline</small><b>{escape(str(optimizer.get('baseline_version') or '—'))}</b></div>
+      <div><small>Latest result</small><b>{escape(str(optimizer.get('last_result') or 'Waiting'))}</b></div>
+    </div>
+    {_note(str(optimizer.get('last_result_reason') or active_change.get('reason') or 'The first experiment begins after 60 clean resolved trades.'))}
+  </div>
   <section class='cards'>{cards_html}</section>
   <div id='best-case-panel' class='panel hidden'>
     <div class='panel-head'><h3>Current-data analysis</h3><span class='sub' id='bc-assumption'></span></div>
     <div class='suggestions' id='strategy-suggestions'></div>
     <div class='bc-grid' id='bc-summary'></div>
     <table class='bc-table'><thead><tr><th>Ticker</th><th>Status</th><th>Current P/L</th><th>Best-case P/L</th><th>Uplift</th><th>Notes</th></tr></thead><tbody id='bc-positions'></tbody></table>
+  </div>
+  <div class='panel'>
+    <div class='panel-head'><h3>Optimizer change ledger</h3><span class='sub'>Every automatic start, keep, and revert</span></div>
+    <table><thead><tr><th>Recorded</th><th>Cycle</th><th>Status</th><th>Area</th><th>Lever</th><th>Change</th><th>Evidence / rationale</th></tr></thead><tbody>{history_rows}</tbody></table>
+  </div>
+  <div class='panel'>
+    <div class='panel-head'><h3>Documented optimization levers</h3><span class='sub'>Only one lever changes per experiment</span></div>
+    <table><thead><tr><th>Area</th><th>Lever</th><th>Settings path</th><th>What it tests</th></tr></thead><tbody>{lever_rows}</tbody></table>
   </div>
   <div class='panel'>
     <div class='panel-head'><h3>Full review data</h3><span class='sub'>{csv_link}</span></div>
@@ -401,6 +470,11 @@ document.getElementById('analyze-now').onclick=async()=>{{
 def main() -> int:
     ensure_directories()
     today = datetime.now().astimezone().date().isoformat()
+    optimizer = run_optimizer_cycle()
+    print(
+        f"Optimizer {optimizer['phase']}: {optimizer['completed']}/{optimizer['target']} "
+        f"resolved trades in cycle {optimizer['cycle']}"
+    )
     rows = build_review_rows(today)
     review = pd.DataFrame(rows)
     append_snapshot("strategy_reviews", review, "stored_review_date", today)

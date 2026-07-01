@@ -30,7 +30,6 @@ from scanner_config import (
     CANDIDATES_FILE,
     DASHBOARD_FILE,
     FIRST_TARGET_GAIN_PCT,
-    MIN_CONFIRMATION_SCORE_TO_BUY,
     PIPELINE_STATE_FILE,
     RUNNER_EXIT_SESSIONS,
     SECOND_TARGET_GAIN_PCT,
@@ -42,6 +41,7 @@ from platform_health import codex_chat, platform_health_payload
 from nav_html import finalize_page_html
 from strategy_review import current_data_suggestions, load_latest_review_rows, render_strategy_review_html
 from best_case_analysis import compute_best_case
+from strategy_optimizer import load_active_settings
 from morning_candidates import build_morning_candidates, preview_rows
 from home_controls import (
     home_assistant_door_control,
@@ -1757,6 +1757,9 @@ def scanner_confirmation_status(
                 confirmation_by_ticker[ticker] = record
     confirmation_finished = bool(confirmation_by_ticker)
 
+    confirmation_threshold = int(
+        load_active_settings().get("selection", {}).get("confirmation_buy_min_score", 40)
+    )
     output_rows = []
     for row in rows:
         output = dict(row)
@@ -1771,7 +1774,7 @@ def scanner_confirmation_status(
                 score = 0
             band = str(confirmation.get("confirmation_band") or "").strip()
             detail = " · ".join(value for value in (band, str(score)) if value)
-            label = "Confirmed" if score >= MIN_CONFIRMATION_SCORE_TO_BUY else "Below threshold"
+            label = "Confirmed" if score >= confirmation_threshold else "Below threshold"
             output[status_column] = f"{label} · {detail}" if detail else label
         output_rows.append(output)
     return output_columns, output_rows

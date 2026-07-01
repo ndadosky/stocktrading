@@ -10,6 +10,34 @@ import strategy_review
 
 
 class StrategyCohortReviewTests(unittest.TestCase):
+    def test_strategy_page_renders_optimizer_progress_and_ledger(self) -> None:
+        status = {
+            "phase": "experiment_running", "step": 3, "completed": 10, "target": 25,
+            "progress_pct": 40.0, "cycle": 2, "active_version": "auto-002",
+            "baseline_version": "auto-001", "candidate_version": "auto-002",
+            "active_change": {
+                "label": "Confirmation threshold", "old_value": 40, "new_value": 45,
+                "reason": "Test stronger confirmation.",
+            },
+            "last_result": "kept", "last_result_reason": "Expectancy improved.",
+            "history": [{
+                "recorded_at": "2026-07-01T10:30:00-04:00", "cycle": 2,
+                "status": "started", "area": "Entry", "lever": "selection.confirmation",
+                "old_value": 40, "new_value": 45, "rationale": "Test stronger confirmation.",
+            }],
+            "levers": [{
+                "area": "Entry", "label": "Confirmation threshold",
+                "key": "selection.confirmation", "reason": "Test stronger confirmation.",
+            }],
+        }
+        with patch.object(strategy_review, "optimizer_status", return_value=status):
+            html = strategy_review.render_strategy_review_html([], "2026-07-01")
+
+        self.assertIn("Continuous optimization · cycle 2", html)
+        self.assertIn("10 resolved trades", html)
+        self.assertIn("Optimizer change ledger", html)
+        self.assertIn("Documented optimization levers", html)
+
     def test_analyze_now_suggests_entry_review_from_current_losses(self) -> None:
         current_version = json.loads(
             strategy_review.SETTINGS_FILE.read_text(encoding="utf-8")
