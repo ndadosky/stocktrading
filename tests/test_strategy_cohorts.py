@@ -10,6 +10,34 @@ import strategy_review
 
 
 class StrategyCohortReviewTests(unittest.TestCase):
+    def test_analyze_now_suggests_entry_review_from_current_losses(self) -> None:
+        current_version = json.loads(
+            strategy_review.SETTINGS_FILE.read_text(encoding="utf-8")
+        )["version"]
+        trades = pd.DataFrame([
+            {
+                "remaining_shares": 0, "shares_sold_10": 0, "initial_cost": 1000,
+                "realized_p_l": -50, "entry_strategy_version": current_version,
+                "strategy_changed_mid_trade": False, "confirmation_band": "B",
+                "exit_reason": "STOP -5%",
+            },
+            {
+                "remaining_shares": 0, "shares_sold_10": 0, "initial_cost": 1000,
+                "realized_p_l": -40, "entry_strategy_version": current_version,
+                "strategy_changed_mid_trade": False, "confirmation_band": "B",
+                "exit_reason": "STOP -5%",
+            },
+        ])
+
+        with patch.object(strategy_review, "read_table", return_value=trades):
+            result = strategy_review.current_data_suggestions()
+
+        self.assertEqual(result["sample"]["resolved"], 2)
+        self.assertEqual(result["sample"]["confidence"], "early signal")
+        titles = [suggestion["title"] for suggestion in result["suggestions"]]
+        self.assertIn("Test stricter entry selection", titles)
+        self.assertIn("Investigate stop-outs by entry quality", titles)
+
     def test_review_uses_clean_current_cohort_and_reports_mixed_trades(self) -> None:
         current_version = json.loads(
             strategy_review.SETTINGS_FILE.read_text(encoding="utf-8")

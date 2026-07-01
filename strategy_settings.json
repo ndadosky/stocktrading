@@ -2,6 +2,12 @@
   "version": "selective-growth-v7",
   "baseline": "strategy_baseline.json",
   "success_definition": "Reached +5% first target before -5% stop",
+  "selection": {
+    "morning_monitor_min_score": 26,
+    "morning_candidate_min_score": 35,
+    "morning_buy_min_score": 42,
+    "confirmation_buy_min_score": 40
+  },
   "morning_weights": {
     "early_weekly_momentum": 8,
     "controlled_daily_move": 6,

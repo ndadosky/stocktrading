@@ -11,7 +11,8 @@ import yfinance as yf
 
 from scanner_config import (
     CANDIDATES_FILE, CONFIRMATION_WEIGHTS, FIRST_TARGET_GAIN_PCT,
-    SECOND_TARGET_GAIN_PCT, STOP_LOSS_PCT, WATCHLIST_EXPORT_DIR, ensure_directories,
+    MIN_CONFIRMATION_SCORE_TO_BUY, SECOND_TARGET_GAIN_PCT, STOP_LOSS_PCT,
+    WATCHLIST_EXPORT_DIR, ensure_directories,
 )
 from pipeline_health import market_gate, record_stage, require_today_snapshot
 from stock_storage import append_snapshot
@@ -73,7 +74,7 @@ def confirm_ticker(ticker: str) -> Optional[dict]:
             score += weight; notes.append(note)
     if vs_open > 8:
         score += CONFIRMATION_WEIGHTS["too_extended_penalty"]; notes.append("too extended")
-    signal = "🔥 BUY TODAY" if score >= 40 else "👀 WAIT" if score >= 25 else "🔴 PASS"
+    signal = "🔥 BUY TODAY" if score >= MIN_CONFIRMATION_SCORE_TO_BUY else "👀 WAIT" if score >= 25 else "🔴 PASS"
     return {
         "ticker": ticker, "session_date": str(latest_date),
         "confirmed_at": session.index[-1].isoformat(), "open": round(open_price, 4),
@@ -168,7 +169,7 @@ def main() -> int:
                     "confirmation_band": "A" if result["score"] >= 50 else "B" if result["score"] >= 40 else "C" if result["score"] >= 25 else "D",
                     **regime,
                 })
-                result.update(live_quote(ticker) if result["score"] >= 40 else {
+                result.update(live_quote(ticker) if result["score"] >= MIN_CONFIRMATION_SCORE_TO_BUY else {
                     "bid": pd.NA, "ask": pd.NA, "bid_ask_spread_pct": pd.NA, "quote_source": "NOT REQUESTED"
                 })
                 results.append(result)

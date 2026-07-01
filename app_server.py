@@ -40,7 +40,7 @@ from scanner_config import (
 from stock_storage import add_bankroll_deposit, bankroll_base, query_rows, snapshot_count, table_count, total_bankroll_deposits
 from platform_health import codex_chat, platform_health_payload
 from nav_html import finalize_page_html
-from strategy_review import load_latest_review_rows, render_strategy_review_html
+from strategy_review import current_data_suggestions, load_latest_review_rows, render_strategy_review_html
 from best_case_analysis import compute_best_case
 from morning_candidates import build_morning_candidates, preview_rows
 from home_controls import (
@@ -2158,7 +2158,9 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_json(settings_payload())
             return
         elif path == "/api/strategy/best-case":
-            self.send_json(compute_best_case())
+            result = compute_best_case()
+            result.update(current_data_suggestions())
+            self.send_json(result)
             return
         super().do_GET()
 

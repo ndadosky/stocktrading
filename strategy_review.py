@@ -36,6 +36,116 @@ def latest_file(pattern: str) -> Path | None:
     return files[-1] if files else None
 
 
+def current_data_suggestions() -> dict:
+    """Return cautious, evidence-backed ideas without bypassing tuning gates."""
+    policy = json.loads(POLICY_FILE.read_text(encoding="utf-8"))
+    settings = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+    trades = read_table("paper_trades")
+    current_version = str(settings.get("version") or "unknown")
+    minimum = int(policy["minimum_resolved_trades"])
+
+    if trades.empty:
+        return {
+            "sample": {"resolved": 0, "minimum": minimum, "strategy_version": current_version},
+            "suggestions": [{
+                "confidence": "insufficient data",
+                "title": "Keep the current settings",
+                "evidence": "There are no resolved trades in the current strategy cohort yet.",
+                "change": "Collect resolved trades before evaluating an adjustment.",
+            }],
+        }
+
+    remaining = pd.to_numeric(trades.get("remaining_shares"), errors="coerce").fillna(0)
+    resolved = trades[remaining.le(0)].copy()
+    if "entry_strategy_version" not in resolved:
+        resolved["entry_strategy_version"] = "legacy-unversioned"
+    changed = resolved.get(
+        "strategy_changed_mid_trade", pd.Series(False, index=resolved.index)
+    ).astype(str).str.lower().isin({"1", "true", "yes"})
+    cohort = resolved[
+        resolved["entry_strategy_version"].astype(str).eq(current_version) & ~changed
+    ].copy()
+    count = len(cohort)
+    confidence = "decision-ready" if count >= minimum else "early signal"
+
+    suggestions: list[dict] = []
+    if not count:
+        suggestions.append({
+            "confidence": "insufficient data",
+            "title": "Keep the current settings",
+            "evidence": f"Historical trades exist, but none are clean {current_version} trades.",
+            "change": "Wait for resolved trades entered under the current strategy.",
+        })
+    else:
+        cost = pd.to_numeric(
+            cohort.get("initial_cost", pd.Series(pd.NA, index=cohort.index)), errors="coerce"
+        )
+        pnl = pd.to_numeric(
+            cohort.get("realized_p_l", pd.Series(0, index=cohort.index)), errors="coerce"
+        ).fillna(0)
+        returns = (pnl / cost.replace(0, pd.NA) * 100).dropna()
+        wins = pnl[pnl.gt(0)]
+        losses = pnl[pnl.lt(0)]
+        profit_factor = float(wins.sum() / abs(losses.sum())) if not losses.empty else None
+        expectancy = float(returns.mean()) if not returns.empty else 0.0
+        hit = pd.to_numeric(
+            cohort.get("shares_sold_10", pd.Series(0, index=cohort.index)), errors="coerce"
+        ).fillna(0).gt(0).mean() * 100
+
+        if expectancy <= 0 or (profit_factor is not None and profit_factor < 1):
+            pf_text = "∞" if profit_factor is None else f"{profit_factor:.2f}"
+            suggestions.append({
+                "confidence": confidence,
+                "title": "Test stricter entry selection",
+                "evidence": f"Current-cohort expectancy is {expectancy:+.2f}% and profit factor is {pf_text} across {count} trades.",
+                "change": "Backtest a higher confirmation threshold or exclude the weakest score band; do not change the live rule yet if this is still an early signal.",
+            })
+        else:
+            pf_text = "no gross losses yet" if profit_factor is None else f"profit factor {profit_factor:.2f}"
+            suggestions.append({
+                "confidence": confidence,
+                "title": "Keep the core exit and risk rules for now",
+                "evidence": f"Current-cohort expectancy is {expectancy:+.2f}% with {pf_text}; {hit:.1f}% reached the first target across {count} trades.",
+                "change": "Continue collecting trades; use score-band evidence for the next entry-rule experiment.",
+            })
+
+        if "confirmation_band" in cohort:
+            band_frame = cohort.assign(_return=(pnl / cost.replace(0, pd.NA) * 100)).groupby(
+                "confirmation_band", dropna=False
+            ).agg(resolved=("confirmation_band", "size"), average_return=("_return", "mean")).reset_index()
+            eligible = band_frame[band_frame["resolved"].ge(3)].dropna(subset=["average_return"])
+            if len(eligible) >= 2:
+                best = eligible.sort_values("average_return", ascending=False).iloc[0]
+                worst = eligible.sort_values("average_return").iloc[0]
+                suggestions.append({
+                    "confidence": confidence,
+                    "title": f"Favor {best['confirmation_band']} over {worst['confirmation_band']} candidates",
+                    "evidence": f"Band {best['confirmation_band']} averages {best['average_return']:+.2f}% over {int(best['resolved'])} trades versus {worst['average_return']:+.2f}% over {int(worst['resolved'])} for {worst['confirmation_band']}.",
+                    "change": f"Backtest raising the minimum accepted band above {worst['confirmation_band']} or reducing allocation to that band.",
+                })
+
+        reasons = cohort.get("exit_reason", pd.Series("", index=cohort.index)).fillna("").astype(str)
+        stop_rate = reasons.str.contains("STOP", case=False).mean() * 100
+        if stop_rate >= 40:
+            suggestions.append({
+                "confidence": confidence,
+                "title": "Investigate stop-outs by entry quality",
+                "evidence": f"{stop_rate:.1f}% of the {count} current-cohort exits were stop-related.",
+                "change": "Compare stopped trades by score, spread, and opening extension before considering a wider stop; widening the stop alone increases risk.",
+            })
+
+    return {
+        "sample": {
+            "resolved": count,
+            "minimum": minimum,
+            "remaining": max(0, minimum - count),
+            "strategy_version": current_version,
+            "confidence": confidence,
+        },
+        "suggestions": suggestions,
+    }
+
+
 def build_review_rows(review_date: str | None = None) -> list[dict]:
     today = review_date or datetime.now().astimezone().date().isoformat()
     policy = json.loads(POLICY_FILE.read_text(encoding="utf-8"))
@@ -208,6 +318,11 @@ main{{max-width:1280px;margin:0 auto;padding:28px 20px 64px}}
 .bc-table{{width:100%;border-collapse:collapse;font-size:13px}}
 .bc-table th,.bc-table td{{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}}
 .bc-table th{{color:var(--muted);font-size:11px;text-transform:uppercase}}
+.suggestions{{display:grid;gap:10px;margin-bottom:18px}}
+.suggestion{{border:1px solid var(--line);border-radius:10px;padding:14px;background:#fbfcfe}}
+.suggestion-head{{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:7px}}
+.suggestion-head strong{{font-size:14px}}.confidence{{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--blue);background:#eff6ff;padding:4px 7px;border-radius:999px}}
+.suggestion p{{margin:4px 0;color:var(--muted);line-height:1.45}}.suggestion .change{{color:var(--text)}}
 .empty{{color:var(--muted);padding:12px 0}}
 .hidden{{display:none}}
 table{{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}}
@@ -234,7 +349,8 @@ a{{color:var(--blue)}}
   <div class='decision {decision_status}'><span class='decision-dot'></span>{decision_value}</div>
   <section class='cards'>{cards_html}</section>
   <div id='best-case-panel' class='panel hidden'>
-    <div class='panel-head'><h3>Best-case analysis</h3><span class='sub' id='bc-assumption'></span></div>
+    <div class='panel-head'><h3>Current-data analysis</h3><span class='sub' id='bc-assumption'></span></div>
+    <div class='suggestions' id='strategy-suggestions'></div>
     <div class='bc-grid' id='bc-summary'></div>
     <table class='bc-table'><thead><tr><th>Ticker</th><th>Status</th><th>Current P/L</th><th>Best-case P/L</th><th>Uplift</th><th>Notes</th></tr></thead><tbody id='bc-positions'></tbody></table>
   </div>
@@ -256,7 +372,13 @@ document.getElementById('analyze-now').onclick=async()=>{{
     const data=await res.json();
     if(!data.ok){{alert(data.error||'Analysis failed');return;}}
     panel.classList.remove('hidden');
-    document.getElementById('bc-assumption').textContent=data.assumption||'';
+    const sample=data.sample||{{}};
+    document.getElementById('bc-assumption').textContent=sample.resolved<sample.minimum
+      ? `${{sample.resolved||0}} of ${{sample.minimum||60}} current-strategy trades — suggestions are provisional`
+      : `${{sample.resolved}} current-strategy trades — tuning threshold met`;
+    document.getElementById('strategy-suggestions').innerHTML=(data.suggestions||[]).map(s=>`<div class="suggestion">
+      <div class="suggestion-head"><strong>${{s.title}}</strong><span class="confidence">${{s.confidence}}</span></div>
+      <p><b>Evidence:</b> ${{s.evidence}}</p><p class="change"><b>Possible change:</b> ${{s.change}}</p></div>`).join('');
     const c=data.current,b=data.best_case;
     document.getElementById('bc-summary').innerHTML=
       `<div class="bc-card"><small>Current equity</small><strong>${{money(c.equity)}}</strong></div>`+

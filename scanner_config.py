@@ -33,23 +33,27 @@ DASHBOARD_FILE = Path(
 ).expanduser().resolve()
 PIPELINE_STATE_FILE = WATCHLIST_EXPORT_DIR / "pipeline_state.json"
 
-MIN_SCORE_FOR_MONITOR = 26
-MIN_SCORE_FOR_CANDIDATE = 35
-MIN_SCORE_FOR_BUY_NEXT_SESSION = 42
-MIN_CONFIRMATION_SCORE_TO_BUY = 40
 STARTING_CAPITAL = float(os.getenv("STOCK_STARTING_CAPITAL", "25000"))
 STRATEGY_BASELINE_FILE = PROJECT_DIR / "strategy_baseline.json"
 STRATEGY_SETTINGS_FILE = PROJECT_DIR / "strategy_settings.json"
+RUNTIME_STRATEGY_SETTINGS_FILE = Path(
+    os.getenv("STOCK_RUNTIME_STRATEGY_SETTINGS", LOGS_DIR / "strategy_optimizer" / "active_settings.json")
+).expanduser().resolve()
 
 
 def load_strategy_settings() -> dict:
     """Load active, versioned strategy controls without mutating the baseline."""
-    with STRATEGY_SETTINGS_FILE.open(encoding="utf-8") as handle:
+    source = RUNTIME_STRATEGY_SETTINGS_FILE if RUNTIME_STRATEGY_SETTINGS_FILE.exists() else STRATEGY_SETTINGS_FILE
+    with source.open(encoding="utf-8") as handle:
         return json.load(handle)
 
 
 STRATEGY = load_strategy_settings()
 STRATEGY_VERSION = str(STRATEGY["version"])
+MIN_SCORE_FOR_MONITOR = int(STRATEGY.get("selection", {}).get("morning_monitor_min_score", 26))
+MIN_SCORE_FOR_CANDIDATE = int(STRATEGY.get("selection", {}).get("morning_candidate_min_score", 35))
+MIN_SCORE_FOR_BUY_NEXT_SESSION = int(STRATEGY.get("selection", {}).get("morning_buy_min_score", 42))
+MIN_CONFIRMATION_SCORE_TO_BUY = int(STRATEGY.get("selection", {}).get("confirmation_buy_min_score", 40))
 MORNING_WEIGHTS = STRATEGY["morning_weights"]
 CONFIRMATION_WEIGHTS = STRATEGY["confirmation_weights"]
 FIRST_TARGET_GAIN_PCT = float(STRATEGY["risk"]["scale_out"]["first_target_gain_pct"])
